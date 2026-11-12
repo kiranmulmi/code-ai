@@ -8,6 +8,7 @@ import {
   CrossIcon,
   DotsVerticalIcon,
   FilePlusIcon,
+  FolderIcon,
   FolderPlusIcon,
   RefreshIcon,
   SearchIcon,
@@ -15,11 +16,19 @@ import {
 import { useToast } from '../../../lib/toast';
 import type { AsyncResource } from '../../../lib/useAsync';
 import { PanelMessage } from '../PanelMessage';
-import { createEntry, deleteEntry, fetchFileContent, renameEntry, saveFile } from './api';
+import {
+  createEntry,
+  deleteEntry,
+  fetchFileContent,
+  renameEntry,
+  revealEntry,
+  saveFile,
+} from './api';
 import { FilePreview } from './FilePreview';
 import { FileSearchResults } from './FileSearchResults';
 import { FileTree } from './FileTree';
 import { RowMenu } from '../../../components/RowMenu';
+import { REVEAL_LABEL } from './revealLabel';
 import { useFileSearch } from './useFileSearch';
 
 const MODES: { id: FileSearchMode; label: string; hint: string }[] = [
@@ -100,6 +109,15 @@ export function FilesPanel({
     } catch (cause) {
       toast(errorMessage(cause, "Couldn't rename it."), 'error');
       throw cause;
+    }
+  };
+
+  /** In Finder / File Explorer on this machine ('' is the workspace folder). */
+  const revealInSystem = async (entryPath: string) => {
+    try {
+      await revealEntry(workspaceId, { path: entryPath });
+    } catch (cause) {
+      toast(errorMessage(cause, "Couldn't open the file manager."), 'error');
     }
   };
 
@@ -217,10 +235,10 @@ export function FilesPanel({
           <div className="relative shrink-0">
             <IconButton
               onClick={() => setIsAddMenuOpen((open) => !open)}
-              aria-label="New file or folder"
+              aria-label="More for the workspace folder"
               aria-haspopup="menu"
               aria-expanded={isAddMenuOpen}
-              title="New file, new folder"
+              title={`New file, new folder, ${REVEAL_LABEL}`}
             >
               <DotsVerticalIcon />
             </IconButton>
@@ -236,6 +254,11 @@ export function FilesPanel({
                     label: 'New folder',
                     icon: <FolderPlusIcon size={13} />,
                     onSelect: () => startCreating('', 'folder'),
+                  },
+                  {
+                    label: REVEAL_LABEL,
+                    icon: <FolderIcon size={13} />,
+                    onSelect: () => void revealInSystem(''),
                   },
                 ]}
                 onClose={closeAddMenu}
@@ -277,6 +300,7 @@ export function FilesPanel({
               onCreate={create}
               onCancelCreate={cancelCreate}
               onDelete={(path, kind) => setPendingDelete({ path, kind })}
+              onReveal={(path) => void revealInSystem(path)}
             />
           </div>
         )}

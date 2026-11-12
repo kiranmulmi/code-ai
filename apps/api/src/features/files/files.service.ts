@@ -28,6 +28,7 @@ import {
   ValidationError,
 } from '../../lib/errors.js';
 import { runGit } from '../git/run-git.js';
+import { revealInFileManager } from './reveal.js';
 import type { WorkspacesService } from '../workspaces/workspaces.service.js';
 
 /** Enough for most projects; past it, the deepest files are the ones left out (see walk.ts). */
@@ -244,6 +245,22 @@ export function createFilesService(workspaces: WorkspacesService) {
       const stat = await fs.lstat(entry);
       if (stat.isDirectory()) await fs.rm(entry, { recursive: true });
       else await fs.unlink(entry);
+    },
+
+    /**
+     * Shows a file or folder (an empty path: the workspace folder) selected in the system's
+     * file manager. Read-only, so `.git` is fine; still only inside the workspace.
+     */
+    async reveal(workspaceId: string, requested: string): Promise<void> {
+      const { path } = await workspaces.require(workspaceId);
+      const target = await resolve(path, requested);
+      const stat = await fs.stat(target).catch(() => null);
+      if (!stat) {
+        throw new NotFoundError(
+          `${requested || 'The workspace folder'} no longer exists. Refresh the list.`,
+        );
+      }
+      await revealInFileManager(target, stat.isDirectory());
     },
   };
 }

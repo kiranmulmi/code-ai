@@ -66,6 +66,14 @@ export type FileRename = z.infer<typeof fileRenameSchema>;
 /** DELETE /v1/workspaces/:id/files?path=: a file, or a folder and everything in it. */
 export const fileDeleteQuerySchema = z.object({ path: entryPath });
 
+/**
+ * POST /v1/workspaces/:id/files/reveal: show a file or folder in the system's file manager
+ * (Finder, File Explorer, ...), selected there. An empty path is the workspace folder.
+ */
+export const fileRevealSchema = z.object({ path: z.string().trim().max(LIMITS.folderPath) });
+
+export type FileReveal = z.infer<typeof fileRevealSchema>;
+
 export interface CreatedEntry {
   /** relative to the workspace folder, with "/" separators */
   path: string;

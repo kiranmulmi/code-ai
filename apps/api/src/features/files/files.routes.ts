@@ -4,6 +4,7 @@ import {
   fileCreateSchema,
   fileDeleteQuerySchema,
   fileRenameSchema,
+  fileRevealSchema,
   fileSearchQuerySchema,
   fileWriteSchema,
 } from '@app/shared';
@@ -71,6 +72,16 @@ export function filesRouter(files: FilesService): Router {
     asyncHandler(async (req, res) => {
       const { path } = parse(fileDeleteQuerySchema, req.query);
       await files.remove(param(req, 'workspaceId'), path);
+      res.status(204).end();
+    }),
+  );
+
+  /** Shows a file or folder in Finder / File Explorer on this machine (the user's own screen). */
+  router.post(
+    '/workspaces/:workspaceId/files/reveal',
+    asyncHandler(async (req, res) => {
+      const { path } = parse(fileRevealSchema, req.body);
+      await files.reveal(param(req, 'workspaceId'), path);
       res.status(204).end();
     }),
   );

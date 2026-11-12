@@ -8,6 +8,7 @@ import {
   EditIcon,
   FilePlusIcon,
   FileTintIcon,
+  FolderIcon,
   FolderOpenIcon,
   FolderPlusIcon,
   FolderTintIcon,
@@ -16,6 +17,7 @@ import {
 import { NameInput } from './NameInput';
 import { RowMenu, type RowMenuItem } from '../../../components/RowMenu';
 import { fileTint } from './fileTint';
+import { REVEAL_LABEL } from './revealLabel';
 
 interface FileNode {
   name: string;
@@ -117,7 +119,8 @@ const MENU_BUTTON =
 /**
  * The workspace's files as a folder tree. Folders toggle; files open a preview. Any row can
  * be dragged onto the message box to insert its absolute path. Each row's ⋯ menu (or a
- * right-click) renames or deletes it, and a folder's adds a new file or folder inside.
+ * right-click) renames or deletes it, shows it in the system's file manager, and a folder's
+ * adds a new file or folder inside.
  */
 export function FileTree({
   root,
@@ -130,6 +133,7 @@ export function FileTree({
   onCreateIn,
   onRename,
   onDelete,
+  onReveal,
   creating,
   onCreate,
   onCancelCreate,
@@ -149,6 +153,8 @@ export function FileTree({
   /** rejects when it couldn't be renamed (the name box stays open) */
   onRename: (path: string, newName: string) => Promise<void>;
   onDelete: (path: string, kind: FileEntryKind) => void;
+  /** shows it selected in Finder / File Explorer */
+  onReveal: (path: string) => void;
   /** a new file or folder being named: its box shows inside `parent` ('' for the top) */
   creating: { parent: string; kind: FileEntryKind } | null;
   /** rejects when it couldn't be created (the name box stays open) */
@@ -205,6 +211,7 @@ export function FileTree({
           },
         ]
       : []),
+    { label: REVEAL_LABEL, icon: <FolderIcon size={13} />, onSelect: () => onReveal(path) },
     { label: 'Rename', icon: <EditIcon size={13} />, onSelect: () => setRenaming(path) },
     {
       label: 'Delete',
@@ -223,7 +230,7 @@ export function FileTree({
         aria-label={`More for ${path}`}
         aria-haspopup="menu"
         aria-expanded={menuFor === path}
-        title="Rename, delete…"
+        title={`${REVEAL_LABEL}, rename, delete…`}
         className={`${MENU_BUTTON} ${
           menuFor === path
             ? 'bg-surface text-ink'

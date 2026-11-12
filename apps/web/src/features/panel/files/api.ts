@@ -3,6 +3,7 @@ import type {
   FileContent,
   FileCreate,
   FileRename,
+  FileReveal,
   FileSearchMode,
   FileSearchResult,
   FileWrite,
@@ -47,4 +48,9 @@ export function deleteEntry(workspaceId: string, entryPath: string): Promise<voi
   return request<void>(`${path(workspaceId)}${buildQuery({ path: entryPath })}`, {
     method: 'DELETE',
   });
+}
+
+/** Shows it selected in the system's file manager ('' is the workspace folder). */
+export function revealEntry(workspaceId: string, input: FileReveal): Promise<void> {
+  return request<void>(`${path(workspaceId)}/reveal`, jsonBody('POST', input));
 }
