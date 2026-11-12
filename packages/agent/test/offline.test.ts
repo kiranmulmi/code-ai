@@ -819,14 +819,42 @@ test('streamed text is passed on as text_delta events in order', async () => {
     'model_call',
     'text:Let me ',
     'text:check.',
+    'usage',
     'context',
     'tool_call',
     'tool_result',
     'model_call',
     'text:It is ',
     'text:4.',
+    'usage',
     'context',
   ]);
+});
+
+test('each model call reports the run tokens so far as a usage event', async () => {
+  const setup = await tempSetup();
+  const events: AgentEvent[] = [];
+  const { callModel } = scriptedModel([
+    callTools(toolCall('t1', 'calculator', { expression: '2+2' })),
+    answer('It is 4.'),
+  ]);
+  const agent = createAgent({
+    ...setup,
+    callModel,
+    logger: silentLogger,
+    config: { planning: 'off' },
+    onEvent: (e) => events.push(e),
+  });
+  const result = await agent.run('2+2?');
+  const live = events.flatMap((e) => (e.type === 'usage' ? [e] : []));
+  assert.deepEqual(
+    live.map((e) => [e.steps, e.usage.inputTokens, e.usage.outputTokens]),
+    [
+      [1, 10, 5],
+      [2, 20, 10],
+    ],
+  );
+  assert.deepEqual(live.at(-1)?.usage, result.usage, 'the last one matches the result');
 });
 
 // ---------- Planning, checking and limits ----------

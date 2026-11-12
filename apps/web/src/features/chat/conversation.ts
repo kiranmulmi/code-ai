@@ -108,6 +108,8 @@ export type AgentTurn = {
   meta: string | null;
   /** Its tokens once it ends, for the usage breakdown (null while it runs). */
   usage: TurnUsage | null;
+  /** "2 steps · 12.3K tokens" so far, while its run works (null once it ends). */
+  liveMeta: string | null;
   /** When the reply finished (ISO), shown next to `meta`. */
   finishedAt: string | null;
 };
@@ -124,8 +126,10 @@ export type Turn = UserTurn | AgentTurn;
 export type ConversationState = {
   turns: Turn[];
   plan: PlanState;
-  /** Tokens of every finished request in this chat, summed. */
+  /** Tokens of every request in this chat, summed; the one running counts as it goes. */
   usage: Usage;
+  /** The running request's tokens so far, already in `usage` (null when none runs). */
+  runUsage: Usage | null;
   /**
    * How full the model's context window was at the last model call (null until one is made
    * after the chat opens).
@@ -154,6 +158,7 @@ export const initialConversation: ConversationState = {
   turns: [],
   plan: initialPlanState,
   usage: { inputTokens: 0, outputTokens: 0 },
+  runUsage: null,
   context: null,
   seq: 0,
 };
@@ -200,6 +205,7 @@ class Draft {
   turns: Turn[];
   seq: number;
   usage: Usage;
+  runUsage: Usage | null;
   context: ConversationState['context'];
   agent: AgentTurn | null = null;
 
@@ -207,6 +213,7 @@ class Draft {
     this.turns = [...state.turns];
     this.seq = state.seq;
     this.usage = state.usage;
+    this.runUsage = state.runUsage;
     this.context = state.context;
     const last = this.turns.at(-1);
     if (last?.role === 'agent') {
@@ -229,6 +236,7 @@ class Draft {
         status,
         meta: null,
         usage: null,
+        liveMeta: null,
         finishedAt: null,
       };
       this.turns.push(this.agent);
@@ -249,7 +257,10 @@ class Draft {
     isSteer = false,
   ): void {
     this.closeSegment(false);
-    if (this.agent) this.agent.status = null;
+    if (this.agent) {
+      this.agent.status = null;
+      this.agent.liveMeta = null;
+    }
     this.endTurn();
     this.turns.push({
       role: 'user',
@@ -508,7 +519,9 @@ class Draft {
           : result.text;
       this.addBubble(reason, true);
     }
-    this.addUsage(result.usage);
+    this.setRunUsage(result.usage);
+    this.runUsage = null;
+    agent.liveMeta = null;
     agent.meta = metaText(result.steps, result.usage);
     agent.usage = { steps: result.steps, usage: result.usage, calls: result.calls };
     agent.finishedAt = new Date(at).toISOString();
@@ -522,12 +535,30 @@ class Draft {
     };
   }
 
+  /** The running request's tokens so far: the chat's total takes in what's new since the last. */
+  setRunUsage(usage: Usage): void {
+    const before = this.runUsage;
+    this.addUsage({
+      inputTokens: usage.inputTokens - (before?.inputTokens ?? 0),
+      outputTokens: usage.outputTokens - (before?.outputTokens ?? 0),
+      cachedInputTokens: (usage.cachedInputTokens ?? 0) - (before?.cachedInputTokens ?? 0),
+    });
+    this.runUsage = usage;
+  }
+
   setStatus(status: string | null): void {
     this.ensureAgent().status = status;
   }
 
   result(state: ConversationState, plan: PlanState = state.plan): ConversationState {
-    return { turns: this.turns, seq: this.seq, usage: this.usage, context: this.context, plan };
+    return {
+      turns: this.turns,
+      seq: this.seq,
+      usage: this.usage,
+      runUsage: this.runUsage,
+      context: this.context,
+      plan,
+    };
   }
 }
 
@@ -639,6 +670,10 @@ function applyEvent(state: ConversationState, event: RunEvent, at: number): Conv
     case 'context':
       draft.context = { usedTokens: event.usedTokens, windowTokens: event.windowTokens };
       break;
+    case 'usage':
+      draft.setRunUsage(event.usage);
+      draft.ensureAgent().liveMeta = metaText(event.steps, event.usage);
+      break;
     case 'compaction':
       draft.addNote(compactionNote(event.summarizedMessages));
       break;
@@ -666,11 +701,14 @@ function applyEvent(state: ConversationState, event: RunEvent, at: number): Conv
       draft.updateApproval(event.id, { state: event.allowed ? 'allowed' : 'denied', error: null });
       draft.setStatus('Working…');
       break;
-    case 'steer':
-      // The agent read a message sent while it worked: it shows here, and the work goes on below.
+    case 'steer': {
+      // The agent read a message sent while it worked: it shows here, and the work goes on below,
+      // with the run's tokens so far.
+      const liveMeta = draft.agent?.liveMeta ?? null;
       draft.addUser(event.text, [], [], event.sentAt, true);
-      draft.ensureAgent('Thinking…');
+      draft.ensureAgent('Thinking…').liveMeta = liveMeta;
       break;
+    }
     case 'done':
       draft.finishRun(event.result, at);
       break;
@@ -719,7 +757,12 @@ export function conversationReducer(
     case 'finish': {
       const draft = new Draft(state);
       draft.closeSegment(false);
-      if (draft.agent) draft.agent.status = null;
+      // A run that ended without `done` (an error): its tokens so far stay in the chat's total.
+      draft.runUsage = null;
+      if (draft.agent) {
+        draft.agent.status = null;
+        draft.agent.liveMeta = null;
+      }
       return draft.result(state, withPhase(state.plan, 'idle', action.at));
     }
     case 'approval_sending': {

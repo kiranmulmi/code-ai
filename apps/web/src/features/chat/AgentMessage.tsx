@@ -105,6 +105,14 @@ export function AgentMessage({
     <div className="flex flex-col gap-1.5">
       {blocks}
       {turn.status && <StatusLine text={turn.status} />}
+      {turn.liveMeta && !turn.meta && (
+        <p
+          className="pl-0.5 text-[12px] tabular-nums text-ink-3"
+          title="This reply's model calls and tokens so far"
+        >
+          {turn.liveMeta}
+        </p>
+      )}
       {!turn.status && revealUpTo === null && (answer || turn.meta) && (
         <div className="-ml-1.5 flex items-center gap-1 text-[12px] text-ink-3">
           {answer && <CopyButton text={answer} label="Copy response" />}

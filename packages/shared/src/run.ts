@@ -117,6 +117,11 @@ export type AgentEvent =
   | { type: 'limit'; reason: string }
   /** After each model call: how full the model's context window was (input plus output). */
   | { type: 'context'; usedTokens: number; windowTokens: number }
+  /**
+   * After each model call (planner and summaries too): the run's tokens so far, so they show
+   * live. `steps` and `usage` count every call made, as `RunResult` does at the end.
+   */
+  | { type: 'usage'; steps: number; usage: Usage }
   /** Older messages were summarized to stay inside the context window. */
   | { type: 'compaction'; summarizedMessages: number; tokensBefore: number; tokensAfter: number }
   /**

@@ -184,6 +184,7 @@ export function createAgent(options: AgentOptions): Agent {
     return baseCallModel({ ...request, signal });
   };
   const isStopped = () => signal?.aborted === true;
+  const emit = options.onEvent ?? (() => {});
   /**
    * One model call for a request: timed, and its tokens recorded on the request's budget with
    * what they went to (`step` names a step's parts).
@@ -205,6 +206,7 @@ export function createAgent(options: AgentOptions): Agent {
       input: inputBreakdown(request, usage.inputTokens, step),
       output: outputBreakdown(message, usage.outputTokens),
     });
+    emit({ type: 'usage', steps: budget.steps, usage: budget.usage() });
     return response;
   };
   const contextWindow = contextBudget(
@@ -215,7 +217,6 @@ export function createAgent(options: AgentOptions): Agent {
   const meter = new ContextMeter();
   const logger = options.logger ?? createLogger({ level: config.logLevel, logDir: config.logDir });
   const approve = options.approve ?? createApprover(config.approval, options.ask);
-  const emit = options.onEvent ?? (() => {});
 
   const disabledTools = options.disabledTools ?? [];
   const toolset = buildToolset(options.extraTools, disabledTools);

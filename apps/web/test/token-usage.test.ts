@@ -146,3 +146,52 @@ test('breakdowns add up across requests: a result re-sent each step counts every
     { label: 'Others', tokens: 10, count: 4 },
   ]);
 });
+
+test('tokens count live while a run works, and the end does not count them twice', () => {
+  const usage = (input: number, output: number) => ({ inputTokens: input, outputTokens: output });
+  const run = (actions: ConversationAction[]) =>
+    actions.reduce(conversationReducer, initialConversation);
+  const send: ConversationAction = { type: 'send', text: 'Go', attachments: [], skills: [], at };
+  const live = (steps: number, input: number, output: number): ConversationAction => ({
+    type: 'event',
+    event: { type: 'usage', steps, usage: usage(input, output) },
+    at,
+  });
+
+  const working = run([send, live(1, 100, 10), live(2, 250, 30)]);
+  assert.equal(working.usage.inputTokens, 250);
+  assert.equal(working.usage.outputTokens, 30);
+  const reply = working.turns.at(-1);
+  assert.equal(reply?.role === 'agent' && reply.liveMeta, '2 steps · 280 tokens');
+
+  const done = conversationReducer(working, {
+    type: 'event',
+    event: {
+      type: 'done',
+      result: {
+        text: 'Done.',
+        status: 'done',
+        steps: 2,
+        toolsUsed: [],
+        usage: usage(250, 30),
+        calls: [],
+      },
+    },
+    at,
+  });
+  assert.equal(done.usage.inputTokens, 250);
+  assert.equal(done.usage.outputTokens, 30);
+  assert.equal(done.runUsage, null);
+  const finished = done.turns.at(-1);
+  assert.equal(finished?.role === 'agent' && finished.liveMeta, null);
+
+  // A run that fails keeps the tokens it spent in the chat's total.
+  const failed = run([
+    send,
+    live(1, 100, 10),
+    { type: 'fail', message: 'x' },
+    { type: 'finish', at },
+  ]);
+  assert.equal(failed.usage.inputTokens, 100);
+  assert.equal(failed.runUsage, null);
+});
