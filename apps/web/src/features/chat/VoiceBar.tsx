@@ -54,8 +54,8 @@ export function VoiceBar(props: {
   hasModel: boolean;
   isRunning: boolean;
   isStopping: boolean;
-  /** an approval card in the chat waits for a click */
-  hasPendingApproval: boolean;
+  /** what the agent waits on the user for: an approval card's click, or a question's answer */
+  waitingFor: 'approval' | 'answer' | null;
   /** the model pickers and Auto-approve, as in the message box */
   controls: ReactNode;
   /** This chat's tokens so far and the context window, shown under the bar like the message box. */
@@ -76,7 +76,7 @@ export function VoiceBar(props: {
     hasModel,
     isRunning,
     isStopping,
-    hasPendingApproval,
+    waitingFor,
     controls,
     usage,
     context,
@@ -291,15 +291,19 @@ export function VoiceBar(props: {
     else current.listen();
   }, [phase, isRunning, isSpeaking, hasQueue, disabled]);
 
-  // An approval waits: say so once.
+  // An approval or a question waits: say so once.
+  const hasPendingApproval = waitingFor !== null;
   const wasWaiting = useRef(false);
   useEffect(() => {
-    if (hasPendingApproval && !wasWaiting.current && phaseRef.current === 'replying') {
-      const line = 'I need your approval to continue. Check the screen.';
+    if (waitingFor && !wasWaiting.current && phaseRef.current === 'replying') {
+      const line =
+        waitingFor === 'answer'
+          ? 'I have a question for you. Check the screen.'
+          : 'I need your approval to continue. Check the screen.';
       speak(line, () => setCaption(line));
     }
-    wasWaiting.current = hasPendingApproval;
-  }, [hasPendingApproval, speak]);
+    wasWaiting.current = waitingFor !== null;
+  }, [waitingFor, speak]);
 
   // Leaving the chat: stop listening (useSpeechOutput stops the voice).
   useEffect(
@@ -321,7 +325,10 @@ export function VoiceBar(props: {
       ? { label: 'Listening', tone: 'coral' }
       : phase === 'replying'
         ? hasPendingApproval
-          ? { label: 'Needs your approval', tone: 'warn' }
+          ? {
+              label: waitingFor === 'answer' ? 'Needs your answer' : 'Needs your approval',
+              tone: 'warn',
+            }
           : isStopping || isQueued
             ? { label: 'Stopping', tone: 'muted' }
             : isTalking
@@ -338,7 +345,9 @@ export function VoiceBar(props: {
       : phase === 'listening'
         ? 'Pause for a second when you’re done.'
         : hasPendingApproval
-          ? 'Approve or deny it in the chat.'
+          ? waitingFor === 'answer'
+            ? 'Answer it above.'
+            : 'Approve or deny it in the chat.'
           : 'Press Interrupt to cut in.';
   const canStart = !disabled && hasModel;
   const isInCall = phase !== 'idle';

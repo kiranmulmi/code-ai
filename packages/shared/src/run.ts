@@ -4,6 +4,7 @@ import type { ChatSummary } from './chat.js';
 import { REASONING_EFFORTS } from './model.js';
 import { SKILL_LIMITS, skillNameSchema } from './skill.js';
 import type { NumberedPlanStep, Plan } from './plan.js';
+import type { QuestionAnswer, QuestionOption } from './question.js';
 
 export const RUN_STATUSES = [
   'done',
@@ -91,6 +92,16 @@ export interface ModelCallUsage extends Usage {
   input: TokenGroup[];
   /** what the output tokens went to, largest first (empty if not known) */
   output: TokenGroup[];
+  /**
+   * The server reported no tokens for this call (Cursor doesn't for a turn that ends in a tool
+   * call), so its counts are the parts counted from the text sent, not the server's.
+   */
+  isEstimated?: boolean;
+}
+
+/** The tokens of a call's parts, added up. */
+export function groupTokens(groups: readonly TokenGroup[]): number {
+  return groups.reduce((sum, group) => sum + group.tokens, 0);
 }
 
 /** How one user prompt ended. */
@@ -118,10 +129,13 @@ export type AgentEvent =
   /** After each model call: how full the model's context window was (input plus output). */
   | { type: 'context'; usedTokens: number; windowTokens: number }
   /**
-   * After each model call (planner and summaries too): the run's tokens so far, so they show
-   * live. `steps` and `usage` count every call made, as `RunResult` does at the end.
+   * The run's tokens so far, so they show live. `steps` and `usage` count every call made, as
+   * `RunResult` does at the end. Servers report a call's tokens only once it ends, so while one
+   * streams (planner and summaries too) these come with `isEstimated`: its input counted from
+   * the request up front, its output from what has streamed so far (a few times a second).
+   * The event after the call ends has the server's counts and no `isEstimated`.
    */
-  | { type: 'usage'; steps: number; usage: Usage }
+  | { type: 'usage'; steps: number; usage: Usage; isEstimated?: boolean }
   /** Older messages were summarized to stay inside the context window. */
   | { type: 'compaction'; summarizedMessages: number; tokensBefore: number; tokensAfter: number }
   /**
@@ -132,13 +146,18 @@ export type AgentEvent =
 
 /**
  * Everything `POST /v1/runs` streams, one per server-sent event as `data: <json>`.
- * `chat` comes first, then agent events and approval requests, then `done` or `error`.
+ * `chat` comes first, then agent events, approval requests and questions, then `done` or
+ * `error`.
  */
 export type StreamEvent =
   | AgentEvent
   | { type: 'chat'; chat: ChatSummary }
   | { type: 'approval'; id: string; tool: string; input: unknown }
   | { type: 'approval_closed'; id: string; allowed: boolean }
+  /** The agent asks the user (ask_user) and waits; answered with `POST /v1/questions/:id`. */
+  | { type: 'question'; id: string; question: string; options: QuestionOption[] }
+  /** Answered, skipped (by the user, or because the run stopped or the tab closed). */
+  | { type: 'question_closed'; id: string; answer: QuestionAnswer }
   | { type: 'done'; result: RunResult }
   | { type: 'error'; message: string };
 

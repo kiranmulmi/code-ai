@@ -1,9 +1,16 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
-import type { Attachment, ChatDetail, ChatSummary, ReasoningEffort } from '@app/shared';
+import type {
+  Attachment,
+  ChatDetail,
+  ChatSummary,
+  QuestionAnswer,
+  ReasoningEffort,
+} from '@app/shared';
 import { errorMessage, isNotFound } from '../../lib/api';
 import { parseStreamEvent, readEventData } from '../../lib/sse';
 import {
   decideApproval,
+  answerQuestion,
   fetchChat,
   setRunAutoApprove,
   startRun,
@@ -294,6 +301,17 @@ export function useConversation(options: Options) {
     }
   }, []);
 
+  /** Answers the question the agent is waiting on; it closes when the stream says so. */
+  const answer = useCallback(async (questionId: string, reply: QuestionAnswer) => {
+    dispatch({ type: 'question_sending', questionId });
+    try {
+      await answerQuestion(questionId, reply);
+      dispatch({ type: 'question_answered', questionId });
+    } catch (cause) {
+      dispatch({ type: 'question_failed', questionId, message: errorMessage(cause) });
+    }
+  }, []);
+
   /**
    * Applies an Auto-approve change to the chat's run in progress (this tab's, or one running
    * elsewhere), from its next approval on. Nothing to do when none is running.
@@ -360,6 +378,7 @@ export function useConversation(options: Options) {
     returned,
     stop,
     decide,
+    answer,
     changeAutoApprove,
     reset,
     reload,

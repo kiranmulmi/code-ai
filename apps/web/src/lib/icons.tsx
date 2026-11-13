@@ -382,6 +382,16 @@ export function ShieldIcon({ size = 14, ...rest }: IconProps) {
   );
 }
 
+export function QuestionIcon({ size = 16, ...rest }: IconProps) {
+  return (
+    <svg {...base(size)} {...rest}>
+      <circle cx="8" cy="8" r="6.25" />
+      <path d="M6.2 6.2a1.9 1.9 0 0 1 3.7.5c0 1.3-1.9 1.6-1.9 2.8" />
+      <circle cx="8" cy="11.4" r=".6" fill="currentColor" />
+    </svg>
+  );
+}
+
 export function ChatIcon({ size = 16, ...rest }: IconProps) {
   return (
     <svg {...base(size)} {...rest}>

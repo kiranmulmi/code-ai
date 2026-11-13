@@ -49,9 +49,9 @@ interface Scripted {
 }
 
 function scriptedModel(responses: Scripted[]) {
-  const requests: Omit<ModelRequest, 'onText'>[] = [];
+  const requests: Omit<ModelRequest, 'onText' | 'onOutput'>[] = [];
   const callModel: CallModel = async (req) => {
-    const { onText: _onText, ...rest } = req;
+    const { onText: _onText, onOutput: _onOutput, ...rest } = req;
     requests.push(structuredClone(rest));
     const next = responses.shift();
     if (!next) throw new Error('fake model ran out of responses');

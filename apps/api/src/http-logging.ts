@@ -7,8 +7,10 @@ import type { Options } from 'pino-http';
  */
 const POLLED_ROUTES = [
   /^\/v1\/info(\?|$)/,
-  // The running-tasks list (every 3 s) and an open task's output (every 1.5 s).
+  // The running-tasks list (every 10 s) and an open task's output (every 1.5 s).
   /^\/v1\/workspaces\/[^/]+\/tasks(\/[^/?]+)?(\?|$)/,
+  // The changed files for the Git diff tab and its label (every 10 s). Not a file's diff.
+  /^\/v1\/workspaces\/[^/]+\/git(\?|$)/,
 ];
 
 function isPolledRead(req: IncomingMessage): boolean {

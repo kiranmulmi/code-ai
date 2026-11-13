@@ -18,13 +18,16 @@ import { SidebarResizer } from './SidebarResizer';
 import type { useSidebarWidth } from './useSidebarWidth';
 
 /**
- * The workspace's full folder path on one line after a folder icon, its folders split by
- * chevrons. When it's wider
- * than the sidebar it scrolls sideways (no scrollbar), starting at the end so the workspace's
- * own folder shows; a fade marks the side with more.
+ * The workspace's real folder path on one line after a folder icon, as the system writes it
+ * (e.g. /Users/me/projects/app), its own folder in bold. When it's wider than the sidebar it
+ * scrolls sideways (no scrollbar), starting at the end so the workspace's own folder shows; a
+ * fade marks the side with more.
  */
 function WorkspacePath({ path }: { path: string }) {
-  const folders = path.split(/[\\/]/).filter(Boolean);
+  const trimmed = path.length > 1 ? path.replace(/[\\/]+$/, '') : path;
+  const cut = Math.max(trimmed.lastIndexOf('/'), trimmed.lastIndexOf('\\')) + 1;
+  const parent = trimmed.slice(0, cut);
+  const name = trimmed.slice(cut);
   const [edges, setEdges] = useState({ hasMoreBefore: false, hasMoreAfter: false });
   const readEdges = useCallback((node: HTMLElement) => {
     const max = node.scrollWidth - node.clientWidth;
@@ -52,17 +55,10 @@ function WorkspacePath({ path }: { path: string }) {
         ref={scroller}
         onScroll={(event) => readEdges(event.currentTarget)}
         style={{ maskImage: `linear-gradient(to right, ${fade})` }}
-        className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto whitespace-nowrap text-[11px] leading-snug tracking-tighter text-ink-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="min-w-0 flex-1 overflow-x-auto whitespace-nowrap text-[11px] leading-snug text-ink-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
-        {folders.map((folder, index) => {
-          const isLast = index === folders.length - 1;
-          return (
-            <span key={index} className="flex shrink-0 items-center gap-0.5">
-              <span className={isLast ? 'font-medium text-ink-2' : ''}>{folder}</span>
-              {!isLast && <ChevronRightIcon size={7} className="shrink-0 text-ink-4" />}
-            </span>
-          );
-        })}
+        {parent}
+        <span className="font-medium text-ink-2">{name}</span>
       </div>
     </div>
   );

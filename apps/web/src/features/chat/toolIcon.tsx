@@ -16,6 +16,7 @@ import {
   MoveIcon,
   PaperclipIcon,
   PulseIcon,
+  QuestionIcon,
   SearchIcon,
   ServerIcon,
   SkillIcon,
@@ -58,6 +59,7 @@ const TOOL_ICONS: Readonly<Record<string, Icon>> = {
   read_skill_file: SkillIcon,
   copy_skill_file: SkillIcon,
   calculator: CalculatorIcon,
+  ask_user: QuestionIcon,
   load_mcp_tools: ServerIcon,
 };
 

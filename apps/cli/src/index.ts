@@ -121,6 +121,20 @@ async function main(): Promise<void> {
   const baseOptions: AgentRunOptions = {
     config,
     ask: (question) => rl.question(question),
+    // ask_user: the options numbered; a number picks one, other text is the answer, Enter skips.
+    askUser: async ({ question, options }) => {
+      console.log(`\n${question}`);
+      options.forEach((option, i) => {
+        const about = option.description ? ` \x1b[2m- ${option.description}\x1b[0m` : '';
+        console.log(`  ${i + 1}. ${option.label}${about}`);
+      });
+      const reply = (
+        await rl.question(`Pick 1-${options.length}, type an answer, or press Enter to skip: `)
+      ).trim();
+      if (!reply) return { type: 'skipped' };
+      const picked = /^\d+$/.test(reply) ? options[Number(reply) - 1] : undefined;
+      return { type: 'answered', text: picked?.label ?? reply };
+    },
     onEvent: printer.onEvent,
   };
 

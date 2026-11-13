@@ -310,6 +310,7 @@ export function ChatScreen({
               onStop={() => void conversation.stop()}
               isStopping={conversation.isStopping}
               onDecide={(approvalId, allow) => void conversation.decide(approvalId, allow)}
+              onAnswer={(questionId, answer) => void conversation.answer(questionId, answer)}
               onReload={() => {
                 conversation.reload();
                 reloadChats();

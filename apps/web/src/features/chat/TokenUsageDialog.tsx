@@ -68,6 +68,8 @@ export function TokenUsageDialog({
   const reply = view.kind === 'reply' ? rows.find((row) => row.key === view.key) : undefined;
   if (view.kind === 'reply' && !reply) return null;
   const total = sumUsage(rows.map((row) => row.usage));
+  const shownCalls = reply ? reply.calls : rows.flatMap((row) => row.calls);
+  const hasEstimates = shownCalls.some((call) => call.isEstimated);
 
   return (
     <Modal
@@ -105,6 +107,8 @@ export function TokenUsageDialog({
           step. Input from cache was read from the model server&apos;s prompt cache and is billed
           far lower. Totals are what the model server reported; it doesn&apos;t say what each part
           cost, so the parts are counted from the text sent and scaled to those totals.
+          {hasEstimates &&
+            ' For requests marked estimated the server reported no tokens (Cursor doesn’t for a step that ends in a tool call), so their totals are counted from the text sent too.'}
         </p>
       </div>
     </Modal>
@@ -476,7 +480,10 @@ function CallsTable({
   return <div className="-mx-4 overflow-x-auto px-4 sm:-mx-5 sm:px-5">{table}</div>;
 }
 
-/** "→ read_file, edit_file · gpt-5": what the response asked for, and the model. */
+/**
+ * "→ read_file, edit_file · gpt-5": what the response asked for, the model, and "estimated"
+ * when its tokens were counted from the text, not reported by the server.
+ */
 function callDetail(call: ModelCallUsage): string {
   const reply =
     call.kind !== 'step'
@@ -484,7 +491,7 @@ function callDetail(call: ModelCallUsage): string {
       : call.toolCalls.length
         ? `→ ${call.toolCalls.join(', ')}`
         : '→ answer';
-  return [reply, call.model].filter(Boolean).join(' · ');
+  return [reply, call.model, call.isEstimated ? 'estimated' : null].filter(Boolean).join(' · ');
 }
 
 /** Each message's reply and its total, folding open to that reply's requests. */

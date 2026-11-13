@@ -40,7 +40,8 @@ export function loginShellPath(env: NodeJS.ProcessEnv = process.env): Promise<st
   return new Promise((resolve) => {
     execFile(
       shell,
-      ['-ilc', `printf '%s' "${MARKER}$PATH${MARKER}"`],
+      // Braces: `$PATH__NIMBRIO_PATH__` would be read as one (unset) variable name.
+      ['-ilc', `printf '%s' "${MARKER}\${PATH}${MARKER}"`],
       { timeout: TIMEOUT_MS, env, encoding: 'utf8' },
       (_error, stdout) => resolve(parseMarkedPath(stdout)),
     );

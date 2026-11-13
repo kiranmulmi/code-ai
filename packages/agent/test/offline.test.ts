@@ -13,9 +13,12 @@ import {
   readAgentSettings,
   type AgentEvent,
   type Attachment,
+  type QuestionAnswer,
   type Skill,
+  type UserQuestion,
 } from '@app/shared';
 import { evaluate } from '../src/tools/calculator.js';
+import { askUser } from '../src/tools/ask-user.js';
 import { Planner, parseDecision } from '../src/planner.js';
 import {
   Budget,
@@ -114,6 +117,7 @@ function toolContext(overrides: Partial<ToolContext>): ToolContext {
     skills: null,
     loadTools: null,
     tasks: null,
+    askUser: null,
     showImage: () => {},
     ...overrides,
   };
@@ -134,13 +138,17 @@ interface Scripted {
 
 /** A fake model that returns scripted responses in order and records each request. */
 function scriptedModel(responses: Scripted[]) {
-  const requests: Omit<ModelRequest, 'onText'>[] = [];
+  const requests: Omit<ModelRequest, 'onText' | 'onOutput'>[] = [];
   const callModel: CallModel = async (req) => {
-    const { onText, ...rest } = req;
+    const { onText, onOutput, ...rest } = req;
     requests.push(structuredClone(rest));
     const next = responses.shift();
     if (!next) throw new Error('fake model ran out of responses');
-    for (const piece of next.stream ?? []) onText?.(piece); // simulate streamed text
+    // simulate streamed text
+    for (const piece of next.stream ?? []) {
+      onText?.(piece);
+      onOutput?.(piece);
+    }
     return {
       model: 'fake',
       usage: { inputTokens: 10, outputTokens: 5 },
@@ -187,6 +195,19 @@ test('planner tracks step status', () => {
   planner.update(2, 'done');
   assert.equal(planner.isComplete(), true);
   assert.throws(() => planner.update(3, 'done'), /doesn't exist/);
+});
+
+test('update_plan can finish a step and start the next in one call', () => {
+  const planner = new Planner();
+  planner.create('Ship it', ['write', 'test', 'release']);
+  planner.update(1, 'in_progress');
+  planner.update(1, 'done', 'written', 2);
+  assert.deepEqual(
+    planner.plan?.steps.map((s) => s.status),
+    ['done', 'in_progress', 'pending'],
+  );
+  assert.throws(() => planner.update(2, 'done', '', 9), /Step 9 doesn't exist/);
+  assert.equal(planner.plan?.steps[1]?.status, 'in_progress', 'a bad next_step changes nothing');
 });
 
 test('guardrails reject bad input and enforce the budget', () => {
@@ -814,9 +835,16 @@ test('streamed text is passed on as text_delta events in order', async () => {
   });
   const result = await agent.run('2+2?');
   assert.equal(result.text, 'It is 4.');
-  const order = events.map((e) => (e.type === 'text_delta' ? `text:${e.text}` : e.type));
+  const order = events.map((e) =>
+    e.type === 'text_delta'
+      ? `text:${e.text}`
+      : e.type === 'usage' && e.isEstimated
+        ? 'usage~'
+        : e.type,
+  );
   assert.deepEqual(order, [
     'model_call',
+    'usage~',
     'text:Let me ',
     'text:check.',
     'usage',
@@ -824,6 +852,7 @@ test('streamed text is passed on as text_delta events in order', async () => {
     'tool_call',
     'tool_result',
     'model_call',
+    'usage~',
     'text:It is ',
     'text:4.',
     'usage',
@@ -846,20 +875,98 @@ test('each model call reports the run tokens so far as a usage event', async () 
     onEvent: (e) => events.push(e),
   });
   const result = await agent.run('2+2?');
-  const live = events.flatMap((e) => (e.type === 'usage' ? [e] : []));
+  const reported = events.flatMap((e) => (e.type === 'usage' && !e.isEstimated ? [e] : []));
   assert.deepEqual(
-    live.map((e) => [e.steps, e.usage.inputTokens, e.usage.outputTokens]),
+    reported.map((e) => [e.steps, e.usage.inputTokens, e.usage.outputTokens]),
     [
       [1, 10, 5],
       [2, 20, 10],
     ],
   );
-  assert.deepEqual(live.at(-1)?.usage, result.usage, 'the last one matches the result');
+  assert.deepEqual(reported.at(-1)?.usage, result.usage, 'the last one matches the result');
+});
+
+test("while a call streams, usage events estimate its tokens on top of the run's so far", async (t) => {
+  t.mock.timers.enable({ apis: ['Date'] });
+  const setup = await tempSetup();
+  const events: AgentEvent[] = [];
+  const callModel: CallModel = async ({ onOutput }) => {
+    const isFirst = !events.some((e) => e.type === 'usage' && !e.isEstimated);
+    // 40 characters (10 tokens) at a time, with time passing between them.
+    for (let i = 0; i < 3; i += 1) {
+      t.mock.timers.tick(300);
+      onOutput?.('x'.repeat(40));
+    }
+    return {
+      model: 'fake',
+      usage: { inputTokens: 1000, outputTokens: 50 },
+      finishReason: isFirst ? 'tool_calls' : 'stop',
+      message: isFirst
+        ? {
+            role: 'assistant',
+            content: null,
+            tool_calls: [toolCall('t1', 'calculator', { expression: '2+2' })],
+          }
+        : { role: 'assistant', content: 'It is 4.' },
+    };
+  };
+  const agent = createAgent({
+    ...setup,
+    callModel,
+    logger: silentLogger,
+    config: { planning: 'off' },
+    onEvent: (e) => events.push(e),
+  });
+  await agent.run('2+2?');
+  const usage = events.flatMap((e) => (e.type === 'usage' ? [e] : []));
+  const second = usage.slice(usage.findIndex((e) => !e.isEstimated) + 1);
+
+  // The second call: its estimates start from the first call's reported tokens.
+  const estimates = second.filter((e) => e.isEstimated);
+  assert.deepEqual(
+    estimates.map((e) => [e.steps, e.usage.outputTokens]),
+    [
+      [2, 50],
+      [2, 60],
+      [2, 70],
+      [2, 80],
+    ],
+    'one up front, then one per piece once the interval has passed',
+  );
+  const input = estimates[0]?.usage.inputTokens ?? 0;
+  assert.ok(input > 1000, 'the request is estimated up front, on top of the first call');
+  assert.ok(estimates.every((e) => e.usage.inputTokens === input));
+  assert.deepEqual(
+    second.at(-1),
+    {
+      type: 'usage',
+      steps: 2,
+      usage: { inputTokens: 2000, outputTokens: 100, cachedInputTokens: 0, cacheWriteTokens: 0 },
+    },
+    "then the server's counts replace the estimate",
+  );
 });
 
 // ---------- Planning, checking and limits ----------
 
 const plannerReply = (obj: object): Scripted => answer(JSON.stringify(obj));
+
+test("every model call of a chat carries the chat's id", async () => {
+  const setup = await tempSetup();
+  const { callModel, requests } = scriptedModel([
+    plannerReply({ mode: 'direct' }),
+    callTools(toolCall('t1', 'calculator', { expression: '6 * 7' })),
+    answer("It's 42."),
+  ]);
+  await createAgent({ ...setup, callModel, chatId: 'chat-1', logger: silentLogger }).run(
+    'What is 6 times 7?',
+  );
+  assert.equal(requests.length, 3);
+  assert.deepEqual(
+    requests.map((request) => request.conversationId),
+    ['chat-1', 'chat-1', 'chat-1'],
+  );
+});
 
 test('planner can choose to answer directly', async () => {
   const setup = await tempSetup();
@@ -2140,6 +2247,45 @@ test('a request records each model call: what it was for, the model, its tools a
   assert.equal(result.calls.length, result.steps, 'every call counted as a step is listed');
 });
 
+test('a call the server reports no tokens for is counted from the text sent', async () => {
+  const setup = await tempSetup();
+  // As Cursor: no counts for the turn that ends in a tool call, counts for the last one.
+  const { callModel: scripted } = scriptedModel([
+    callTools(toolCall('t1', 'calculator', { expression: '2+2' })),
+    answer('It is 4.'),
+  ]);
+  let calls = 0;
+  const callModel: CallModel = async (request) => {
+    const response = await scripted(request);
+    calls += 1;
+    return calls === 1 ? { ...response, usage: { inputTokens: 0, outputTokens: 0 } } : response;
+  };
+  const agent = createAgent({
+    ...setup,
+    callModel,
+    logger: silentLogger,
+    config: { planning: 'off' },
+  });
+  const result = await agent.run('2+2?');
+  const [first, second] = result.calls;
+  assert.ok(first && second);
+  assert.equal(first.isEstimated, true);
+  assert.ok(first.inputTokens > 100, 'the system prompt and tools count');
+  assert.ok(first.outputTokens > 0, 'the tool call counts');
+  assert.equal(
+    first.inputTokens,
+    first.input.reduce((sum, group) => sum + group.tokens, 0),
+    'the total is its parts',
+  );
+  assert.equal(second.isEstimated, undefined, "a reported call keeps the server's counts");
+  assert.deepEqual(result.usage, {
+    inputTokens: first.inputTokens + 10,
+    outputTokens: first.outputTokens + 5,
+    cachedInputTokens: 0,
+    cacheWriteTokens: 0,
+  });
+});
+
 test('each call says what its tokens went to, adding up to what the server reported', async () => {
   const setup = await tempSetup();
   const { callModel } = scriptedModel([
@@ -2309,8 +2455,8 @@ test('limits scale with the window, and long transcripts are summarized in parts
 
 test('near the context window, older messages are summarized and the chat goes on', async () => {
   const setup = await tempSetup();
-  const requests: Omit<ModelRequest, 'onText'>[] = [];
-  const callModel: CallModel = async ({ onText: _onText, ...req }) => {
+  const requests: Omit<ModelRequest, 'onText' | 'onOutput'>[] = [];
+  const callModel: CallModel = async ({ onText: _onText, onOutput: _onOutput, ...req }) => {
     requests.push(structuredClone(req));
     const isSummary = req.system === COMPACTION_PROMPT;
     return {
@@ -2437,4 +2583,63 @@ test('messages sent mid-run reach the model between steps and before it settles 
   );
   const reloaded = Conversation.fromRows(agent.conversation.rows());
   assert.deepEqual(reloaded.rows(), agent.conversation.rows());
+});
+
+// ---------- Asking the user ----------
+
+const titleOptions = [
+  { label: 'fix: security hardening', description: 'Short and generic' },
+  { label: 'fix(security): hardening for v3.2.0' },
+];
+
+test('ask_user waits for the answer and tells the model what the user picked', async () => {
+  const setup = await tempSetup();
+  const asked: UserQuestion[] = [];
+  const answers: QuestionAnswer[] = [
+    { type: 'answered', text: 'fix: security hardening' },
+    { type: 'answered', text: 'Something shorter, please' },
+    { type: 'skipped' },
+  ];
+  const ask = (id: string) =>
+    callTools(toolCall(id, 'ask_user', { question: 'Which title?', options: titleOptions }));
+  const { callModel, requests } = scriptedModel([ask('q1'), ask('q2'), ask('q3'), answer('Done.')]);
+  const result = await createAgent({
+    ...setup,
+    callModel,
+    logger: silentLogger,
+    config: { planning: 'off' },
+    askUser: async (question) => {
+      asked.push(question);
+      const next = answers.shift();
+      assert.ok(next);
+      return next;
+    },
+  }).run('Suggest a PR title');
+
+  assert.equal(result.text, 'Done.');
+  assert.deepEqual(asked[0], { question: 'Which title?', options: titleOptions });
+  const results = toolMessages(nth(requests, -1)).map((m) => m.content);
+  assert.deepEqual(results, [
+    'The user chose: fix: security hardening',
+    'The user answered in their own words: Something shorter, please',
+    'The user skipped the question. Go on with your best judgment and say what you assumed, or leave that part out and say so.',
+  ]);
+});
+
+test('ask_user refuses bad options, and says to ask in the reply where nobody can answer', async () => {
+  const run = (input: unknown, ctx: Partial<ToolContext> = {}) =>
+    askUser.runValidated(
+      input,
+      toolContext({ askUser: async () => ({ type: 'skipped' }), ...ctx }),
+    );
+  await assert.rejects(run({ question: 'Which?', options: [{ label: 'Only one' }] }), /2 to 4/);
+  await assert.rejects(
+    run({ question: 'Which?', options: [{ label: 'A' }, { label: 'A' }] }),
+    /different label/,
+  );
+  await assert.rejects(run({ question: 'Which?', options: [{ label: 'A' }, 'B'] }), /Option 2/);
+  await assert.rejects(
+    run({ question: 'Which?', options: titleOptions }, { askUser: null }),
+    /Ask in your reply instead/,
+  );
 });

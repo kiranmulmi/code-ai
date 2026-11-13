@@ -1,10 +1,13 @@
+import type { QuestionAnswer, UserQuestion } from '@app/shared';
 import type { SkillStore } from '../skills.js';
 import type { Planner } from '../planner.js';
 import type { AttachmentStore } from '../attachments.js';
 import type { MemoryStore } from '../memory/long-term.js';
 import type { WorkspaceTasks } from '../background-tasks.js';
 
-/** What a tool can reach while it runs. */
+/** Asks the user a question mid-run and resolves with their answer (or that they skipped it). */
+export type AskUserFn = (question: UserQuestion) => Promise<QuestionAnswer>;
+
 /** What load_mcp_tools did with the names it was given. */
 export interface McpToolsLoaded {
   loaded: string[];
@@ -12,6 +15,7 @@ export interface McpToolsLoaded {
   unknown: string[];
 }
 
+/** What a tool can reach while it runs. */
 export interface ToolContext {
   planner: Planner;
   longTermMemory: MemoryStore;
@@ -29,6 +33,8 @@ export interface ToolContext {
   loadTools: ((names: readonly string[]) => McpToolsLoaded) | null;
   /** the workspace's background tasks (run_command background, task_output, stop_task); null when the app keeps none */
   tasks: WorkspaceTasks | null;
+  /** ask_user: asks the user and waits for the answer; null where nobody can answer */
+  askUser: AskUserFn | null;
   /** view_image: show this attached image to the model with the next message */
   showImage: (attachmentId: string) => void;
   /** aborted when the user stops the run: long tools (run_command) stop early */
@@ -59,7 +65,12 @@ export type PropertySchema = {
   type?: 'string' | 'integer' | 'number' | 'boolean' | 'array' | 'object';
   description?: string;
   enum?: readonly string[];
-  items?: { type?: PropertySchema['type'] };
+  /** Object items' own fields are only described to the model; the tool checks them. */
+  items?: {
+    type?: PropertySchema['type'];
+    properties?: Record<string, PropertySchema>;
+    required?: string[];
+  };
 };
 
 export type ToolParameters = {

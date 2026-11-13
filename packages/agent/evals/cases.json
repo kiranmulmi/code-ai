@@ -3,8 +3,14 @@
     "name": "answers-simple-question-directly",
     "why": "Simple knowledge questions should not trigger planning or tools.",
     "prompt": "What is the capital of Japan? One word.",
-    "forbidTools": ["create_plan", "calculator", "read_file"],
+    "forbidTools": ["create_plan", "calculator", "read_file", "ask_user"],
     "outputIncludes": ["Tokyo"]
+  },
+  {
+    "name": "asks-the-user-to-choose",
+    "why": "A choice only the user can make goes through ask_user with options, then the work goes on with the answer.",
+    "prompt": "Rename the greet function in src/greet.ts to something clearer. Let me pick the new name from a few suggestions before you change anything.",
+    "expectTools": ["ask_user", "edit_file"]
   },
   {
     "name": "uses-calculator-for-math",

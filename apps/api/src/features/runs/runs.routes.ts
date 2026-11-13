@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import {
   approvalDecisionSchema,
+  questionAnswerSchema,
   runChangeSchema,
   runRequestSchema,
   steerRequestSchema,
@@ -86,6 +87,19 @@ export function runsRouter(runsService: RunsService, registry: RunRegistry): Rou
         throw new NotFoundError('That approval request is no longer waiting.');
       }
       res.json({ data: { allowed: allow } });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  /** The user's answer to a question the agent asked (ask_user): an option, their own words, or skipped. */
+  router.post('/questions/:questionId', (req, res, next) => {
+    try {
+      const answer = parse(questionAnswerSchema, req.body);
+      if (!registry.answer(param(req, 'questionId'), answer)) {
+        throw new NotFoundError('That question is no longer waiting for an answer.');
+      }
+      res.json({ data: answer });
     } catch (error) {
       next(error);
     }

@@ -38,6 +38,8 @@ test('background polling logs at debug, other requests at info', () => {
   assert.equal(levelFor('GET', '/v1/workspaces/abc/tasks/t1', 200), 'debug');
   assert.equal(levelFor('POST', '/v1/workspaces/abc/tasks', 200), 'info');
   assert.equal(levelFor('GET', '/v1/workspaces/abc/chats', 200), 'info');
+  assert.equal(levelFor('GET', '/v1/workspaces/abc/git', 200), 'debug');
+  assert.equal(levelFor('GET', '/v1/workspaces/abc/git/diff?path=a.ts', 200), 'info');
 });
 
 test('failures are never hidden, even on polled routes', () => {

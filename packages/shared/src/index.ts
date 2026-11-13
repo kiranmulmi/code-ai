@@ -151,6 +151,7 @@ export {
   approvalDecisionSchema,
   MODEL_CALL_KINDS,
   TOKEN_GROUPS,
+  groupTokens,
   runChangeSchema,
   runRequestSchema,
   steerRequestSchema,
@@ -170,6 +171,14 @@ export {
   type StreamEvent,
   type Usage,
 } from './run.js';
+
+export {
+  QUESTION_LIMITS,
+  questionAnswerSchema,
+  type QuestionAnswer,
+  type QuestionOption,
+  type UserQuestion,
+} from './question.js';
 
 export {
   MCP_SERVER_NAME,

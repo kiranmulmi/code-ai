@@ -4,6 +4,7 @@ import type { ToolGroup } from '@app/shared';
 import type { AnyTool, ToolDefinition } from './define.js';
 import { getCurrentTime } from './time.js';
 import { calculator } from './calculator.js';
+import { askUser } from './ask-user.js';
 import { listFiles } from './files/list-files.js';
 import { readFile } from './files/read-file.js';
 import { findFiles } from './files/find-files.js';
@@ -33,6 +34,7 @@ const TOOLS: readonly AnyTool[] = [
   copySkillFile,
   getCurrentTime,
   calculator,
+  askUser,
   webSearch,
   fetchPage,
   listFiles,

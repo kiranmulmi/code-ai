@@ -22,17 +22,27 @@ export const createPlan = defineTool<{ goal: string; steps: string[]; done_when:
   },
 });
 
-export const updatePlan = defineTool<{ step_number: number; status: string; note: string }>({
+export const updatePlan = defineTool<{
+  step_number: number;
+  status: string;
+  note: string;
+  next_step?: number;
+}>({
   name: 'update_plan',
   description:
-    "Mark a plan step's progress. Call it when you start a step (in_progress) and when you finish it (done), or when a step is skipped or failed, with a short note on the result.",
+    "Mark a plan step's progress: in_progress when you start the first step, then done (or skipped or failed) when you finish one, with a short note on the result. When finishing a step, give the step you start next as next_step, so one call does both. Call it in the same turn as other tool calls when you can.",
   properties: {
     step_number: { type: 'integer', description: '1-based step number from the plan.' },
     status: { type: 'string', enum: STEP_STATUSES },
     note: { type: 'string', description: 'Short result or reason, or "" for none.' },
+    next_step: {
+      type: 'integer',
+      description: 'The step you start now (marked in_progress). Leave out when none is left.',
+    },
   },
-  async run({ step_number, status, note }, ctx) {
-    return ctx.planner.update(step_number, status, note);
+  optional: ['next_step'],
+  async run({ step_number, status, note, next_step }, ctx) {
+    return ctx.planner.update(step_number, status, note, next_step);
   },
 });
 

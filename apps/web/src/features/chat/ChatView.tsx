@@ -1,8 +1,9 @@
 import { useMemo, useState, type ReactNode } from 'react';
-import type { Attachment, Skill, Workspace } from '@app/shared';
+import type { Attachment, QuestionAnswer, Skill, Workspace } from '@app/shared';
 import { PageLoader } from '../../components/PageLoader';
 import { AgentMessage } from './AgentMessage';
 import { PlanDock } from './PlanDock';
+import { QuestionPrompt } from './QuestionPrompt';
 import { placePlans } from './planPlacement';
 import { Composer } from './Composer';
 import type { ConversationState } from './conversation';
@@ -41,6 +42,7 @@ export function ChatView({
   onStop,
   isStopping,
   onDecide,
+  onAnswer,
   onReload,
   isVoiceMode,
   subscribeReply,
@@ -71,6 +73,8 @@ export function ChatView({
   onStop: () => void;
   isStopping: boolean;
   onDecide: (approvalId: string, allow: boolean) => void;
+  /** Answers the question the agent is waiting on (shown over the message box). */
+  onAnswer: (questionId: string, answer: QuestionAnswer) => void;
   onReload: () => void;
   /** The workspace chats by voice. */
   isVoiceMode: boolean;
@@ -171,13 +175,16 @@ export function ChatView({
           for it; type here meanwhile.
         </p>
       )}
+      {state.question && (
+        <QuestionPrompt key={state.question.id} question={state.question} onAnswer={onAnswer} />
+      )}
       {canTalk ? (
         <VoiceBar
           disabled={!canSend}
           hasModel={hasModel}
           isRunning={isBusy}
           isStopping={isStopping}
-          hasPendingApproval={hasPendingApproval}
+          waitingFor={state.question ? 'answer' : hasPendingApproval ? 'approval' : null}
           controls={modelControls}
           usage={state.usage}
           context={state.context}

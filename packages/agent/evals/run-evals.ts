@@ -147,6 +147,8 @@ async function runCase(
       skills,
       extraTools: trackerTools,
       tasks: tasks.forWorkspace(filesDir),
+      // The user always picks the first option (the one the agent recommends).
+      askUser: async ({ options }) => ({ type: 'answered', text: options[0]?.label ?? 'Yes' }),
     });
   const usage: Usage = { inputTokens: 0, outputTokens: 0 };
   const add = (u: Usage) => {

@@ -46,6 +46,7 @@ const unusedContext = (): ToolContext => ({
   skills: null,
   loadTools: null,
   tasks: null,
+  askUser: null,
   showImage: () => {},
 });
 

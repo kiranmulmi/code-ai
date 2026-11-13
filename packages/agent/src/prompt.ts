@@ -33,7 +33,8 @@ function guidance(off: ReadonlySet<ToolGroup>, { hasSkills }: { hasSkills: boole
     on('web')
       ? `- Anything that may have changed since your training (news, who holds an office, prices, versions, company structures, recent events): search the web with web_search before answering, even if you think you know. Your training data is out of date for these. Base the answer on what the sources say, and cite the links you used as Markdown links.`
       : null,
-    `- An ambiguous request where a wrong guess would waste real work: ask one short clarifying question instead of guessing.`,
+    `- An ambiguous request where a wrong guess would waste real work, or a decision only the user can make (which option, name or version to use, whether to go ahead with a change): ask with ask_user, giving the likely answers as options, instead of guessing or ending your reply with a question. Don't ask what your tools can find out.`,
+    `- Every turn resends the whole conversation, so make each one count: when several tool calls don't depend on each other's results (reading a few files, several searches), make them all in the same turn.`,
   ];
   // Approvals and the `reason` argument concern every tool that asks first, not only files.
   const approvals = [
@@ -55,7 +56,7 @@ function guidance(off: ReadonlySet<ToolGroup>, { hasSkills }: { hasSkills: boole
     how.filter(Boolean).join('\n'),
     on('plans')
       ? `Working through a plan:
-- Follow the steps in order. The user watches the plan live, so keep it current as you go: mark each step in_progress when you start it and done (with a short note on what you found) as soon as it's finished, using update_plan. You can update the plan in the same turn as other tool calls. Mark a step skipped or failed, with the reason, only after you've genuinely tried it.
+- Follow the steps in order. The user watches the plan live, so keep it current as you go: mark the first step in_progress when you start it, and each step done (with a short note on what you found) as soon as it's finished, giving the step you start next as next_step so one update_plan call does both. Each update costs a full model call, so put it in the same turn as the step's other tool calls whenever you can, never in a turn of its own just to change a status. Mark a step skipped or failed, with the reason, only after you've genuinely tried it.
 - When you discover more work (for example a sub-company whose own subsidiaries need looking up), add it with add_plan_steps. If the approach turns out to be wrong, re-plan with create_plan.
 - If a request handled directly turns out to need several steps, make a plan with create_plan.
 - Before your final answer, check the result against the plan's "Done when" test. If it isn't met, keep working, or say plainly what's missing and why.`

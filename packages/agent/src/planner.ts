@@ -7,6 +7,7 @@ import {
   STEP_STATUSES,
   type NumberedPlanStep,
   type Plan,
+  type PlanStep,
   type StepStatus,
   type Usage,
 } from '@app/shared';
@@ -50,18 +51,29 @@ export class Planner {
     return this.render();
   }
 
-  update(stepNumber: number, status: string, note = ''): string {
+  /**
+   * Set a step's status. `nextStep` is started (in_progress) in the same update, so finishing
+   * one step and starting the next takes one call, not two.
+   */
+  update(stepNumber: number, status: string, note = '', nextStep?: number): string {
     if (!this.plan) throw new Error('There is no plan yet. Call create_plan first.');
     if (!isStepStatus(status)) throw new Error(`Unknown status "${status}".`);
-    const step = this.plan.steps[stepNumber - 1];
-    if (!step) {
-      throw new Error(
-        `Step ${stepNumber} doesn't exist; the plan has ${this.plan.steps.length} steps.`,
-      );
-    }
+    const step = this.#step(stepNumber);
+    // Checked before anything changes, so a bad next_step leaves the plan as it was.
+    const next = nextStep === undefined ? undefined : this.#step(nextStep);
     step.status = status;
     if (note) step.note = note;
+    if (next && next !== step) next.status = 'in_progress';
     return this.render();
+  }
+
+  #step(stepNumber: number): PlanStep {
+    const steps = this.plan?.steps ?? [];
+    const step = steps[stepNumber - 1];
+    if (!step) {
+      throw new Error(`Step ${stepNumber} doesn't exist; the plan has ${steps.length} steps.`);
+    }
+    return step;
   }
 
   /** Add steps discovered while working, at the end of the plan. */

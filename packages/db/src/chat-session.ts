@@ -75,6 +75,7 @@ export async function runInChat({
     config: { ...agentOptions.config, ...(planning ? { planning } : {}) },
     disabledTools: workspace.disabledTools,
     conversation,
+    chatId: chat.id,
     planner,
     memoryShown: chat.memoryShown ?? null,
     longTermMemory: store.memory(workspace),

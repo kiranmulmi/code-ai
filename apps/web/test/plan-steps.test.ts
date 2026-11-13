@@ -87,6 +87,24 @@ test('each step shows above the tool calls made for it', () => {
   ]);
 });
 
+test("finishing a step with next_step starts the next step's section", () => {
+  const state = run([
+    ...call('create_plan', { goal: 'Fix the bug', steps: [], done_when: '' }),
+    { type: 'plan', plan },
+    ...step(1, 'in_progress'),
+    ...read('a'),
+    ...call('update_plan', { step_number: 1, status: 'done', note: '', next_step: 2 }),
+    ...call('edit_file', { path: 'a' }),
+    ...call('update_plan', { step_number: 2, status: 'done', note: '', next_step: 9 }, false),
+    ...read('b'),
+  ]);
+  assert.deepEqual(shape(flowSections(agentTurn(state).flow)), [
+    'plan',
+    'step 1: tools×1',
+    'step 2: tools×2',
+  ]);
+});
+
 test('the answer and warnings stand outside the last step', () => {
   const state = run([
     ...call('create_plan', { goal: 'Fix the bug', steps: [], done_when: '' }),

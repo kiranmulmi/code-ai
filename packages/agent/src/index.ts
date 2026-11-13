@@ -76,6 +76,7 @@ export { findFilesByName, searchFileContents } from './workspace-search.js';
 export {
   defineTool,
   type AnyTool,
+  type AskUserFn,
   type JsonObjectSchema,
   type Tool,
   type ToolContext,

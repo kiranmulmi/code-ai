@@ -12,6 +12,7 @@
 // messages are summarized; past it, the oldest tool results are shortened for that call.
 import {
   DEFAULT_CONTEXT_WINDOW,
+  groupTokens,
   toolResultPreview,
   type AgentEvent,
   type Attachment,
@@ -47,6 +48,7 @@ import {
   type StepParts,
 } from './usage-breakdown.js';
 import {
+  CHARS_PER_TOKEN,
   COMPACT_AT,
   HARD_LIMIT,
   ContextMeter,
@@ -59,7 +61,7 @@ import {
 } from './context.js';
 import type { ToolDefinition } from './tools/define.js';
 import { ATTACHMENT_TOOLS, SKILL_TOOLS, buildToolset } from './tools/index.js';
-import type { AnyTool, ToolContext } from './tools/define.js';
+import type { AnyTool, AskUserFn, ToolContext } from './tools/define.js';
 import type { WorkspaceTasks } from './background-tasks.js';
 import { Planner, decide } from './planner.js';
 import { Conversation, type ModelMessage } from './memory/short-term.js';
@@ -102,6 +104,8 @@ export interface AgentRunOptions {
   ask?: AskFn;
   /** replaces `ask` + config.approval */
   approve?: ApproveFn;
+  /** asks the user a question mid-run (ask_user); without it the tool tells the model to ask in its reply */
+  askUser?: AskUserFn;
   /**
    * live progress for a UI:
    * planning, route, model_call, text_delta, tool_call, tool_result, plan, check, limit
@@ -126,6 +130,8 @@ export interface AgentRunOptions {
  */
 export interface AgentOptions extends AgentRunOptions {
   conversation?: Conversation;
+  /** the chat's id, sent with every model call as its `conversationId` */
+  chatId?: string;
   planner?: Planner;
   /** the memory list the model last saw in this chat */
   memoryShown?: string | null;
@@ -176,12 +182,13 @@ function modelCallerFor({ callModel, model }: AgentRunOptions): CallModel {
 
 export function createAgent(options: AgentOptions): Agent {
   const config: AgentConfig = { ...loadAgentConfig(process.env), ...options.config };
-  const { signal } = options;
+  const { signal, chatId } = options;
   const baseCallModel = modelCallerFor(options);
-  // Every model call carries the stop signal, and none starts once the run is stopped.
+  // Every model call carries the stop signal and the chat's id, and none starts once the run is
+  // stopped.
   const callModel: CallModel = (request) => {
     if (signal?.aborted) return Promise.reject(new StoppedError());
-    return baseCallModel({ ...request, signal });
+    return baseCallModel({ ...request, signal, ...(chatId ? { conversationId: chatId } : {}) });
   };
   const isStopped = () => signal?.aborted === true;
   const emit = options.onEvent ?? (() => {});
@@ -196,16 +203,52 @@ export function createAgent(options: AgentOptions): Agent {
     step?: StepParts,
   ) => {
     const startedAt = Date.now();
-    const response = await callModel(request);
-    const { usage, message } = response;
-    budget.recordCall(usage, {
-      kind,
-      model: response.model || null,
-      durationMs: Date.now() - startedAt,
-      toolCalls: message.tool_calls?.map((call) => call.function.name) ?? [],
-      input: inputBreakdown(request, usage.inputTokens, step),
-      output: outputBreakdown(message, usage.outputTokens),
+    // The server reports the call's tokens only once it ends. Until then the run's tokens show
+    // with an estimate for it: the request's size up front, then its output as it streams.
+    const estimatedInput = groupTokens(inputBreakdown(request, 0, step));
+    let outputCharacters = 0;
+    let lastLiveAt = 0;
+    const emitLive = () => {
+      lastLiveAt = Date.now();
+      const sofar = budget.usage();
+      emit({
+        type: 'usage',
+        steps: budget.steps + 1,
+        usage: {
+          ...sofar,
+          inputTokens: sofar.inputTokens + estimatedInput,
+          outputTokens: sofar.outputTokens + Math.ceil(outputCharacters / CHARS_PER_TOKEN),
+        },
+        isEstimated: true,
+      });
+    };
+    emitLive();
+    const response = await callModel({
+      ...request,
+      onOutput: (piece) => {
+        outputCharacters += piece.length;
+        if (Date.now() - lastLiveAt >= LIVE_USAGE_INTERVAL_MS) emitLive();
+      },
     });
+    const { usage, message } = response;
+    const input = inputBreakdown(request, usage.inputTokens, step);
+    const output = outputBreakdown(message, usage.outputTokens);
+    // A call the server reported nothing for (Cursor reports a turn's tokens only once it
+    // ends, which a turn ending in a tool call never does) still sent its tokens: count them
+    // from the text (the unscaled parts), so the run's totals and token budget include them.
+    const isEstimated = usage.inputTokens === 0 && usage.outputTokens === 0;
+    budget.recordCall(
+      isEstimated ? { inputTokens: groupTokens(input), outputTokens: groupTokens(output) } : usage,
+      {
+        kind,
+        model: response.model || null,
+        durationMs: Date.now() - startedAt,
+        toolCalls: message.tool_calls?.map((call) => call.function.name) ?? [],
+        input,
+        output,
+        ...(isEstimated ? { isEstimated } : {}),
+      },
+    );
     emit({ type: 'usage', steps: budget.steps, usage: budget.usage() });
     return response;
   };
@@ -272,6 +315,7 @@ export function createAgent(options: AgentOptions): Agent {
     attachments: attachmentStore,
     skills: skillStore,
     tasks: options.tasks ?? null,
+    askUser: options.askUser ?? null,
     loadTools: toolset.deferred.size ? loadTools : null,
     signal,
     showImage: (id) => {
@@ -821,6 +865,9 @@ export function createAgent(options: AgentOptions): Agent {
 }
 
 const STOPPED_TEXT = 'Stopped by the user.';
+
+/** How often a streaming call's estimated tokens are reported, at most. */
+const LIVE_USAGE_INTERVAL_MS = 250;
 
 const PLAN_TOOLS = new Set(['create_plan', 'update_plan', 'add_plan_steps']);
 const MEMORY_TOOLS = new Set(['remember', 'forget']);

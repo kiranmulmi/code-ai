@@ -2,6 +2,7 @@ import type {
   Attachment,
   ChatDetail,
   ModelCallUsage,
+  QuestionOption,
   RunResult,
   StreamEvent,
   Usage,
@@ -123,6 +124,16 @@ export type TurnUsage = {
 
 export type Turn = UserTurn | AgentTurn;
 
+/** A question the agent is waiting on (ask_user), shown above the message box. */
+export type OpenQuestion = {
+  id: string;
+  question: string;
+  options: QuestionOption[];
+  /** The answer is on its way to the server. */
+  isSending: boolean;
+  error: string | null;
+};
+
 export type ConversationState = {
   turns: Turn[];
   plan: PlanState;
@@ -135,6 +146,8 @@ export type ConversationState = {
    * after the chat opens).
    */
   context: { usedTokens: number; windowTokens: number } | null;
+  /** The question the agent is waiting on, if any (tools run one at a time). */
+  question: OpenQuestion | null;
   /** Counter for React keys, so the reducer stays pure. */
   seq: number;
 };
@@ -152,7 +165,10 @@ export type ConversationAction =
   | { type: 'stopping' }
   | { type: 'approval_sending'; approvalId: string }
   | { type: 'approval_failed'; approvalId: string; message: string }
-  | { type: 'approval_decided'; approvalId: string; allowed: boolean };
+  | { type: 'approval_decided'; approvalId: string; allowed: boolean }
+  | { type: 'question_sending'; questionId: string }
+  | { type: 'question_failed'; questionId: string; message: string }
+  | { type: 'question_answered'; questionId: string };
 
 export const initialConversation: ConversationState = {
   turns: [],
@@ -160,6 +176,7 @@ export const initialConversation: ConversationState = {
   usage: { inputTokens: 0, outputTokens: 0 },
   runUsage: null,
   context: null,
+  question: null,
   seq: 0,
 };
 
@@ -183,6 +200,10 @@ function planGoal(args: string): string {
   }
 }
 
+/** A 1-based plan step number, as update_plan takes. */
+const isStepNumber = (value: unknown): value is number =>
+  typeof value === 'number' && Number.isInteger(value) && value >= 1;
+
 const isDecided = (state: ApprovalState) => state === 'allowed' || state === 'denied';
 
 /** "4.4K tokens · 3.9K cached": the cached part is input read from the server's cache. */
@@ -192,9 +213,9 @@ export function tokensText(usage: Usage): string {
   return cached ? `${total} · ${compactNumber(cached)} cached` : total;
 }
 
-/** "2 steps · 4.4K tokens · 3.9K cached" */
-function metaText(steps: number, usage: Usage): string {
-  return `${plural(steps, 'step')} · ${tokensText(usage)}`;
+/** "2 steps · 4.4K tokens · 3.9K cached"; "~4.4K" while a model call's tokens are estimated. */
+function metaText(steps: number, usage: Usage, isEstimated = false): string {
+  return `${plural(steps, 'step')} · ${isEstimated ? '~' : ''}${tokensText(usage)}`;
 }
 
 /**
@@ -207,6 +228,7 @@ class Draft {
   usage: Usage;
   runUsage: Usage | null;
   context: ConversationState['context'];
+  question: OpenQuestion | null;
   agent: AgentTurn | null = null;
 
   constructor(state: ConversationState) {
@@ -215,6 +237,7 @@ class Draft {
     this.usage = state.usage;
     this.runUsage = state.runUsage;
     this.context = state.context;
+    this.question = state.question;
     const last = this.turns.at(-1);
     if (last?.role === 'agent') {
       this.agent = { ...last, flow: [...last.flow] };
@@ -428,21 +451,32 @@ class Draft {
   /**
    * An update_plan call: starting a step puts its text in the chat, above the work that
    * follows. Finishing (or skipping) a step that was never started marks it too, so every
-   * step shows up once; finishing a started one changes only its status, shown in place.
+   * step shows up once; finishing a started one changes only its status, shown in place. Its
+   * `next_step` starts that step in the same call.
    */
   private markStep(callId: string | null, args: string): void {
-    const { step_number: number, status } = parseArgs(args);
-    if (typeof number !== 'number' || !Number.isInteger(number) || number < 1) return;
+    const { step_number: number, status, next_step: next } = parseArgs(args);
+    if (!isStepNumber(number)) return;
+    if (status === 'in_progress') {
+      this.startStep(callId, number);
+    } else if (status === 'done' || status === 'skipped' || status === 'failed') {
+      const planKey = this.lastPlanKey();
+      const marks = this.stepMarks().filter((mark) => mark.planKey === planKey);
+      if (!marks.some((mark) => mark.number === number)) this.pushStepMark(callId, number);
+      if (isStepNumber(next)) this.startStep(callId, next);
+    }
+  }
+
+  /** A step started: its text goes in the chat unless it's already the step being worked on. */
+  private startStep(callId: string | null, number: number): void {
     const planKey = this.lastPlanKey();
     const marks = this.stepMarks().filter((mark) => mark.planKey === planKey);
-    if (status === 'in_progress') {
-      if (marks.at(-1)?.number === number) return; // already the step being worked on
-    } else if (status === 'done' || status === 'skipped' || status === 'failed') {
-      if (marks.some((mark) => mark.number === number)) return;
-    } else {
-      return;
-    }
+    if (marks.at(-1)?.number !== number) this.pushStepMark(callId, number);
+  }
+
+  private pushStepMark(callId: string | null, number: number): void {
     this.closeSegment();
+    const planKey = this.lastPlanKey();
     this.ensureAgent().flow.push({ kind: 'step', key: this.key('k'), callId, planKey, number });
   }
 
@@ -455,9 +489,17 @@ class Draft {
         item.callId === callId,
     );
     const item = flow[index];
-    // A plan call that failed changed nothing: nothing to show in its place.
+    // A plan call that failed changed nothing: nothing to show in its place (an update_plan
+    // with a next_step can have put two step marks there).
     if (item?.kind === 'plan' || item?.kind === 'step') {
-      if (!ok) flow.splice(index, 1);
+      if (!ok) {
+        for (let i = flow.length - 1; i >= index; i -= 1) {
+          const marked = flow[i];
+          if ((marked?.kind === 'plan' || marked?.kind === 'step') && marked.callId === callId) {
+            flow.splice(i, 1);
+          }
+        }
+      }
       return;
     }
     if (item?.kind !== 'tool') return;
@@ -557,6 +599,7 @@ class Draft {
       usage: this.usage,
       runUsage: this.runUsage,
       context: this.context,
+      question: this.question,
       plan,
     };
   }
@@ -672,7 +715,7 @@ function applyEvent(state: ConversationState, event: RunEvent, at: number): Conv
       break;
     case 'usage':
       draft.setRunUsage(event.usage);
-      draft.ensureAgent().liveMeta = metaText(event.steps, event.usage);
+      draft.ensureAgent().liveMeta = metaText(event.steps, event.usage, event.isEstimated);
       break;
     case 'compaction':
       draft.addNote(compactionNote(event.summarizedMessages));
@@ -701,6 +744,20 @@ function applyEvent(state: ConversationState, event: RunEvent, at: number): Conv
       draft.updateApproval(event.id, { state: event.allowed ? 'allowed' : 'denied', error: null });
       draft.setStatus('Working…');
       break;
+    case 'question':
+      draft.question = {
+        id: event.id,
+        question: event.question,
+        options: event.options,
+        isSending: false,
+        error: null,
+      };
+      draft.setStatus('Waiting for your answer…');
+      break;
+    case 'question_closed':
+      if (draft.question?.id === event.id) draft.question = null;
+      draft.setStatus('Working…');
+      break;
     case 'steer': {
       // The agent read a message sent while it worked: it shows here, and the work goes on below,
       // with the run's tokens so far.
@@ -710,9 +767,11 @@ function applyEvent(state: ConversationState, event: RunEvent, at: number): Conv
       break;
     }
     case 'done':
+      draft.question = null;
       draft.finishRun(event.result, at);
       break;
     case 'error':
+      draft.question = null;
       draft.closeSegment(false);
       draft.addBubble(event.message, true);
       break;
@@ -745,6 +804,7 @@ export function conversationReducer(
       return applyEvent(state, action.event, action.at);
     case 'fail': {
       const draft = new Draft(state);
+      draft.question = null;
       draft.closeSegment(false);
       draft.addBubble(action.message, true);
       return draft.result(state);
@@ -759,6 +819,7 @@ export function conversationReducer(
       draft.closeSegment(false);
       // A run that ended without `done` (an error): its tokens so far stay in the chat's total.
       draft.runUsage = null;
+      draft.question = null;
       if (draft.agent) {
         draft.agent.status = null;
         draft.agent.liveMeta = null;
@@ -782,6 +843,19 @@ export function conversationReducer(
         error: null,
       });
       return draft.result(state);
+    }
+    case 'question_sending':
+    case 'question_failed':
+    case 'question_answered': {
+      const open = state.question;
+      if (open?.id !== action.questionId) return state;
+      const question: OpenQuestion | null =
+        action.type === 'question_answered'
+          ? null
+          : action.type === 'question_sending'
+            ? { ...open, isSending: true, error: null }
+            : { ...open, isSending: false, error: action.message };
+      return { ...state, question };
     }
   }
 }

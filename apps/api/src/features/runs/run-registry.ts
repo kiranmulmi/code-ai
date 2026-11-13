@@ -1,14 +1,20 @@
 import { randomUUID } from 'node:crypto';
-import type { ApproveFn, SteeringInbox, SteeringMessage } from '@app/agent';
-import type { ApprovalMode, StreamEvent } from '@app/shared';
+import type { ApproveFn, AskUserFn, SteeringInbox, SteeringMessage } from '@app/agent';
+import type { ApprovalMode, QuestionAnswer, StreamEvent } from '@app/shared';
 
 const APPROVAL_TIMEOUT_MS = 5 * 60 * 1000;
+/** A question takes thought, so it waits longer than an approval before it counts as skipped. */
+const QUESTION_TIMEOUT_MS = 30 * 60 * 1000;
 /** Messages sent during a run that the agent hasn't read yet, at most. */
 export const MAX_WAITING_MESSAGES = 10;
 
 type Settle = (allowed: boolean) => void;
+type Reply = (answer: QuestionAnswer) => void;
 
-/** Which chats have a run in progress (one at a time per chat), and their open approval requests. */
+/**
+ * Which chats have a run in progress (one at a time per chat), and their open approval requests
+ * and questions.
+ */
 export class RunRegistry {
   private readonly running = new Map<
     string,
@@ -22,6 +28,7 @@ export class RunRegistry {
     }
   >();
   private readonly pendingApprovals = new Map<string, Settle>();
+  private readonly pendingQuestions = new Map<string, Reply>();
 
   isRunning(chatId: string): boolean {
     return this.running.has(chatId);
@@ -125,5 +132,44 @@ export class RunRegistry {
     };
 
     return { approve, denyAll };
+  }
+
+  /** Answers a question the agent asked. Returns false when it is no longer waiting. */
+  answer(questionId: string, answer: QuestionAnswer): boolean {
+    const reply = this.pendingQuestions.get(questionId);
+    reply?.(answer);
+    return Boolean(reply);
+  }
+
+  /**
+   * Questions from the chat's run (ask_user), answered from the browser tab that started it.
+   * `skipAll` is called when that tab goes away or the run stops, so the run never waits on
+   * nobody; one left unanswered for half an hour counts as skipped too.
+   */
+  createAsker(send: (event: StreamEvent) => void) {
+    const mine = new Set<string>();
+
+    const askUser: AskUserFn = ({ question, options }) => {
+      const id = randomUUID();
+      return new Promise<QuestionAnswer>((resolve) => {
+        const reply: Reply = (answer) => {
+          clearTimeout(timer);
+          this.pendingQuestions.delete(id);
+          mine.delete(id);
+          send({ type: 'question_closed', id, answer });
+          resolve(answer);
+        };
+        const timer = setTimeout(() => reply({ type: 'skipped' }), QUESTION_TIMEOUT_MS);
+        this.pendingQuestions.set(id, reply);
+        mine.add(id);
+        send({ type: 'question', id, question, options });
+      });
+    };
+
+    const skipAll = () => {
+      for (const id of [...mine]) this.pendingQuestions.get(id)?.({ type: 'skipped' });
+    };
+
+    return { askUser, skipAll };
   }
 }

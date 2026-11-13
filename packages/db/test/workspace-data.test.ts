@@ -200,6 +200,34 @@ test('settings, chats, messages and runs are saved under .nimbrio-ai', async () 
   await fs.writeFile(runsFile, `${JSON.stringify(older)}\n`);
   assert.deepEqual((await data.loadRuns(chat.id)).get(0)?.calls, []);
 
+  // A call saved at 0 tokens (Cursor's tool-call turns, before they were counted) loads with
+  // its parts' tokens, marked estimated, and the run's totals include them.
+  const part = (id: string, tokens: number) => ({ id, tokens, items: [] });
+  const zeroCall = {
+    kind: 'step',
+    model: 'cursor-model',
+    durationMs: 9000,
+    toolCalls: ['read_file'],
+    input: [part('results', 3000), part('system', 1000)],
+    output: [part('tool_calls', 40)],
+    inputTokens: 0,
+    outputTokens: 0,
+  };
+  const reported = { ...zeroCall, toolCalls: [], inputTokens: 5000, outputTokens: 60 };
+  await fs.writeFile(
+    runsFile,
+    `${JSON.stringify({ ...older, inputTokens: 5000, outputTokens: 60, calls: [zeroCall, reported] })}\n`,
+  );
+  const repaired = (await data.loadRuns(chat.id)).get(0);
+  assert.deepEqual(
+    repaired?.calls.map((c) => [c.inputTokens, c.outputTokens, c.isEstimated]),
+    [
+      [4000, 40, true],
+      [5000, 60, undefined],
+    ],
+  );
+  assert.deepEqual([repaired?.inputTokens, repaired?.outputTokens], [9000, 100]);
+
   const lines = await fs.readFile(
     path.join(folder, '.nimbrio-ai', 'chats', chat.id, 'messages.jsonl'),
     'utf8',

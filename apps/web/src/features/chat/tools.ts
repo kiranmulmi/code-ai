@@ -25,6 +25,7 @@ const ACTIVITY: Record<string, (args: Record<string, unknown>) => string> = {
   delete_path: (a) => `Deleting ${text(a.path)}`,
   run_command: (a) => `Running ${shorten(text(a.command), 60)}`,
   calculator: () => 'Calculating',
+  ask_user: () => 'Waiting for your answer',
   get_current_time: () => 'Checking the date and time',
   remember: () => 'Saving to memory',
   recall: () => 'Searching memory',

@@ -5,6 +5,7 @@ import type {
   ChatSummary,
   ImprovePromptRequest,
   ImprovedPrompt,
+  QuestionAnswer,
   RunChange,
   RunRequest,
   SteerAccepted,
@@ -46,6 +47,17 @@ export function decideApproval(approvalId: string, allow: boolean): Promise<{ al
   return request<{ allowed: boolean }>(
     `/approvals/${encodeURIComponent(approvalId)}`,
     jsonBody('POST', { allow }),
+  );
+}
+
+/** The user's answer to a question the agent asked (ask_user). */
+export function answerQuestion(
+  questionId: string,
+  answer: QuestionAnswer,
+): Promise<QuestionAnswer> {
+  return request<QuestionAnswer>(
+    `/questions/${encodeURIComponent(questionId)}`,
+    jsonBody('POST', answer),
   );
 }
 

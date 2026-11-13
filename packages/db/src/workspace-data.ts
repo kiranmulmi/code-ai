@@ -22,6 +22,7 @@ import {
   RUN_STATUSES,
   TOKEN_GROUPS,
   STEP_STATUSES,
+  groupTokens,
   TOOL_GROUPS,
   WORKSPACE_PLANNING,
   mcpConfigSchema,
@@ -228,6 +229,7 @@ const modelCallSchema = z.object({
   outputTokens: z.number(),
   cachedInputTokens: z.number().default(0),
   cacheWriteTokens: z.number().default(0),
+  isEstimated: z.boolean().optional(),
 });
 
 const runSchema = z.object({
@@ -246,6 +248,31 @@ const runSchema = z.object({
   startedAt: z.string(),
   finishedAt: z.string(),
 });
+
+/**
+ * A run saved before calls the server reported no tokens for were counted (Cursor reports none
+ * for a turn that ends in a tool call) has those calls at 0 tokens. Their parts were counted from
+ * the text sent, so they stand in, marked as estimated, and the run's totals include them.
+ */
+function withEstimatedCalls(run: z.infer<typeof runSchema>): z.infer<typeof runSchema> {
+  let addedInput = 0;
+  let addedOutput = 0;
+  const calls = run.calls.map((call) => {
+    if (call.inputTokens > 0 || call.outputTokens > 0 || call.input.length === 0) return call;
+    const inputTokens = groupTokens(call.input);
+    const outputTokens = groupTokens(call.output);
+    addedInput += inputTokens;
+    addedOutput += outputTokens;
+    return { ...call, inputTokens, outputTokens, isEstimated: true };
+  });
+  if (addedInput === 0 && addedOutput === 0) return run;
+  return {
+    ...run,
+    calls,
+    inputTokens: run.inputTokens + addedInput,
+    outputTokens: run.outputTokens + addedOutput,
+  };
+}
 
 // ---------- One workspace's data ----------
 
@@ -417,7 +444,7 @@ export class WorkspaceData {
   async loadRuns(id: string): Promise<Map<number, RunRecord>> {
     const lines = await readLines(this.#runsFile(id), runSchema);
     return new Map(
-      lines.map((r) => [
+      lines.map(withEstimatedCalls).map((r) => [
         r.startSeq,
         {
           startSeq: r.startSeq,

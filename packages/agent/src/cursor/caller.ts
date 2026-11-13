@@ -59,6 +59,7 @@ export function createCursorModelCaller(settings: ModelSettings): CallModel {
       userText: conversationText(request, tools.length > 0),
       images: images.map(({ image }) => image),
       tools,
+      ...(request.conversationId ? { conversationId: request.conversationId } : {}),
     });
     return runTurn(url, settings, body, tools, request, images.length > 0);
   };
@@ -152,7 +153,7 @@ function runTurn(
   settings: ModelSettings,
   body: Buffer,
   tools: CursorTool[],
-  { onText, signal }: ModelRequest,
+  { onText, onOutput, signal }: ModelRequest,
   hasImages: boolean,
 ): Promise<ModelResponse> {
   const isComposer = /^composer(-|$)/i.test(settings.model);
@@ -227,6 +228,7 @@ function runTurn(
       else if (exec.kind === 'list_mcp_resources') send(listMcpResourcesReply(exec));
       else if (exec.kind === 'builtin') send(builtinReply(exec));
       else {
+        onOutput?.(exec.toolName + JSON.stringify(exec.args));
         state.toolCalls.push({
           // GPT's ids carry a newline and a second id; keep them to one safe token.
           id:
@@ -251,8 +253,13 @@ function runTurn(
       if (kv) send(kvReply(kv, blobs));
       onExec(payload);
       for (const update of decodeUpdates(payload)) {
-        if (update.kind === 'text') emitText(update.text);
-        else if (update.kind === 'thinking' && isComposer) {
+        if (update.kind === 'text') {
+          emitText(update.text);
+          onOutput?.(update.text);
+        } else if (update.kind === 'thinking') {
+          // All of it is output, shown or not; composer's reply is in it, so counted once here.
+          onOutput?.(update.text);
+          if (!isComposer) continue;
           const before = composerReply(state.thinking);
           state.thinking += update.text;
           const after = composerReply(state.thinking);

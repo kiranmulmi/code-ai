@@ -43,8 +43,18 @@ export interface ModelRequest {
   images?: ReadonlyMap<string, string>;
   /** Called with each piece of text as it streams in. */
   onText?: (delta: string) => void;
+  /**
+   * Called with each piece of output as it streams in, shown or not (text, refusal, tool calls,
+   * reasoning), so the caller can count the call's tokens before the server reports them.
+   */
+  onOutput?: (piece: string) => void;
   /** Cancels the call (the user stopped the run). */
   signal?: AbortSignal;
+  /**
+   * The same for every call of one chat (its id). Cursor files a call under it, which may let
+   * its prompt cache match the chat's earlier calls; the Chat Completions call doesn't use it.
+   */
+  conversationId?: string;
 }
 
 /** The complete assistant turn: text plus any tool calls. */
@@ -77,7 +87,15 @@ export function createModelCaller(config: ModelSettings): CallModel {
     return client;
   }
 
-  return async function callModel({ system, messages, tools = [], images, onText, signal }) {
+  return async function callModel({
+    system,
+    messages,
+    tools = [],
+    images,
+    onText,
+    onOutput,
+    signal,
+  }) {
     if (!config.model) {
       throw new Error(`"${config.label}" has no model name. Set one in Settings → Models.`);
     }
@@ -120,8 +138,16 @@ export function createModelCaller(config: ModelSettings): CallModel {
         if (delta.content) {
           content += delta.content;
           onText?.(delta.content);
+          onOutput?.(delta.content);
         }
-        if (delta.refusal) refusal = (refusal ?? '') + delta.refusal;
+        if (delta.refusal) {
+          refusal = (refusal ?? '') + delta.refusal;
+          onOutput?.(delta.refusal);
+        }
+        // Not in OpenAI's types: the reasoning text some servers stream (DeepSeek, vLLM, Ollama,
+        // OpenRouter). Not kept, only counted.
+        const reasoning = reasoningPiece(delta);
+        if (reasoning) onOutput?.(reasoning);
 
         // Tool calls arrive in pieces: the first piece has the id and name, later
         // pieces add to the arguments string. `index` says which call a piece is for.
@@ -133,8 +159,14 @@ export function createModelCaller(config: ModelSettings): CallModel {
             function: { name: '', arguments: '' },
           });
           if (piece.id) call.id = piece.id;
-          if (piece.function?.name && !call.function.name) call.function.name = piece.function.name;
-          if (piece.function?.arguments) call.function.arguments += piece.function.arguments;
+          if (piece.function?.name && !call.function.name) {
+            call.function.name = piece.function.name;
+            onOutput?.(piece.function.name);
+          }
+          if (piece.function?.arguments) {
+            call.function.arguments += piece.function.arguments;
+            onOutput?.(piece.function.arguments);
+          }
         }
         if (choice.finish_reason) finishReason = choice.finish_reason;
       }
@@ -159,6 +191,13 @@ export function createModelCaller(config: ModelSettings): CallModel {
       usage: readUsage(usage),
     };
   };
+}
+
+/** A streamed piece of reasoning text, under the field names servers use for it, or ''. */
+function reasoningPiece(delta: unknown): string {
+  if (!isRecord(delta)) return '';
+  const piece = delta.reasoning_content ?? delta.reasoning;
+  return typeof piece === 'string' ? piece : '';
 }
 
 const count = (value: unknown): number =>

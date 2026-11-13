@@ -20,7 +20,7 @@ const KEEP_RECENT = 0.25;
 /** One summarizing call reads at most this share of the usable window of transcript. */
 const SUMMARY_CHUNK = 0.5;
 
-const CHARS_PER_TOKEN = 4;
+export const CHARS_PER_TOKEN = 4;
 /** Roles, separators and the like that every message adds. */
 const MESSAGE_OVERHEAD = 4;
 /** What an attached image roughly costs (it depends on its size and the model). */

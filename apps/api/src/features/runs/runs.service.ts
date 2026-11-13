@@ -76,9 +76,12 @@ export function createRunsService(
 
       return async function stream({ send, onClose }: RunStream): Promise<void> {
         const approver = runs.createApprover(chat.id, config.approval, send);
+        const asker = runs.createAsker(send);
         onClose(approver.denyAll);
-        // Stopping also answers any approval the agent is waiting on.
+        onClose(asker.skipAll);
+        // Stopping also answers any approval or question the agent is waiting on.
         signal.addEventListener('abort', approver.denyAll, { once: true });
+        signal.addEventListener('abort', asker.skipAll, { once: true });
         send({ type: 'chat', chat: chats.summarize(chat) });
         // Written alongside the run, so it's ready by the time the answer is.
         const title = isTitleDue
@@ -103,6 +106,7 @@ export function createRunsService(
               config,
               model,
               approve: approver.approve,
+              askUser: asker.askUser,
               signal,
               steering: runs.inbox(chat.id),
               onEvent: send,

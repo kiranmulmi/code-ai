@@ -1,7 +1,7 @@
 // Offline tests for reading the login shell's PATH. Run with: npm run test -w @app/desktop
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mergePaths, parseMarkedPath } from '../src/shell-path.js';
+import { loginShellPath, mergePaths, parseMarkedPath } from '../src/shell-path.js';
 
 test('takes the PATH between the markers, ignoring what start-up files print', () => {
   const output = 'Welcome back!\n__NIMBRIO_PATH__/opt/homebrew/bin:/usr/bin__NIMBRIO_PATH__\nbye';
@@ -20,4 +20,13 @@ test("merges the shell's PATH first, then the folders only the app had, without 
     '/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin',
   );
   assert.equal(mergePaths('', '/usr/bin'), '/usr/bin');
+});
+
+test('reads the PATH from a real shell', { skip: process.platform === 'win32' }, async () => {
+  const shellPath = await loginShellPath({
+    ...process.env,
+    SHELL: '/bin/sh',
+    PATH: '/usr/bin:/bin',
+  });
+  assert.ok(shellPath?.split(':').includes('/usr/bin'), `got ${String(shellPath)}`);
 });

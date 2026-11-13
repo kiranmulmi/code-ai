@@ -3,10 +3,11 @@ import { usePageVisible } from '../../../lib/usePageVisible';
 import { fetchGitChanges } from './api';
 
 /**
- * Once a minute: `git status` plus line counts cost more than a task list, and the count is
- * also checked on each run start/end and when the tab is shown again.
+ * Every 10 s, so changes made outside the agent (an editor, a terminal) show soon. It's also
+ * checked on each run start/end and when the browser tab is shown again. The API logs these
+ * quiet reads at debug only (`POLLED_ROUTES`).
  */
-const POLL_MS = 60_000;
+export const GIT_POLL_MS = 10_000;
 
 /**
  * How many files changed since the last commit, for the Git diff tab's label (null when
@@ -40,7 +41,7 @@ export function useGitChangeCount(
   useEffect(() => {
     if (!isEnabled || !isPageVisible) return;
     void refresh();
-    const timer = window.setInterval(() => void refresh(), POLL_MS);
+    const timer = window.setInterval(() => void refresh(), GIT_POLL_MS);
     return () => window.clearInterval(timer);
   }, [refresh, isEnabled, isBusy, isPageVisible]);
 

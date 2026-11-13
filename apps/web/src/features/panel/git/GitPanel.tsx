@@ -7,7 +7,9 @@ import { plural } from '../../../lib/format';
 import { ChevronRightIcon, GitDiffIcon, RefreshIcon } from '../../../lib/icons';
 import { useAsync } from '../../../lib/useAsync';
 import { PanelMessage } from '../PanelMessage';
+import { usePageVisible } from '../../../lib/usePageVisible';
 import { fetchGitChanges, fetchGitDiff } from './api';
+import { GIT_POLL_MS } from './useGitChangeCount';
 import { DiffView } from './DiffView';
 
 const STATUS: Record<GitFileStatus, { letter: string; label: string; tone: string }> = {
@@ -23,7 +25,8 @@ type DiffState = { diff: GitFileDiff } | { error: string } | 'loading';
 /**
  * The Git diff tab: the files changed in the workspace's folder since the last commit
  * (staged or not, new ones too). Click a file to see its diff. Reloads when the agent
- * finishes, since that's when files usually change.
+ * finishes, since that's when files usually change, and every 10 s while the browser tab shows
+ * (open diffs load again only when the list changed).
  */
 export function GitPanel({ workspaceId, isBusy }: { workspaceId: string; isBusy: boolean }) {
   const load = useCallback(() => fetchGitChanges(workspaceId), [workspaceId]);
@@ -32,16 +35,29 @@ export function GitPanel({ workspaceId, isBusy }: { workspaceId: string; isBusy:
   const [open, setOpen] = useState<ReadonlySet<string>>(new Set());
   const [diffs, setDiffs] = useState<ReadonlyMap<string, DiffState>>(new Map());
 
+  // The refresh button spins for a reload the user asked for (or one after a run), not for polls.
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const refresh = useCallback(() => {
     setDiffs(new Map()); // stale once the files change; open ones load again
+    setIsRefreshing(true);
     reload();
   }, [reload]);
+  useEffect(() => {
+    if (!changes.isLoading) setIsRefreshing(false);
+  }, [changes.isLoading]);
 
   const wasBusy = useRef(isBusy);
   useEffect(() => {
     if (wasBusy.current && !isBusy) refresh();
     wasBusy.current = isBusy;
   }, [isBusy, refresh]);
+
+  const isPageVisible = usePageVisible();
+  useEffect(() => {
+    if (!isPageVisible) return;
+    const timer = window.setInterval(reload, GIT_POLL_MS);
+    return () => window.clearInterval(timer);
+  }, [reload, isPageVisible]);
 
   const loadDiff = useCallback(
     (path: string) => {
@@ -57,8 +73,17 @@ export function GitPanel({ workspaceId, isBusy }: { workspaceId: string; isBusy:
     [workspaceId],
   );
 
-  // An open file whose diff isn't loaded (just opened, or after a refresh) loads it.
+  // A poll that finds the files changed makes the open diffs stale: they load again below.
   const files = changes.data?.files;
+  const filesSeen = useRef<string | null>(null);
+  useEffect(() => {
+    if (!files) return;
+    const seen = JSON.stringify(files);
+    if (filesSeen.current !== null && filesSeen.current !== seen) setDiffs(new Map());
+    filesSeen.current = seen;
+  }, [files]);
+
+  // An open file whose diff isn't loaded (just opened, or after a refresh) loads it.
   useEffect(() => {
     if (!files) return;
     for (const file of files) {
@@ -109,7 +134,11 @@ export function GitPanel({ workspaceId, isBusy }: { workspaceId: string; isBusy:
           aria-label="Refresh"
           title="Refresh"
         >
-          {changes.isLoading ? <Spinner size={12} /> : <RefreshIcon />}
+          {changes.isLoading && (isRefreshing || !changes.data) ? (
+            <Spinner size={12} />
+          ) : (
+            <RefreshIcon />
+          )}
         </IconButton>
       </div>
 
