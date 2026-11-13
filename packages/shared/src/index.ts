@@ -198,16 +198,20 @@ export {
 
 export {
   SKILL_LIMITS,
+  SKILL_MAIN_FILE,
   SKILL_REQUEST_MAX_CHARS,
   SKILL_NAME_PATTERN,
   skillImproveSchema,
   skillInputSchema,
   skillNameSchema,
+  skillUploadSchema,
   toSkillName,
   type ImprovedSkill,
   type Skill,
+  type SkillFile,
   type SkillImproveRequest,
   type SkillInput,
+  type SkillUpload,
 } from './skill.js';
 export {
   TASK_COMMAND_MAX_CHARS,

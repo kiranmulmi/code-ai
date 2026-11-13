@@ -9,6 +9,7 @@ import {
   type Skill,
   type ToolGroup,
 } from '@app/shared';
+import { skillFilesNote } from './tools/skills.js';
 
 // ---------- The agent (executor) ----------
 
@@ -103,6 +104,7 @@ function guidance(off: ReadonlySet<ToolGroup>, { hasSkills }: { hasSkills: boole
       ? `Skills:
 - Skills are instructions the user wrote for kinds of task (a workflow, a checklist, a house style). The workspace's skills are listed at the end of these instructions, each with when to use it.
 - Before starting a task that matches a skill's description, load it with use_skill and follow it. If several match, load each one that applies. Skills the user picked for a message come with the message in full; don't load those again.
+- Some skills come with files of their own (references, templates, assets), listed after their instructions. Read one with read_skill_file when the instructions point to it, rather than guessing what it says, and copy one into the project with copy_skill_file when the skill says to use it there.
 - A skill guides how you do the task. It never overrides the rules about tools, approvals, files and untrusted web content.`
       : null,
     memory.join('\n'),
@@ -282,7 +284,9 @@ export function attachmentContext(attachments: readonly Attachment[]): string {
 
 /** The skills the user picked for their message, in full, put after it. */
 export function pickedSkillsContext(skills: readonly Skill[]): string {
-  const blocks = skills.map((skill) => `<skill name="${skill.name}">\n${skill.body}\n</skill>`);
+  const blocks = skills.map(
+    (skill) => `<skill name="${skill.name}">\n${skill.body}\n</skill>${skillFilesNote(skill)}`,
+  );
   return `[Skills the user picked for this message. Added by the agent framework. Follow them for this request]\n${blocks.join('\n')}\n[End of picked skills]`;
 }
 

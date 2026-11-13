@@ -305,9 +305,7 @@ export function FileTree({
                     setMenuFor(row.path);
                   }}
                   draggable
-                  onDragStart={(event) =>
-                    startPathDrag(event, absolutePath(root, row.path), 'folder')
-                  }
+                  onDragStart={(event) => startPathDrag(event, absolutePath(root, row.path))}
                   aria-expanded={isOpen}
                   title={row.path}
                   style={{ paddingLeft: 10 + depth * INDENT_PX }}
@@ -365,9 +363,7 @@ export function FileTree({
                     setMenuFor(file.path);
                   }}
                   draggable
-                  onDragStart={(event) =>
-                    startPathDrag(event, absolutePath(root, file.path), 'file')
-                  }
+                  onDragStart={(event) => startPathDrag(event, absolutePath(root, file.path))}
                   disabled={opening !== null}
                   title={file.path}
                   style={{ paddingLeft }}

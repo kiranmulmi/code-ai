@@ -15,25 +15,11 @@ import {
   type Skill,
   type Usage,
 } from '@app/shared';
-import { PATH_DRAG_TYPE, PATH_KIND_DRAG_TYPE } from '../../lib/dragPath';
+import { PATH_DRAG_TYPE, desktopPathOf, droppedPathsText, quoteIfSpaced } from '../../lib/dragPath';
 import { Spinner } from '../../components/Spinner';
 import { errorMessage } from '../../lib/api';
-import {
-  FileTintIcon,
-  FolderTintIcon,
-  MicIcon,
-  PaperclipIcon,
-  SendIcon,
-  StopIcon,
-  WandIcon,
-} from '../../lib/icons';
-import {
-  expandMentions,
-  splitMentions,
-  tokenFor,
-  type Mentions,
-  type PathMention,
-} from './pathMentions';
+import { MicIcon, PaperclipIcon, SendIcon, StopIcon, WandIcon } from '../../lib/icons';
+import { useToast } from '../../lib/toast';
 import { AttachmentChip } from './AttachmentChip';
 import { ImagePreview, type PreviewImage } from './ImagePreview';
 import { ChatUsageLine } from './ChatUsageLine';
@@ -46,14 +32,16 @@ import { useDraftAttachments } from './useDraftAttachments';
 
 const MAX_HEIGHT = 240;
 
-/** Shared by the box and the copy behind it, so their text lines up exactly. */
+/** The message box's text layout. */
 const BOX_TEXT =
   'px-4 pb-1 pt-3 text-[14px] leading-relaxed whitespace-pre-wrap [overflow-wrap:break-word] [scrollbar-gutter:stable]';
 
 /**
  * The message box: Enter sends, Shift+Enter adds a line. `controls` pick the model. Files
- * can be attached with the paperclip, dropped on the box or pasted; they upload right away.
- * Skills can be picked for the message with the Skills button; they're sent with it.
+ * can be attached with the paperclip or pasted; they upload right away. Files and folders
+ * dropped on the box (from the Files panel, or Finder / File Explorer in the desktop app) only
+ * put their full path in the text. Skills can be picked for the message with the Skills
+ * button; they're sent with it.
  */
 export function Composer({
   workspaceId,
@@ -110,14 +98,9 @@ export function Composer({
     setPicked((current) =>
       current.includes(name) ? current.filter((item) => item !== name) : [...current, name],
     );
-  // What is being dragged over the box: files to attach, or a path from the Files panel.
-  const [dragging, setDragging] = useState<'files' | 'path' | null>(null);
-  const isDragging = dragging !== null;
-  // Dropped paths, by the token that stands for them in the box.
-  const [mentions, setMentions] = useState<Mentions>(new Map());
-  const parts = splitMentions(value, mentions);
-  const hasMentions = parts.some((part) => part.type === 'mention');
-  const backdrop = useRef<HTMLDivElement>(null);
+  // Files or folders being dragged over the box: dropping them inserts their paths.
+  const [isDragging, setIsDragging] = useState(false);
+  const toast = useToast();
   // The wand: rewriting, the draft it replaced (for Undo), and why it failed.
   const [isImproving, setIsImproving] = useState(false);
   const [beforeImprove, setBeforeImprove] = useState<string | null>(null);
@@ -191,33 +174,47 @@ export function Composer({
     event?.preventDefault();
     if (!canSubmit) return;
     if (isSteering) {
-      onSteer(expandMentions(value, mentions));
+      onSteer(value);
       setValue('');
-      setMentions(new Map());
       setBeforeImprove(null);
       setImproveError(null);
       return;
     }
     const available = new Set((skills ?? []).map((skill) => skill.name));
     onSend(
-      expandMentions(value, mentions),
+      value,
       files.ready,
       picked.filter((name) => available.has(name)),
     );
     setValue('');
     setPicked([]);
-    setMentions(new Map());
     setBeforeImprove(null);
     setImproveError(null);
     files.clear();
   };
 
-  const dragKind = (event: DragEvent) =>
-    event.dataTransfer.types.includes(PATH_DRAG_TYPE)
-      ? 'path'
-      : event.dataTransfer.types.includes('Files')
-        ? 'files'
-        : null;
+  /** A file or folder from the Files panel, or from Finder / File Explorer. */
+  const isPathDrag = (event: DragEvent) =>
+    event.dataTransfer.types.includes(PATH_DRAG_TYPE) || event.dataTransfer.types.includes('Files');
+
+  /** Dropped files and folders: their full paths go in the box; nothing is attached. */
+  const dropPaths = (event: DragEvent) => {
+    const fromPanel = event.dataTransfer.getData(PATH_DRAG_TYPE);
+    if (fromPanel) {
+      insertAtCaret(quoteIfSpaced(fromPanel));
+      return;
+    }
+    const dropped = Array.from(event.dataTransfer.files);
+    if (!dropped.length) return;
+    const { text, missing } = droppedPathsText(dropped, (file) => desktopPathOf(file as File));
+    insertAtCaret(text);
+    if (missing.length) {
+      toast(
+        'The browser shares only the names of files dropped from your computer, not where they are. Drag from the Files panel, or use the desktop app, to get full paths.',
+        'warning',
+      );
+    }
+  };
 
   /** Put `text` where the caret is (or in place of the selection), spaced from its neighbours. */
   const insertAtCaret = (text: string) => {
@@ -243,36 +240,23 @@ export function Composer({
         // Clicking the padding or the bottom row still puts the caret in the box.
         onClick={() => ref.current?.focus()}
         onDragEnter={(event) => {
-          const kind = dragKind(event);
-          if (kind) setDragging(kind);
+          if (isPathDrag(event)) setIsDragging(true);
         }}
         onDragOver={(event) => {
-          if (!dragKind(event)) return;
+          if (!isPathDrag(event)) return;
           event.preventDefault();
           event.dataTransfer.dropEffect = 'copy';
         }}
         onDragLeave={(event) => {
           if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
-            setDragging(null);
+            setIsDragging(false);
           }
         }}
         onDrop={(event) => {
-          const kind = dragKind(event);
-          if (!kind) return;
+          if (!isPathDrag(event)) return;
           event.preventDefault();
-          setDragging(null);
-          if (kind === 'path') {
-            const path = event.dataTransfer.getData(PATH_DRAG_TYPE);
-            if (!path) return;
-            const mention: PathMention = {
-              path,
-              kind:
-                event.dataTransfer.getData(PATH_KIND_DRAG_TYPE) === 'folder' ? 'folder' : 'file',
-            };
-            const token = tokenFor(path, mentions);
-            setMentions((current) => new Map(current).set(token, mention));
-            insertAtCaret(token);
-          } else files.add(event.dataTransfer.files);
+          setIsDragging(false);
+          dropPaths(event);
         }}
         className={`relative mx-auto w-full max-w-[1000px] cursor-text rounded-2xl border bg-surface shadow-card transition-[border-color,box-shadow] focus-within:border-line-strong focus-within:shadow-float ${
           isDragging ? 'border-accent' : 'border-line hover:border-line-strong'
@@ -280,7 +264,7 @@ export function Composer({
       >
         {isDragging && (
           <div className="pointer-events-none absolute inset-0 z-10 grid place-items-center rounded-2xl bg-accent-soft text-[13px] font-medium text-accent">
-            {dragging === 'path' ? 'Drop to insert its path' : 'Drop files to attach them'}
+            Drop to insert the full path
           </div>
         )}
         {(files.drafts.length > 0 || picked.length > 0) && (
@@ -312,51 +296,10 @@ export function Composer({
           </div>
         )}
         <div className="relative">
-          {/* Dropped paths show as pills: a copy of the text behind the (then see-through)
-            box, styled without changing any widths, so the caret stays where it should. */}
-          {hasMentions && (
-            <div
-              ref={backdrop}
-              aria-hidden
-              className={`${BOX_TEXT} pointer-events-none absolute inset-0 overflow-hidden text-ink`}
-            >
-              {parts.map((part, index) =>
-                part.type === 'text' ? (
-                  part.text
-                ) : (
-                  <span
-                    key={index}
-                    title={part.mention.path}
-                    className="rounded-[5px] bg-accent-soft text-accent-2 shadow-[0_0_0_2px_var(--accent-soft)]"
-                  >
-                    <span className="relative">
-                      <span className="invisible">@</span>
-                      {part.mention.kind === 'folder' ? (
-                        <FolderTintIcon
-                          size={13}
-                          className="absolute left-0 top-1/2 -translate-y-1/2 text-ft-folder"
-                        />
-                      ) : (
-                        <FileTintIcon
-                          size={13}
-                          className="absolute left-0 top-1/2 -translate-y-1/2"
-                        />
-                      )}
-                    </span>
-                    {part.text.slice(1)}
-                  </span>
-                ),
-              )}
-              {'\n'}
-            </div>
-          )}
           <textarea
             ref={ref}
             rows={2}
             value={value}
-            onScroll={(event) => {
-              if (backdrop.current) backdrop.current.scrollTop = event.currentTarget.scrollTop;
-            }}
             onChange={(event) => setValue(event.target.value)}
             onPaste={(event) => {
               // A pasted screenshot or file is attached; pasted text goes in as usual.
@@ -379,9 +322,7 @@ export function Composer({
             }
             name="message"
             aria-label="Message"
-            className={`${BOX_TEXT} relative block w-full resize-none bg-transparent text-ink caret-ink outline-none placeholder:text-ink-3 focus-visible:outline-none ${
-              hasMentions ? '[-webkit-text-fill-color:transparent]' : ''
-            }`}
+            className={`${BOX_TEXT} relative block w-full resize-none bg-transparent text-ink caret-ink outline-none placeholder:text-ink-3 focus-visible:outline-none`}
           />
         </div>
         <div className="flex items-center justify-between gap-2 px-3 pb-2.5 pl-2.5">

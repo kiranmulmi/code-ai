@@ -315,7 +315,7 @@ export class Store {
     return new WorkspaceAttachments(workspace.path);
   }
 
-  /** One workspace's skills: .nimbrio-ai/skills/<name>.md. */
+  /** One workspace's skills: .nimbrio-ai/skills/<name>.md, or <name>/SKILL.md with its files. */
   skills(workspace: Pick<Workspace, 'path'>): WorkspaceSkills {
     return new WorkspaceSkills(workspace.path);
   }

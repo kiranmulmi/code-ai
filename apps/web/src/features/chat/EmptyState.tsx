@@ -13,7 +13,7 @@ const STEPS = [
   },
   {
     title: 'Attach anything',
-    text: 'Drop in screenshots, PDFs, Word documents or code for it to read.',
+    text: 'Attach or paste screenshots, PDFs, Word documents or code; drop a file to insert its path.',
   },
 ];
 

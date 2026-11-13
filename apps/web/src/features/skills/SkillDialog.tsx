@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import {
   SKILL_LIMITS,
+  SKILL_MAIN_FILE,
   SKILL_REQUEST_MAX_CHARS,
+  formatBytes,
   skillInputSchema,
   toSkillName,
   type Skill,
+  type SkillFile,
 } from '@app/shared';
 import { AiWritingEditor, type AiChip } from '../../components/AiWritingEditor';
 import { Button } from '../../components/Button';
@@ -14,9 +17,16 @@ import { Modal } from '../../components/Modal';
 import { PageLoader } from '../../components/PageLoader';
 import { Spinner } from '../../components/Spinner';
 import { ApiError, errorMessage, isNotFound } from '../../lib/api';
-import { TrashIcon } from '../../lib/icons';
+import { DownloadIcon, FileIcon, TrashIcon } from '../../lib/icons';
 import { useToast } from '../../lib/toast';
-import { createSkill, deleteSkill, fetchSkill, improveSkill, updateSkill } from './api';
+import {
+  createSkill,
+  deleteSkill,
+  fetchSkill,
+  fetchSkillFile,
+  improveSkill,
+  updateSkill,
+} from './api';
 
 type Field = 'name' | 'description' | 'body';
 type Errors = Partial<Record<Field, string>>;
@@ -91,6 +101,8 @@ export function SkillDialog({
   // The AI writer: busy (Save waits), and the description it replaced (for Undo).
   const [isImproving, setIsImproving] = useState(false);
   const descriptionBeforeAi = useRef<string | null>(null);
+  // A folder skill (uploaded): its files besides SKILL.md. Null: a single-file skill.
+  const [files, setFiles] = useState<SkillFile[] | null>(null);
 
   const isDirty =
     draft.name !== saved.name ||
@@ -107,6 +119,7 @@ export function SkillDialog({
         const loaded = { name: skill.name, description: skill.description, body: skill.body };
         setDraft(loaded);
         setSaved(loaded);
+        setFiles(skill.files ?? null);
       })
       .catch((cause: unknown) => {
         if (!isCurrent) return;
@@ -217,6 +230,23 @@ export function SkillDialog({
   const cancelDelete = useCallback(() => setIsDeleteOpen(false), []);
 
   const fileName = toSkillName(draft.name) || 'name';
+  const savedAs = files !== null ? `${fileName}/${SKILL_MAIN_FILE}` : `${fileName}.md`;
+
+  /** Saves one of the skill's files through the browser. */
+  const downloadFile = async (file: SkillFile) => {
+    if (!skillName) return;
+    try {
+      const blob = await fetchSkillFile(workspaceId, skillName, file.path);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = file.path.split('/').pop() ?? 'file';
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (cause) {
+      toast(errorMessage(cause, "Couldn't download the file."), 'error');
+    }
+  };
 
   const footer = isClosing ? (
     <>
@@ -305,7 +335,7 @@ export function SkillDialog({
                 <p className={HINT}>
                   Lower-case words joined by hyphens. Saved as{' '}
                   <span className="break-all font-mono text-[12px]">
-                    .nimbrio-ai/skills/{fileName}.md
+                    .nimbrio-ai/skills/{savedAs}
                   </span>
                 </p>
               </div>
@@ -377,6 +407,51 @@ export function SkillDialog({
                 </span>
               </p>
             </div>
+
+            {files !== null && (
+              <div className={SECTION}>
+                <span className={LABEL}>
+                  Files{' '}
+                  <span className="font-normal text-ink-3">
+                    · {files.length} besides {SKILL_MAIN_FILE}
+                  </span>
+                </span>
+                {files.length === 0 ? (
+                  <p className={HINT}>This skill folder has no other files.</p>
+                ) : (
+                  <ul className="panel max-h-48 divide-y divide-line-2 overflow-y-auto">
+                    {files.map((file) => (
+                      <li
+                        key={file.path}
+                        className="flex items-center gap-2 px-3 py-1.5 text-[12.5px]"
+                      >
+                        <FileIcon size={13} className="shrink-0 text-ink-3" />
+                        <span className="min-w-0 flex-1 truncate font-mono text-ink">
+                          {file.path}
+                        </span>
+                        <span className="shrink-0 tabular-nums text-ink-3">
+                          {formatBytes(file.size)}
+                        </span>
+                        <button
+                          type="button"
+                          title="Download this file"
+                          aria-label={`Download ${file.path}`}
+                          onClick={() => void downloadFile(file)}
+                          className="grid h-6 w-6 shrink-0 place-items-center rounded-md text-ink-3 transition hover:bg-subtle hover:text-ink"
+                        >
+                          <DownloadIcon size={12} />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <p className={HINT}>
+                  The agent reads these with read_skill_file when the instructions point to them,
+                  and copies them into the project with copy_skill_file. To change them, upload the
+                  folder again and replace this skill.
+                </p>
+              </div>
+            )}
           </form>
         )}
       </Modal>

@@ -55,6 +55,8 @@ const TOOL_ICONS: Readonly<Record<string, Icon>> = {
   add_plan_steps: FlagIcon,
   get_current_time: ClockIcon,
   use_skill: SkillIcon,
+  read_skill_file: SkillIcon,
+  copy_skill_file: SkillIcon,
   calculator: CalculatorIcon,
   load_mcp_tools: ServerIcon,
 };

@@ -23,6 +23,9 @@ export {
   SkillExistsError,
   formatSkillFile,
   parseSkillFile,
+  skillFileName,
+  splitSkillPath,
+  type SkillUploadFile,
 } from './workspace-skills.js';
 export {
   runInChat,

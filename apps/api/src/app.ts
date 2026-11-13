@@ -34,7 +34,7 @@ import { createTerminalSocket } from './features/terminal/terminal.socket.js';
 import { createMcpService } from './features/mcp/mcp.service.js';
 import { memoriesRouter } from './features/memories/memories.routes.js';
 import { skillsRouter } from './features/skills/skills.routes.js';
-import { createSkillsService } from './features/skills/skills.service.js';
+import { SKILL_UPLOAD_BODY_LIMIT, createSkillsService } from './features/skills/skills.service.js';
 import { modelsRouter } from './features/models/models.routes.js';
 import { createModelsService } from './features/models/models.service.js';
 import { runsRouter } from './features/runs/runs.routes.js';
@@ -92,6 +92,10 @@ export function createApp(context: AppContext) {
   app.use(requireJson);
   // Uploads carry a file as base64, so only they get a larger body; everything else stays at 1 MB.
   app.use('/v1/workspaces/:workspaceId/attachments', express.json({ limit: UPLOAD_BODY_LIMIT }));
+  app.use(
+    '/v1/workspaces/:workspaceId/skills/upload',
+    express.json({ limit: SKILL_UPLOAD_BODY_LIMIT }),
+  );
   app.use(express.json({ limit: '1mb' }));
 
   app.get('/health', (_req, res) => {

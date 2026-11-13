@@ -2,13 +2,15 @@ import { z } from 'zod';
 
 /**
  * A skill: instructions for one kind of task (a workflow, a checklist, a house style),
- * written by the user in the Skills tab and kept in the workspace's
- * `.nimbrio-ai/skills/<name>.md`. The agent sees every skill's name and description and
- * loads one with `use_skill` when a task matches it; the user can also pick skills for a
- * message in the composer, and those come with the message in full.
+ * written by the user in the Skills tab and kept in the workspace's `.nimbrio-ai/skills/`,
+ * either as one file (`<name>.md`) or, when uploaded with files of its own, as a folder
+ * (`<name>/SKILL.md` plus e.g. `references/…` and `assets/…`). The agent sees every skill's
+ * name and description and loads one with `use_skill` when a task matches it, then reads its
+ * files with `read_skill_file`; the user can also pick skills for a message in the composer,
+ * and those come with the message in full.
  */
 export interface Skill {
-  /** kebab-case, also the file name: "jira-ticket-fix" */
+  /** kebab-case, also the file or folder name: "jira-ticket-fix" */
   name: string;
   /** when to use it, in a sentence or two: this is what the agent decides by */
   description: string;
@@ -16,17 +18,61 @@ export interface Skill {
   body: string;
   /** when the file last changed (ISO) */
   updatedAt: string | null;
+  /** A folder skill's other files (not SKILL.md), by path inside the folder. Empty or left out: none. */
+  files?: SkillFile[];
+}
+
+/** One file that comes with a folder skill. */
+export interface SkillFile {
+  /** relative to the skill's folder, with "/": "references/tokens.md" */
+  path: string;
+  size: number;
 }
 
 export const SKILL_LIMITS = {
   nameLength: 64,
-  descriptionLength: 500,
+  descriptionLength: 1024,
   bodyChars: 40_000,
   /** skills one workspace can have (all of them are listed to the agent) */
   count: 100,
   /** skills the user can pick for one message */
   perMessage: 5,
+  /** An uploaded skill folder: at most this many files (SKILL.md included)… */
+  fileCount: 100,
+  /** …each at most this large… */
+  fileBytes: 2 * 1024 * 1024,
+  /** …and together at most this large. */
+  totalBytes: 10 * 1024 * 1024,
+  /** a file's path inside the skill folder */
+  pathLength: 240,
 } as const;
+
+/** The file in a skill folder that holds its name, description and instructions. */
+export const SKILL_MAIN_FILE = 'SKILL.md';
+
+/**
+ * `POST /v1/workspaces/:id/skills/upload`: a skill folder, one entry per file, as picked in the
+ * browser (paths may start with the folder's own name, which is dropped). `replace`: overwrite
+ * a skill that has the same name (otherwise that is a 409).
+ */
+export const skillUploadSchema = z.object({
+  files: z
+    .array(
+      z.object({
+        path: z
+          .string()
+          .min(1)
+          .max(SKILL_LIMITS.pathLength + SKILL_LIMITS.nameLength + 1),
+        /** The file's bytes, base64-encoded (the API only accepts JSON). */
+        data: z.string().regex(/^[A-Za-z0-9+/]*={0,2}$/, 'The file data must be base64.'),
+      }),
+    )
+    .min(1, 'Pick a skill folder.')
+    .max(SKILL_LIMITS.fileCount, `A skill can have at most ${SKILL_LIMITS.fileCount} files.`),
+  replace: z.boolean().default(false),
+});
+
+export type SkillUpload = z.input<typeof skillUploadSchema>;
 
 /** Lower-case words joined by single hyphens: safe as a file name everywhere. */
 export const SKILL_NAME_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;

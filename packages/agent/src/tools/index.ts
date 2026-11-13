@@ -20,7 +20,7 @@ import { stopTask, taskOutput } from './tasks.js';
 import { remember, recall, forget } from './memory.js';
 import { createPlan, updatePlan, addPlanSteps } from './plan.js';
 import { webSearch } from './web-search.js';
-import { useSkill } from './skills.js';
+import { copySkillFile, readSkillFile, useSkill } from './skills.js';
 import { loadMcpTools } from './load-mcp-tools.js';
 import { fetchPage } from './fetch-page.js';
 
@@ -29,6 +29,8 @@ const TOOLS: readonly AnyTool[] = [
   updatePlan,
   addPlanSteps,
   useSkill,
+  readSkillFile,
+  copySkillFile,
   getCurrentTime,
   calculator,
   webSearch,
@@ -67,6 +69,7 @@ const GROUP_OF: Record<string, ToolGroup> = {
   [copyPath.name]: 'files',
   [deletePath.name]: 'files',
   [saveAttachment.name]: 'files', // it writes into the folder
+  [copySkillFile.name]: 'files', // so does this
   [runCommand.name]: 'commands',
   [taskOutput.name]: 'commands',
   [stopTask.name]: 'commands',
@@ -86,7 +89,11 @@ export const ATTACHMENT_TOOLS: readonly string[] = [
   viewImage.name,
   saveAttachment.name,
 ];
-export const SKILL_TOOLS: readonly string[] = [useSkill.name];
+export const SKILL_TOOLS: readonly string[] = [
+  useSkill.name,
+  readSkillFile.name,
+  copySkillFile.name,
+];
 
 export interface Toolset {
   byName: Map<string, AnyTool>;

@@ -1,10 +1,18 @@
 import { SkillExistsError } from '@app/db';
-import type { Skill, SkillInput } from '@app/shared';
+import { SKILL_LIMITS, type Skill, type SkillInput, type SkillUpload } from '@app/shared';
 import type { AppContext } from '../../context.js';
-import { ConflictError, NotFoundError, ValidationError } from '../../lib/errors.js';
+import {
+  ConflictError,
+  NotFoundError,
+  PayloadTooLargeError,
+  ValidationError,
+} from '../../lib/errors.js';
 import type { WorkspacesService } from '../workspaces/workspaces.service.js';
 
-/** A workspace's skills (its .nimbrio-ai/skills/), written from the Skills tab. */
+/** Base64 of the largest skill folder, plus room for the paths and the rest of the JSON. */
+export const SKILL_UPLOAD_BODY_LIMIT = `${Math.ceil((SKILL_LIMITS.totalBytes * 4) / 3 / (1024 * 1024)) + 1}mb`;
+
+/** A workspace's skills (its .nimbrio-ai/skills/), written or uploaded from the Skills tab. */
 export function createSkillsService({ store }: AppContext, workspaces: WorkspacesService) {
   const skillsOf = async (workspaceId: string) =>
     store.skills(await workspaces.require(workspaceId));
@@ -34,6 +42,29 @@ export function createSkillsService({ store }: AppContext, workspaces: Workspace
       const skill = await (await skillsOf(workspaceId)).update(name, input).catch(conflictIfTaken);
       if (!skill) throw new NotFoundError(`There's no skill called "${name}".`);
       return skill;
+    },
+
+    /** A skill folder (SKILL.md plus its files); a 409 when the name is taken and `replace` is off. */
+    async upload(workspaceId: string, { files, replace = false }: SkillUpload): Promise<Skill> {
+      // Checked before decoding, so an oversized upload costs no memory.
+      const encoded = files.reduce((sum, file) => sum + file.data.length, 0);
+      if (Math.floor((encoded * 3) / 4) > SKILL_LIMITS.totalBytes + 2 * files.length) {
+        throw new PayloadTooLargeError(
+          `The skill is too large: at most ${SKILL_LIMITS.totalBytes / (1024 * 1024)} MB in all.`,
+        );
+      }
+      const decoded = files.map((file) => ({
+        path: file.path,
+        bytes: Buffer.from(file.data, 'base64'),
+      }));
+      return (await skillsOf(workspaceId)).upload(decoded, { replace }).catch(conflictIfTaken);
+    },
+
+    /** One of a folder skill's files, to show in the Skills tab. */
+    async file(workspaceId: string, name: string, filePath: string): Promise<Buffer> {
+      const bytes = await (await skillsOf(workspaceId)).readFile(name, filePath);
+      if (!bytes) throw new NotFoundError(`The skill "${name}" has no file "${filePath}".`);
+      return bytes;
     },
 
     async remove(workspaceId: string, name: string): Promise<void> {

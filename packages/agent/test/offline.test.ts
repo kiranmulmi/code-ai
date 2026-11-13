@@ -53,7 +53,7 @@ import { recall, forget, remember } from '../src/tools/memory.js';
 import { readAttachment, saveAttachment, viewImage } from '../src/tools/attachments.js';
 import type { AttachmentStore } from '../src/attachments.js';
 import type { SkillStore } from '../src/skills.js';
-import { useSkill } from '../src/tools/skills.js';
+import { copySkillFile, readSkillFile, useSkill } from '../src/tools/skills.js';
 import { improveSkill, parseImprovedSkill } from '../src/improve-skill.js';
 import { Conversation } from '../src/memory/short-term.js';
 import {
@@ -1565,11 +1565,15 @@ test('stopping a run halts it cleanly and keeps the chat consistent', async () =
   );
 });
 
-/** A SkillStore over a fixed list. */
-function skillStore(skills: Skill[]): SkillStore {
+/** A SkillStore over a fixed list; `files` holds folder skills' files by "<skill>/<path>". */
+function skillStore(skills: Skill[], files: Record<string, string | Buffer> = {}): SkillStore {
   return {
     list: async () => skills,
     get: async (name) => skills.find((skill) => skill.name === name) ?? null,
+    readFile: async (name, filePath) => {
+      const content = files[`${name}/${filePath}`];
+      return content === undefined ? null : Buffer.from(content);
+    },
   };
 }
 
@@ -1611,6 +1615,111 @@ test('use_skill names the skills there are when asked for a missing one', async 
   const ctx = toolContext({ skills: skillStore([TICKET_SKILL]) });
   await assert.rejects(useSkill.run({ name: 'deploy' }, ctx), /The skills are: jira-ticket-fix/);
   await assert.rejects(useSkill.run({ name: 'x' }, toolContext({})), /no skills/);
+});
+
+const DESIGN_SKILL: Skill = {
+  name: 'corporate-navy-teal',
+  description: 'Design system for corporate sites in navy and teal.',
+  body: 'Start with `assets/design-system.css`. Read `references/tokens.md` before rebranding.',
+  updatedAt: null,
+  files: [
+    { path: 'assets/design-system.css', size: 31 },
+    { path: 'assets/logo.png', size: 8 },
+    { path: 'references/tokens.md', size: 22 },
+  ],
+};
+const DESIGN_FILES = {
+  'corporate-navy-teal/assets/design-system.css': ':root { --c-primary: #14305d; }',
+  'corporate-navy-teal/assets/logo.png': Buffer.from([0x89, 0x50, 0x4e, 0x47, 0, 0, 0, 0]),
+  'corporate-navy-teal/references/tokens.md': '# Tokens\nNavy #14305d',
+};
+
+test("use_skill lists a folder skill's files, and read_skill_file reads only those", async () => {
+  const ctx = toolContext({ skills: skillStore([DESIGN_SKILL, TICKET_SKILL], DESIGN_FILES) });
+  const loaded = String(await useSkill.run({ name: 'corporate-navy-teal' }, ctx));
+  assert.match(loaded, /\[Files in skill "corporate-navy-teal"/);
+  assert.match(loaded, /- references\/tokens\.md \(22 B\)/);
+  assert.match(loaded, /read_skill_file/);
+  // A single-file skill has no file list.
+  assert.doesNotMatch(String(await useSkill.run({ name: 'jira-ticket-fix' }, ctx)), /Files in/);
+
+  const tokens = await readSkillFile.run(
+    { skill: 'corporate-navy-teal', path: './references/tokens.md' },
+    ctx,
+  );
+  assert.equal(tokens, '# Tokens\nNavy #14305d');
+  assert.match(
+    String(await readSkillFile.run({ skill: 'corporate-navy-teal', path: 'assets/logo.png' }, ctx)),
+    /binary file/,
+  );
+  await assert.rejects(
+    readSkillFile.run({ skill: 'corporate-navy-teal', path: '../../memory.json' }, ctx),
+    /has no file "\.\.\/\.\.\/memory\.json"\. Its files are: assets\/design-system\.css/,
+  );
+  await assert.rejects(
+    readSkillFile.run({ skill: 'jira-ticket-fix', path: 'x.md' }, ctx),
+    /no files besides its instructions/,
+  );
+  await assert.rejects(
+    readSkillFile.run({ skill: 'nope', path: 'x.md' }, ctx),
+    /No skill is called "nope"/,
+  );
+});
+
+test('copy_skill_file asks first, copies the bytes into the workspace and never overwrites', async () => {
+  assert.equal(copySkillFile.needsApproval, true);
+  const setup = await tempSetup();
+  const ctx = toolContext({
+    workspace: setup.filesDir,
+    skills: skillStore([DESIGN_SKILL], DESIGN_FILES),
+  });
+  const result = await copySkillFile.run(
+    { skill: 'corporate-navy-teal', path: 'assets/logo.png', to: 'public/logo.png' },
+    ctx,
+  );
+  assert.match(String(result), /Copied "assets\/logo\.png".*to public\/logo\.png/);
+  assert.deepEqual(
+    await fs.readFile(path.join(setup.filesDir, 'public', 'logo.png')),
+    DESIGN_FILES['corporate-navy-teal/assets/logo.png'],
+  );
+  await assert.rejects(
+    copySkillFile.run(
+      { skill: 'corporate-navy-teal', path: 'assets/logo.png', to: 'public/logo.png' },
+      ctx,
+    ),
+    /already exists/,
+  );
+  await assert.rejects(
+    copySkillFile.run(
+      { skill: 'corporate-navy-teal', path: 'assets/design-system.css', to: '.nimbrio-ai/x.css' },
+      ctx,
+    ),
+    /can't reach it/,
+  );
+  await assert.rejects(
+    copySkillFile.run(
+      { skill: 'corporate-navy-teal', path: 'assets/design-system.css', to: '../outside.css' },
+      ctx,
+    ),
+    /outside the workspace/,
+  );
+});
+
+test('a picked folder skill comes with its file list', async () => {
+  const setup = await tempSetup();
+  const { callModel, requests } = scriptedModel([answer('Done.')]);
+  const agent = createAgent({
+    ...setup,
+    skills: skillStore([DESIGN_SKILL], DESIGN_FILES),
+    callModel,
+    logger: silentLogger,
+    config: { planning: 'off' },
+  });
+  await agent.run('Build a landing page', { skills: [DESIGN_SKILL] });
+  const sent = JSON.stringify(nth(requests, 0).messages);
+  assert.match(sent, /Files in skill \\"corporate-navy-teal\\"/);
+  const names = toolNames(nth(requests, 0));
+  assert.ok(names.includes('read_skill_file') && names.includes('copy_skill_file'));
 });
 
 test('skills the user picked come with the message in full and are saved on it', async () => {
