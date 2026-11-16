@@ -25,10 +25,11 @@ export const TOOL_GROUP_LABELS: Record<ToolGroup, { label: string; detail: strin
 };
 
 /**
- * The planning step before each message: `default` follows Settings → Agent; `auto` and
- * `off` override it for this workspace. Off saves one model call per message.
+ * How bigger tasks get planned (`PlanningMode`): `default` follows Settings → Agent; `off` (the
+ * agent plans itself when needed) and `auto` (a planning step before each message) override it
+ * for this workspace. In the order the workspace form shows them.
  */
-export const WORKSPACE_PLANNING = ['default', 'auto', 'off'] as const;
+export const WORKSPACE_PLANNING = ['default', 'off', 'auto'] as const;
 export type WorkspacePlanning = (typeof WORKSPACE_PLANNING)[number];
 
 export interface Workspace {

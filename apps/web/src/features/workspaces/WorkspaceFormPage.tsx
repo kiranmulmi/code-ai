@@ -581,7 +581,7 @@ export function WorkspaceFormPage() {
               <Field
                 id="workspace-planning"
                 label="Planning"
-                hint="A short step before each message decides whether to plan first. Off saves one model call per message."
+                hint="Agent decides: the agent makes a plan itself when a task has several steps. Planning step: an extra model call before every message decides; steadier with smaller models, but slower."
               >
                 <PlanningChoice
                   id="workspace-planning"

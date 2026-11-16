@@ -286,16 +286,17 @@ export function AgentSettingsPage() {
           <div className="flex flex-col divide-y divide-line-2">
             <div className={`${SECTION} flex items-start justify-between gap-4`}>
               <div>
-                <p className={LABEL}>Plan multi-step work first</p>
+                <p className={LABEL}>Planning step before every message</p>
                 <p className={HINT}>
-                  Before each request, a quick planning step decides whether to answer directly or
-                  write a plan (shown in the Plan panel). Off: always answer directly.
+                  Off (the default): the agent answers simple messages directly and makes a plan
+                  itself when a task has several steps. On: an extra model call before every message
+                  decides whether to plan first; steadier with smaller models, but slower.
                 </p>
               </div>
               <Switch
                 isOn={draft.planning === 'auto'}
                 onChange={(isOn) => set('planning', isOn ? 'auto' : 'off')}
-                label="Plan multi-step work first"
+                label="Planning step before every message"
               />
             </div>
             <div className={`${SECTION} grid gap-5 md:grid-cols-3`}>

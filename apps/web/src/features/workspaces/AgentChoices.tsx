@@ -15,11 +15,11 @@ const LIST = 'mt-2 divide-y divide-line-2 overflow-hidden rounded-xl border bord
 
 const PLANNING_LABEL: Record<WorkspacePlanning, string> = {
   default: 'Agent settings',
-  auto: 'On',
-  off: 'Off',
+  off: 'Agent decides',
+  auto: 'Planning step',
 };
 
-/** The workspace's planning step: follow Settings → Agent, or on or off here. */
+/** How the workspace plans bigger tasks: as Settings → Agent says, or chosen here. */
 export function PlanningChoice({
   id,
   value,
@@ -38,7 +38,7 @@ export function PlanningChoice({
       <div
         id={id}
         role="radiogroup"
-        aria-label="Planning step"
+        aria-label="Planning"
         className="mt-2 inline-flex rounded-xl border border-line bg-surface p-0.5"
       >
         {WORKSPACE_PLANNING.map((option) => {
@@ -63,7 +63,7 @@ export function PlanningChoice({
         })}
       </div>
       {isPlansOff && (
-        <p className="mt-1.5 text-[12.5px] text-ink-3">Off while the Plans tools are off.</p>
+        <p className="mt-1.5 text-[12.5px] text-ink-3">No plans while the Plans tools are off.</p>
       )}
     </div>
   );

@@ -4,6 +4,11 @@ import { APPROVAL_MODES, type ApprovalMode } from './info.js';
 export const LOG_LEVELS = ['debug', 'info', 'silent'] as const;
 export type LogLevel = (typeof LOG_LEVELS)[number];
 
+/**
+ * `off` (the default): no planning step; the agent makes a plan itself (create_plan) when a task
+ * has several steps. `auto`: a planning step, one extra model call before each message, decides
+ * whether to plan first: steadier with smaller models, but it costs a call on every message.
+ */
 export const PLANNING_MODES = ['auto', 'off'] as const;
 export type PlanningMode = (typeof PLANNING_MODES)[number];
 
@@ -12,7 +17,7 @@ export type PlanningMode = (typeof PLANNING_MODES)[number];
  * stay in .env.
  */
 export interface AgentSettings {
-  /** auto: before each request, a planning step decides whether to plan first. */
+  /** auto: a planning step before each request decides whether to plan; off: the agent decides itself. */
   planning: PlanningMode;
   /** Working steps (model calls that can use tools) per user prompt; planner and summary calls don't count. */
   maxSteps: number;
@@ -29,7 +34,7 @@ export interface AgentSettings {
 }
 
 export const DEFAULT_AGENT_SETTINGS: AgentSettings = {
-  planning: 'auto',
+  planning: 'off',
   maxSteps: 30,
   maxTotalTokens: 400_000,
   maxInputChars: 20_000,

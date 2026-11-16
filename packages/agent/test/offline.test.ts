@@ -1048,9 +1048,13 @@ test("every model call of a chat carries the chat's id", async () => {
     callTools(toolCall('t1', 'recall', { query: '6 * 7' })),
     answer("It's 42."),
   ]);
-  await createAgent({ ...setup, callModel, chatId: 'chat-1', logger: silentLogger }).run(
-    'What is 6 times 7?',
-  );
+  await createAgent({
+    ...setup,
+    callModel,
+    chatId: 'chat-1',
+    logger: silentLogger,
+    config: { planning: 'auto' },
+  }).run('What is 6 times 7?');
   assert.equal(requests.length, 3);
   assert.deepEqual(
     requests.map((request) => request.conversationId),
@@ -1088,13 +1092,23 @@ test('with the planning step off, the agent plans itself and its plan is checked
   assert.equal(result.text, 'Both are done now.');
 });
 
+test('by default there is no planning step: the agent plans itself', () => {
+  assert.equal(loadAgentConfig({}).planning, 'off');
+  assert.equal(DEFAULT_AGENT_SETTINGS.planning, 'off');
+});
+
 test('with the planning step on, the agent is told a plan may be made for it', async () => {
   const setup = await tempSetup();
   const { callModel, requests } = scriptedModel([
     plannerReply({ mode: 'direct', reason: 'Simple.' }),
     answer('Hi.'),
   ]);
-  await createAgent({ ...setup, callModel, logger: silentLogger, config: {} }).run('hello');
+  await createAgent({
+    ...setup,
+    callModel,
+    logger: silentLogger,
+    config: { planning: 'auto' },
+  }).run('hello');
   const system = nth(requests, 1).system ?? '';
   assert.match(system, /a planning step reads the request/);
   assert.doesNotMatch(system, /call create_plan first/);
@@ -1111,7 +1125,7 @@ test('planner can choose to answer directly', async () => {
     ...setup,
     callModel,
     logger: silentLogger,
-    config: {},
+    config: { planning: 'auto' },
     onEvent: (e) => events.push(e),
   });
   const result = await agent.run('hello');
@@ -1152,7 +1166,7 @@ test('planner plan is injected as a create_plan step, and open steps trigger one
     ...setup,
     callModel,
     logger: silentLogger,
-    config: {},
+    config: { planning: 'auto' },
     onEvent: (e) => events.push(e),
   });
   const result = await agent.run('list x and y');
@@ -1191,7 +1205,7 @@ test('the check runs at most once per request', async () => {
     ...setup,
     callModel,
     logger: silentLogger,
-    config: {},
+    config: { planning: 'auto' },
   }).run('do it');
   assert.equal(result.status, 'done');
   assert.equal(result.text, 'First try, which is a reasonably long answer.\n\nNothing new.');
@@ -1302,7 +1316,7 @@ test('after a check that leads to new research, the new answer replaces the old 
     ...setup,
     callModel,
     logger: silentLogger,
-    config: {},
+    config: { planning: 'auto' },
   }).run('do it');
   assert.equal(result.text, 'Full answer: 4.');
 });
