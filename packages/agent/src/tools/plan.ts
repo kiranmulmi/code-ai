@@ -4,7 +4,7 @@ import { STEP_STATUSES } from '../planner.js';
 export const createPlan = defineTool<{ goal: string; steps: string[]; done_when: string }>({
   name: 'create_plan',
   description:
-    "Write a step-by-step plan for a task with several distinct steps. A plan is usually made for you before you start; call this only to re-plan when what you've learned changes the approach (it replaces the current plan). Don't use it for simple questions.",
+    "Write a step-by-step plan for a task with several distinct steps: before you start it, or to re-plan when what you've learned changes the approach (it replaces the current plan). If a plan for this request is already at the start of your turn, don't make another unless you are re-planning. Don't use it for simple questions.",
   properties: {
     goal: { type: 'string', description: 'What the finished task achieves, in one sentence.' },
     steps: {

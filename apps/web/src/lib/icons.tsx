@@ -611,29 +611,11 @@ export function BrainIcon({ size = 16, ...rest }: IconProps) {
   );
 }
 
-export function CalculatorIcon({ size = 16, ...rest }: IconProps) {
-  return (
-    <svg {...base(size)} {...rest}>
-      <rect x="2.5" y="2.5" width="11" height="11" rx="2" />
-      <path d="M5 5.5h2M6 4.5v2M9 5.5h2M5 10.5h2M9 9.5h2M9 11.5h2" />
-    </svg>
-  );
-}
-
 export function GlobeIcon({ size = 14, ...rest }: IconProps) {
   return (
     <svg {...base(size)} {...rest}>
       <circle cx="8" cy="8" r="6" />
       <path d="M2 8h12M8 2c1.6 1.7 2.4 3.7 2.4 6S9.6 12.3 8 14c-1.6-1.7-2.4-3.7-2.4-6S6.4 3.7 8 2z" />
-    </svg>
-  );
-}
-
-export function ClockIcon({ size = 14, ...rest }: IconProps) {
-  return (
-    <svg {...base(size)} {...rest}>
-      <circle cx="8" cy="8" r="6" />
-      <path d="M8 4.75V8l2.25 1.5" />
     </svg>
   );
 }

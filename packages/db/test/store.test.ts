@@ -182,12 +182,29 @@ test('workspaces keep their own memories and the folder chosen for them', async 
   });
 });
 
+test('a new workspace starts with the file tools off until turned on', async () => {
+  const store = db();
+  const ws = await store.createWorkspace({ name: 'Fresh', path: folder('fresh') });
+  assert.deepEqual(ws.disabledTools, ['files']);
+
+  const updated = await store.updateWorkspace(ws.id, { disabledTools: [] });
+  assert.deepEqual(updated?.disabledTools, [], 'turning them on is saved');
+
+  const chosen = await store.createWorkspace({
+    name: 'All on',
+    path: folder('all-on'),
+    disabledTools: [],
+  });
+  assert.deepEqual(chosen.disabledTools, [], 'an explicit choice wins over the default');
+});
+
 test("a chat is saved and continues across requests, with the workspace's instructions and memories", async () => {
   const store = db();
   const ws = await store.createWorkspace({
     name: 'Tutor',
     path: folder('chat'),
     instructions: 'Always answer in simple English.',
+    disabledTools: [], // it writes a file, and new workspaces start with the file tools off
   });
   await store.memory(ws).add("The user's name is Kiran.");
   const chat = await store.createChat(ws.id, titleFrom('hello?\nsecond line'));

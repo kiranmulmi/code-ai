@@ -13,11 +13,11 @@ import {
   readAgentSettings,
   type AgentEvent,
   type Attachment,
+  type ModelCallKind,
   type QuestionAnswer,
   type Skill,
   type UserQuestion,
 } from '@app/shared';
-import { evaluate } from '../src/tools/calculator.js';
 import { askUser } from '../src/tools/ask-user.js';
 import { Planner, parseDecision } from '../src/planner.js';
 import {
@@ -175,17 +175,6 @@ const answer = (text: string): Scripted => ({
 });
 const isToolMessage = (m: ModelMessage): m is ToolMessage => m.role === 'tool';
 const toolMessages = (req: { messages: ModelMessage[] }) => req.messages.filter(isToolMessage);
-
-test('calculator handles precedence, powers and functions', () => {
-  assert.equal(evaluate('2 + 3 * 4'), 14);
-  assert.equal(evaluate('(2 + 3) * 4'), 20);
-  assert.equal(evaluate('2 ^ 3 ^ 2'), 512);
-  assert.equal(evaluate('-2 ^ 2'), -4);
-  assert.equal(evaluate('sqrt(16) + abs(-3)'), 7);
-  assert.ok(Math.abs(evaluate('2347912 * 0.185') - 434363.72) < 1e-6);
-  assert.throws(() => evaluate('1 / 0'), /Division by zero/);
-  assert.throws(() => evaluate('process.exit()'), /Unknown symbol/);
-});
 
 test('planner tracks step status', () => {
   const planner = new Planner();
@@ -632,7 +621,7 @@ test('the system prompt names the workspace folder', async () => {
 test('loop runs the tool the model picks and returns the final answer', async () => {
   const setup = await tempSetup();
   const { callModel, requests } = scriptedModel([
-    callTools(toolCall('t1', 'calculator', { expression: '6 * 7' })),
+    callTools(toolCall('t1', 'recall', { query: '6 * 7' })),
     answer("It's 42."),
   ]);
   const agent = createAgent({
@@ -645,7 +634,7 @@ test('loop runs the tool the model picks and returns the final answer', async ()
 
   assert.equal(result.status, 'done');
   assert.equal(result.text, "It's 42.");
-  assert.deepEqual(result.toolsUsed, ['calculator']);
+  assert.deepEqual(result.toolsUsed, ['recall']);
   // Second request carries the assistant's tool call, then the result matched by id.
   const sent = nth(requests, 1).messages;
   const assistantTurn = nth(sent, -2);
@@ -654,7 +643,7 @@ test('loop runs the tool the model picks and returns the final answer', async ()
   assert.equal(assistantTurn.tool_calls?.[0]?.id, 't1');
   assert.ok(toolTurn.role === 'tool');
   assert.equal(toolTurn.tool_call_id, 't1');
-  assert.match(toolTurn.content, /42/);
+  assert.match(toolTurn.content, /No matching memories/);
 });
 
 test('write_file is blocked when approval is denied', async () => {
@@ -678,7 +667,7 @@ test('write_file is blocked when approval is denied', async () => {
 test('loop stops at the step limit', async () => {
   const setup = await tempSetup();
   const loopForever = Array.from({ length: 5 }, (_, i) =>
-    callTools(toolCall(`t${i}`, 'get_current_time', { timezone: 'UTC' })),
+    callTools(toolCall(`t${i}`, 'recall', { query: 'loop' })),
   );
   const { callModel } = scriptedModel(loopForever);
   const agent = createAgent({
@@ -689,7 +678,108 @@ test('loop stops at the step limit', async () => {
   });
   const result = await agent.run('loop');
   assert.equal(result.status, 'budget_exceeded');
-  assert.equal(result.steps, 4, '3 working steps + 1 write-up call');
+  assert.equal(result.steps, 3, 'the write-up call is not a step');
+  assert.equal(result.calls.length, 4, '3 working steps + 1 write-up call');
+});
+
+test('the budget counts working steps only, and cached input at a tenth', () => {
+  const budget = new Budget({ maxSteps: 2, maxTotalTokens: 10_000 });
+  const call = (kind: ModelCallKind) => ({
+    kind,
+    model: null,
+    durationMs: 0,
+    toolCalls: [],
+    input: [],
+    output: [],
+  });
+  budget.recordCall({ inputTokens: 100, outputTokens: 10 }, call('planner'));
+  budget.recordCall({ inputTokens: 100, outputTokens: 10 }, call('compaction'));
+  assert.equal(budget.steps, 0, 'the planner and summaries are not steps');
+
+  // A long step: most of its input came from the server's cache.
+  budget.recordCall(
+    { inputTokens: 50_000, cachedInputTokens: 45_000, outputTokens: 100 },
+    call('step'),
+  );
+  assert.equal(budget.steps, 1);
+  assert.equal(budget.budgetTokens(), 5_200 + 4_500 + 120, 'new input, a tenth of cached, output');
+  assert.equal(budget.exceeded(), null, 'in full it would be 50,320 tokens, past the budget');
+  assert.equal(budget.usage().inputTokens, 50_200, 'usage still reports every token');
+
+  budget.recordCall({ inputTokens: 100, outputTokens: 10 }, call('step'));
+  assert.match(budget.exceeded() ?? '', /limit of 2 steps/);
+});
+
+test('read-only calls next to each other run together; the rest one at a time, in order', async () => {
+  const setup = await tempSetup();
+  await fs.writeFile(path.join(setup.filesDir, 'a.txt'), 'AAA');
+  await fs.writeFile(path.join(setup.filesDir, 'b.txt'), 'BBB');
+  const { callModel, requests } = scriptedModel([
+    callTools(
+      toolCall('t1', 'read_file', { path: 'a.txt' }),
+      toolCall('t2', 'list_files', {}),
+      toolCall('t3', 'remember', { fact: 'The user keeps notes in a.txt.', replaces: '' }),
+      toolCall('t4', 'read_file', { path: 'b.txt' }),
+    ),
+    answer('Done.'),
+  ]);
+  const order: string[] = [];
+  const result = await createAgent({
+    ...setup,
+    callModel,
+    logger: silentLogger,
+    config: { planning: 'off' },
+    onEvent: (event) => {
+      if (event.type === 'tool_call') order.push(`call ${event.id}`);
+      if (event.type === 'tool_result') order.push(`result ${event.id}`);
+    },
+  }).run('look around');
+
+  assert.deepEqual(order.slice(0, 2), ['call t1', 'call t2'], 'both reads start together');
+  assert.deepEqual(order.slice(2, 4).sort(), ['result t1', 'result t2']);
+  assert.deepEqual(
+    order.slice(4),
+    ['call t3', 'result t3', 'call t4', 'result t4'],
+    'remember waits for the reads, and the read after it waits for remember',
+  );
+  assert.deepEqual(result.toolsUsed, ['read_file', 'list_files', 'remember', 'read_file']);
+  const results = toolMessages(nth(requests, 1));
+  assert.deepEqual(
+    results.map((m) => m.tool_call_id),
+    ['t1', 't2', 't3', 't4'],
+    'results go back in the order the model asked',
+  );
+  assert.match(nth(results, 0).content, /AAA/);
+  assert.match(nth(results, 3).content, /BBB/);
+});
+
+test('a call repeated with the same result gets a note to stop repeating it', async () => {
+  const setup = await tempSetup();
+  const { callModel, requests } = scriptedModel([
+    callTools(toolCall('t1', 'recall', { query: 'pets' })),
+    callTools(toolCall('t2', 'recall', { query: 'pets' })),
+    callTools(
+      toolCall('t3', 'remember', {
+        fact: 'The user has a cat; pets matter to them.',
+        replaces: '',
+      }),
+    ),
+    callTools(toolCall('t4', 'recall', { query: 'pets' })),
+    callTools(toolCall('t5', 'recall', { query: 'cat' })),
+    answer('A cat.'),
+  ]);
+  await createAgent({
+    ...setup,
+    callModel,
+    logger: silentLogger,
+    config: { planning: 'off' },
+  }).run('Do I have pets?');
+  const resultSentTo = (request: number) => nth(toolMessages(nth(requests, request)), -1).content;
+  assert.doesNotMatch(resultSentTo(1), /exact call/, 'the first call is not a repeat');
+  assert.match(resultSentTo(2), /No matching memories[\s\S]*made this exact call before/);
+  assert.doesNotMatch(resultSentTo(4), /exact call/, 'the same call with a new result is fine');
+  assert.match(resultSentTo(4), /cat/);
+  assert.doesNotMatch(resultSentTo(5), /exact call/, 'other arguments are another call');
 });
 
 test('memory saved in one session is recalled in the next', async () => {
@@ -724,8 +814,8 @@ test('bad tool arguments come back as errors the model can fix', async () => {
   const setup = await tempSetup();
   const { callModel, requests } = scriptedModel([
     callTools(
-      toolCall('t1', 'calculator', '{not json'),
-      toolCall('t2', 'calculator', { expr: '1+1' }),
+      toolCall('t1', 'recall', '{not json'),
+      toolCall('t2', 'recall', { q: '1+1' }),
       toolCall('t3', 'update_plan', { step_number: 1, status: 'finished', note: '' }),
       toolCall('t4', 'no_such_tool', {}),
     ),
@@ -742,7 +832,7 @@ test('bad tool arguments come back as errors the model can fix', async () => {
   const results = toolMessages(nth(requests, 1)).map((m) => m.content);
   assert.equal(results.length, 4, 'every tool call gets a result');
   assert.match(nth(results, 0), /not valid JSON/);
-  assert.match(nth(results, 1), /Missing required argument "expression"/);
+  assert.match(nth(results, 1), /Missing required argument "query"/);
   assert.match(nth(results, 2), /must be one of/);
   assert.match(nth(results, 3), /no tool named/);
 });
@@ -750,7 +840,7 @@ test('bad tool arguments come back as errors the model can fix', async () => {
 test('tool calls are run even when the server reports finish_reason stop', async () => {
   const setup = await tempSetup();
   const { callModel } = scriptedModel([
-    { ...callTools(toolCall('t1', 'calculator', { expression: '2+2' })), finishReason: 'stop' },
+    { ...callTools(toolCall('t1', 'recall', { query: '2+2' })), finishReason: 'stop' },
     answer('4'),
   ]);
   const result = await createAgent({
@@ -759,7 +849,7 @@ test('tool calls are run even when the server reports finish_reason stop', async
     logger: silentLogger,
     config: { planning: 'off' },
   }).run('2+2?');
-  assert.deepEqual(result.toolsUsed, ['calculator']);
+  assert.deepEqual(result.toolsUsed, ['recall']);
   assert.equal(result.text, '4');
 });
 
@@ -821,7 +911,7 @@ test('streamed text is passed on as text_delta events in order', async () => {
   const events: AgentEvent[] = [];
   const { callModel } = scriptedModel([
     {
-      ...callTools(toolCall('t1', 'calculator', { expression: '2+2' })),
+      ...callTools(toolCall('t1', 'recall', { query: '2+2' })),
       stream: ['Let me ', 'check.'],
     },
     { ...answer('It is 4.'), stream: ['It is ', '4.'] },
@@ -864,7 +954,7 @@ test('each model call reports the run tokens so far as a usage event', async () 
   const setup = await tempSetup();
   const events: AgentEvent[] = [];
   const { callModel } = scriptedModel([
-    callTools(toolCall('t1', 'calculator', { expression: '2+2' })),
+    callTools(toolCall('t1', 'recall', { query: '2+2' })),
     answer('It is 4.'),
   ]);
   const agent = createAgent({
@@ -905,7 +995,7 @@ test("while a call streams, usage events estimate its tokens on top of the run's
         ? {
             role: 'assistant',
             content: null,
-            tool_calls: [toolCall('t1', 'calculator', { expression: '2+2' })],
+            tool_calls: [toolCall('t1', 'recall', { query: '2+2' })],
           }
         : { role: 'assistant', content: 'It is 4.' },
     };
@@ -955,7 +1045,7 @@ test("every model call of a chat carries the chat's id", async () => {
   const setup = await tempSetup();
   const { callModel, requests } = scriptedModel([
     plannerReply({ mode: 'direct' }),
-    callTools(toolCall('t1', 'calculator', { expression: '6 * 7' })),
+    callTools(toolCall('t1', 'recall', { query: '6 * 7' })),
     answer("It's 42."),
   ]);
   await createAgent({ ...setup, callModel, chatId: 'chat-1', logger: silentLogger }).run(
@@ -966,6 +1056,48 @@ test("every model call of a chat carries the chat's id", async () => {
     requests.map((request) => request.conversationId),
     ['chat-1', 'chat-1', 'chat-1'],
   );
+});
+
+test('with the planning step off, the agent plans itself and its plan is checked', async () => {
+  const setup = await tempSetup();
+  const { callModel, requests } = scriptedModel([
+    callTools(
+      toolCall('p1', 'create_plan', { goal: 'Do A and B', steps: ['A', 'B'], done_when: 'Both' }),
+    ),
+    answer('Done early.'),
+    answer('Both are done now.'),
+  ]);
+  const events: AgentEvent[] = [];
+  const result = await createAgent({
+    ...setup,
+    callModel,
+    logger: silentLogger,
+    config: { planning: 'off' },
+    onEvent: (e) => events.push(e),
+  }).run('Do A, then B');
+
+  const system = nth(requests, 0).system ?? '';
+  assert.match(system, /call create_plan first, then work through the plan/);
+  assert.doesNotMatch(system, /a planning step reads the request/, 'no planning step is promised');
+  assert.ok(!events.some((e) => e.type === 'planning'), 'no planning call');
+  assert.ok(
+    events.some((e) => e.type === 'check'),
+    "the agent's own plan is checked before the answer",
+  );
+  assert.equal(requests.length, 3, 'plan, early answer, answer after the check');
+  assert.equal(result.text, 'Both are done now.');
+});
+
+test('with the planning step on, the agent is told a plan may be made for it', async () => {
+  const setup = await tempSetup();
+  const { callModel, requests } = scriptedModel([
+    plannerReply({ mode: 'direct', reason: 'Simple.' }),
+    answer('Hi.'),
+  ]);
+  await createAgent({ ...setup, callModel, logger: silentLogger, config: {} }).run('hello');
+  const system = nth(requests, 1).system ?? '';
+  assert.match(system, /a planning step reads the request/);
+  assert.doesNotMatch(system, /call create_plan first/);
 });
 
 test('planner can choose to answer directly', async () => {
@@ -984,7 +1116,8 @@ test('planner can choose to answer directly', async () => {
   });
   const result = await agent.run('hello');
   assert.equal(result.text, 'Hi there!');
-  assert.equal(result.steps, 2, 'planning call + answer');
+  assert.equal(result.steps, 1, 'the planning call is not a step');
+  assert.equal(result.calls.length, 2, 'planning call + answer');
   assert.equal(agent.planner.plan, null);
   assert.ok(!nth(requests, 0).tools?.length, 'the planning call has no tools');
   assert.deepEqual(
@@ -1067,8 +1200,8 @@ test('the check runs at most once per request', async () => {
 test('hitting the step limit writes up the findings with a tool-free call', async () => {
   const setup = await tempSetup();
   const { callModel, requests } = scriptedModel([
-    callTools(toolCall('t1', 'calculator', { expression: '1+1' })),
-    callTools(toolCall('t2', 'calculator', { expression: '2+2' })),
+    callTools(toolCall('t1', 'recall', { query: '1+1' })),
+    callTools(toolCall('t2', 'recall', { query: '2+2' })),
     answer('So far: 1+1=2 and 2+2=4. Not finished: the rest.'),
   ]);
   const agent = createAgent({
@@ -1082,7 +1215,7 @@ test('hitting the step limit writes up the findings with a tool-free call', asyn
   assert.match(result.text, /So far: 1\+1=2/);
   const summaryRequest = nth(requests, 2);
   assert.ok(!summaryRequest.tools?.length, 'the write-up call has no tools');
-  assert.match(nth(summaryRequest.messages, 0).content, /Result: \{[\s\S]*"result": 4/);
+  assert.match(nth(summaryRequest.messages, 0).content, /Result: No matching memories/);
 });
 
 test('planner replies are parsed defensively', () => {
@@ -1160,7 +1293,7 @@ test('after a check that leads to new research, the new answer replaces the old 
     plannerReply({ mode: 'plan', reason: '', goal: 'G', steps: ['A'], done_when: '' }),
     answer('Draft answer.'),
     callTools(
-      toolCall('t1', 'calculator', { expression: '2+2' }),
+      toolCall('t1', 'recall', { query: '2+2' }),
       toolCall('t2', 'update_plan', { step_number: 1, status: 'done', note: '' }),
     ),
     answer('Full answer: 4.'),
@@ -1619,12 +1752,13 @@ test('the Files panel search finds names and lines, skipping generated and app f
 
 test('stopping a run halts it cleanly and keeps the chat consistent', async () => {
   // Stopped after the first of two tool calls: the second gets a result but doesn't run.
+  // (remember changes something, so the two run one at a time, not together.)
   const setup = await tempSetup();
   const stop = new AbortController();
   const { callModel, requests } = scriptedModel([
     callTools(
-      toolCall('t1', 'calculator', { expression: '1 + 1' }),
-      toolCall('t2', 'calculator', { expression: '2 + 2' }),
+      toolCall('t1', 'remember', { fact: 'One.', replaces: '' }),
+      toolCall('t2', 'remember', { fact: 'Two.', replaces: '' }),
     ),
     answer('never reached'),
   ]);
@@ -2058,7 +2192,7 @@ test('a workspace that turns tool groups off sends neither their tools nor their
   for (const off of ['read_file', 'write_file', 'run_command', 'web_search', 'create_plan']) {
     assert.ok(!names.includes(off), `${off} is not sent`);
   }
-  for (const on of ['remember', 'recall', 'get_current_time', 'calculator']) {
+  for (const on of ['remember', 'recall']) {
     assert.ok(names.includes(on), `${on} is sent`);
   }
   const system = first.system ?? '';
@@ -2211,10 +2345,7 @@ test('a request adds up its calls, cache included', async () => {
 test('a request records each model call: what it was for, the model, its tools and tokens', async () => {
   const setup = await tempSetup();
   const { callModel } = scriptedModel([
-    callTools(
-      toolCall('t1', 'list_files', {}),
-      toolCall('t2', 'calculator', { expression: '1+1' }),
-    ),
+    callTools(toolCall('t1', 'list_files', {}), toolCall('t2', 'recall', { query: '1+1' })),
     answer('Done.'),
   ]);
   const agent = createAgent({
@@ -2236,7 +2367,7 @@ test('a request records each model call: what it was for, the model, its tools a
       {
         kind: 'step',
         model: 'fake',
-        toolCalls: ['list_files', 'calculator'],
+        toolCalls: ['list_files', 'recall'],
         inputTokens: 10,
         outputTokens: 5,
       },
@@ -2251,7 +2382,7 @@ test('a call the server reports no tokens for is counted from the text sent', as
   const setup = await tempSetup();
   // As Cursor: no counts for the turn that ends in a tool call, counts for the last one.
   const { callModel: scripted } = scriptedModel([
-    callTools(toolCall('t1', 'calculator', { expression: '2+2' })),
+    callTools(toolCall('t1', 'recall', { query: '2+2' })),
     answer('It is 4.'),
   ]);
   let calls = 0;
@@ -2289,7 +2420,7 @@ test('a call the server reports no tokens for is counted from the text sent', as
 test('each call says what its tokens went to, adding up to what the server reported', async () => {
   const setup = await tempSetup();
   const { callModel } = scriptedModel([
-    callTools(toolCall('t1', 'calculator', { expression: '1+1' })),
+    callTools(toolCall('t1', 'recall', { query: '1+1' })),
     answer('It is 2.'),
   ]);
   const reporting: CallModel = async (req) => ({
@@ -2316,7 +2447,7 @@ test('each call says what its tokens went to, adding up to what the server repor
   );
   assert.deepEqual(
     group('results')?.items.map((item) => item.label),
-    ['calculator: 1+1'],
+    ['recall: 1+1'],
   );
   assert.ok(group('history'), 'the earlier tool call is counted');
   assert.deepEqual(
@@ -2540,7 +2671,7 @@ test('messages sent mid-run reach the model between steps and before it settles 
     [steer('s2', 'Also double it.')],
   ];
   const { callModel, requests } = scriptedModel([
-    callTools(toolCall('t1', 'calculator', { expression: '6 * 7' })),
+    callTools(toolCall('t1', 'recall', { query: '6 * 7' })),
     answer("It's 42."),
     answer("It's 42; doubled, 84."),
   ]);

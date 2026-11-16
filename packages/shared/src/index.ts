@@ -84,6 +84,7 @@ export {
 } from './provider.js';
 
 export {
+  DEFAULT_DISABLED_TOOLS,
   TOOL_GROUPS,
   TOOL_GROUP_LABELS,
   WORKSPACE_PLANNING,

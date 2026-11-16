@@ -6,6 +6,7 @@ const MAX_RESULTS = 200;
 
 export const findFiles = defineTool<{ pattern: string; path?: string }>({
   name: 'find_files',
+  isReadOnly: true,
   description:
     'Find files in the workspace folder by name or path pattern (a glob such as "*.test.ts", "src/**/*.tsx" or "README*"). Call this when you know roughly what a file is called but not where it is.',
   properties: {

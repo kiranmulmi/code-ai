@@ -1,7 +1,6 @@
 // Prompts. The agent is "prompt-driven": instead of hard-coded routing, the
 // model reads each request and decides what to do. Keep these texts stable -
-// servers that cache prompt prefixes can only reuse them if they don't change.
-// (No timestamps here; the agent asks the get_current_time tool instead.)
+// servers that cache prompt prefixes can only reuse them if they don't change, so no timestamps.
 import {
   formatBytes,
   type Attachment,
@@ -21,15 +20,20 @@ const INTRO = `You are a capable, careful assistant that works on the user's req
  * (Files, Commands, Web, Memory, Plans) leaves its section out, so each call is smaller. With
  * every group on this is the full prompt, in the same words and order as always.
  */
-function guidance(off: ReadonlySet<ToolGroup>, { hasSkills }: { hasSkills: boolean }): string[] {
+function guidance(
+  off: ReadonlySet<ToolGroup>,
+  { hasSkills, hasPlanningStep }: { hasSkills: boolean; hasPlanningStep: boolean },
+): string[] {
   const on = (group: ToolGroup) => !off.has(group);
+  // With the planning step off, the model decides itself whether a request needs a plan.
+  const planning = hasPlanningStep
+    ? `- Before you start, a planning step reads the request. If it needs several steps, a plan is made and appears at the start of your turn as a create_plan call. If there is no new plan, the request was judged simple enough to handle directly.`
+    : `- A task with several distinct steps (research across several sources, a change to several files, work you could lose track of): call create_plan first, then work through the plan. A simple question, a single lookup or a small change needs no plan: handle it directly.`;
   const how = [
     `How a request is handled:`,
-    on('plans')
-      ? `- Before you start, a planning step reads the request. If it needs several steps, a plan is made and appears at the start of your turn as a create_plan call. If there is no new plan, the request was judged simple enough to handle directly.`
-      : null,
+    on('plans') ? planning : null,
     `- Simple question or chat you can answer from knowledge: answer directly. Don't use tools for their own sake.`,
-    `- Facts you don't have (the date, exact arithmetic, file contents, things the user told you in earlier sessions): call the tool that gets them.`,
+    `- Facts you don't have (file contents, things the user told you in earlier sessions): call the tool that gets them.`,
     on('web')
       ? `- Anything that may have changed since your training (news, who holds an office, prices, versions, company structures, recent events): search the web with web_search before answering, even if you think you know. Your training data is out of date for these. Base the answer on what the sources say, and cite the links you used as Markdown links.`
       : null,
@@ -115,9 +119,16 @@ function guidance(off: ReadonlySet<ToolGroup>, { hasSkills }: { hasSkills: boole
 /** The agent's base prompt, without the parts for tool groups that are `off`. */
 export function basePrompt(
   off: readonly ToolGroup[] = [],
-  { hasSkills = true }: { hasSkills?: boolean } = {},
+  {
+    hasSkills = true,
+    hasPlanningStep = true,
+  }: {
+    hasSkills?: boolean;
+    /** a planning step runs before the agent (planning: auto); else the agent plans itself */
+    hasPlanningStep?: boolean;
+  } = {},
 ): string {
-  return [INTRO, ...guidance(new Set(off), { hasSkills })].join('\n\n');
+  return [INTRO, ...guidance(new Set(off), { hasSkills, hasPlanningStep })].join('\n\n');
 }
 
 /** Everything on: the full prompt. */
@@ -158,10 +169,13 @@ export function systemPromptSections(
   skills = '',
   mcpTools = '',
   off: readonly ToolGroup[] = [],
-  { voiceReplies = false }: { voiceReplies?: boolean } = {},
+  {
+    voiceReplies = false,
+    hasPlanningStep = true,
+  }: { voiceReplies?: boolean; hasPlanningStep?: boolean } = {},
 ): PromptSection[] {
   const text = String(instructions ?? '').trim();
-  const base = basePrompt(off, { hasSkills: skills !== '' });
+  const base = basePrompt(off, { hasSkills: skills !== '', hasPlanningStep });
   const sections: PromptSection[] = [
     { label: 'Agent instructions', text: folder ? `${base}\n\nWorkspace folder: ${folder}` : base },
   ];

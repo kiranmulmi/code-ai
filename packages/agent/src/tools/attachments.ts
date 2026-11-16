@@ -75,6 +75,7 @@ export const readAttachment = defineTool<{
   start_line?: number;
 }>({
   name: 'read_attachment',
+  isReadOnly: true,
   description:
     'Read the text of a file the user attached to the chat: a PDF, a Word document (.docx) or a text file (code, CSV, JSON, Markdown, ...). Call this whenever the user refers to an attached file. PDFs come back page by page (continue with start_page), other files line by line (continue with start_line). For images use view_image.',
   properties: {

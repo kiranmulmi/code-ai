@@ -34,6 +34,7 @@ export const remember = defineTool<{ fact: string; replaces: string }>({
 
 export const recall = defineTool<{ query: string }>({
   name: 'recall',
+  isReadOnly: true,
   description:
     'Search long-term memory for facts saved in earlier sessions. Call this when the user refers to something they told you before, or when their preferences would change your answer.',
   properties: {

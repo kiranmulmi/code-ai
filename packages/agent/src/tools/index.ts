@@ -2,8 +2,6 @@
 // add it to TOOLS. Keep the order fixed so servers that cache prompt prefixes can reuse them.
 import type { ToolGroup } from '@app/shared';
 import type { AnyTool, ToolDefinition } from './define.js';
-import { getCurrentTime } from './time.js';
-import { calculator } from './calculator.js';
 import { askUser } from './ask-user.js';
 import { listFiles } from './files/list-files.js';
 import { readFile } from './files/read-file.js';
@@ -32,8 +30,6 @@ const TOOLS: readonly AnyTool[] = [
   useSkill,
   readSkillFile,
   copySkillFile,
-  getCurrentTime,
-  calculator,
   askUser,
   webSearch,
   fetchPage,

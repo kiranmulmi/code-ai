@@ -38,7 +38,16 @@ export function checkInput(
 
 // ---------- Run budget (steps + tokens per user prompt) ----------
 
+/**
+ * How much a token read from the server's prompt cache weighs against the token budget. Every
+ * step resends the whole conversation, mostly from the cache, and cache reads cost about a tenth
+ * of new input (Anthropic, OpenAI's recent models); counted in full, long tasks ran out of
+ * tokens long before they ran out of steps.
+ */
+export const CACHED_INPUT_WEIGHT = 0.1;
+
 export class Budget {
+  /** Working steps (model calls that can use tools); planner and summary calls aren't steps. */
   steps = 0;
   inputTokens = 0;
   outputTokens = 0;
@@ -71,7 +80,7 @@ export class Budget {
       cachedInputTokens: usage.cachedInputTokens ?? 0,
       cacheWriteTokens: usage.cacheWriteTokens ?? 0,
     };
-    this.steps += 1;
+    if (call.kind === 'step') this.steps += 1;
     this.inputTokens += counts.inputTokens;
     this.outputTokens += counts.outputTokens;
     this.cachedInputTokens += counts.cachedInputTokens ?? 0;
@@ -89,10 +98,16 @@ export class Budget {
     };
   }
 
+  /** The tokens counted against the budget: cached input at CACHED_INPUT_WEIGHT, the rest in full. */
+  budgetTokens(): number {
+    const cached = Math.min(this.cachedInputTokens, this.inputTokens);
+    return this.inputTokens - cached + cached * CACHED_INPUT_WEIGHT + this.outputTokens;
+  }
+
   /** A reason string when the run must stop, otherwise null. */
   exceeded(): string | null {
     if (this.steps >= this.maxSteps) return `reached the limit of ${this.maxSteps} steps`;
-    if (this.inputTokens + this.outputTokens >= this.maxTotalTokens) {
+    if (this.budgetTokens() >= this.maxTotalTokens) {
       return `used its token budget (${this.maxTotalTokens.toLocaleString()} tokens)`;
     }
     return null;

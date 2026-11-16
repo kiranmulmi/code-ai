@@ -14,9 +14,9 @@ export type PlanningMode = (typeof PLANNING_MODES)[number];
 export interface AgentSettings {
   /** auto: before each request, a planning step decides whether to plan first. */
   planning: PlanningMode;
-  /** Model calls per user prompt. */
+  /** Working steps (model calls that can use tools) per user prompt; planner and summary calls don't count. */
   maxSteps: number;
-  /** Input + output token budget per user prompt. */
+  /** Input + output token budget per user prompt; input read from the server's cache counts at a tenth. */
   maxTotalTokens: number;
   /** Prompts longer than this many characters are rejected. */
   maxInputChars: number;

@@ -3,7 +3,7 @@
     "name": "answers-simple-question-directly",
     "why": "Simple knowledge questions should not trigger planning or tools.",
     "prompt": "What is the capital of Japan? One word.",
-    "forbidTools": ["create_plan", "calculator", "read_file", "ask_user"],
+    "forbidTools": ["create_plan", "read_file", "ask_user"],
     "outputIncludes": ["Tokyo"]
   },
   {
@@ -11,17 +11,6 @@
     "why": "A choice only the user can make goes through ask_user with options, then the work goes on with the answer.",
     "prompt": "Rename the greet function in src/greet.ts to something clearer. Let me pick the new name from a few suggestions before you change anything.",
     "expectTools": ["ask_user", "edit_file"]
-  },
-  {
-    "name": "uses-calculator-for-math",
-    "prompt": "What is 18.5% of 2,347,912? Give the exact number.",
-    "expectTools": ["calculator"],
-    "outputIncludes": ["434363.72"]
-  },
-  {
-    "name": "checks-the-clock-for-dates",
-    "prompt": "What day of the week is it today?",
-    "expectTools": ["get_current_time"]
   },
   {
     "name": "searches-web-for-current-facts",
@@ -39,8 +28,8 @@
     "name": "does-not-plan-simple-lookup",
     "why": "The planning step should send single lookups straight to the answer.",
     "prompt": "What is 15% of 980?",
-    "expectTools": ["calculator"],
-    "forbidTools": ["create_plan"]
+    "forbidTools": ["create_plan"],
+    "outputIncludes": ["147"]
   },
   {
     "name": "reads-workspace-file",

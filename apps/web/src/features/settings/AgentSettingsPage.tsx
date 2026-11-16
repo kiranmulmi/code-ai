@@ -302,14 +302,14 @@ export function AgentSettingsPage() {
               {numberField(
                 'maxSteps',
                 'Max steps',
-                'calls',
-                'Model calls per message. Research with a plan can take 20+.',
+                'steps',
+                "Working steps per message (planning and summaries don't count). Research with a plan can take 20+.",
               )}
               {numberField(
                 'maxTotalTokens',
                 'Token budget',
                 'tokens',
-                'Input + output tokens per message.',
+                'Input + output tokens per message. Input the server read from its cache counts at a tenth.',
                 true,
               )}
               {numberField(

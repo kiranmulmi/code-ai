@@ -29,6 +29,7 @@ const searxReply = z.object({
 
 export const webSearch = defineTool<{ query: string; category: string; time_range: string }>({
   name: 'web_search',
+  isReadOnly: true,
   description:
     "Search the web and get the top results (title, link, snippet). Call this for anything that may have changed since your training: news, current office holders, prices, recent releases, today's events, or any fact you aren't sure of. Search before answering rather than guessing, and cite the links you used.",
   properties: {

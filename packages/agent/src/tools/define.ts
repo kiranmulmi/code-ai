@@ -98,6 +98,11 @@ export interface ToolSpec<I> {
   optional?: readonly (keyof I & string)[];
   /** ask the human before running (side effects) */
   needsApproval?: boolean;
+  /**
+   * only reads (files, the web, memory): changes nothing and doesn't depend on the order of
+   * calls, so the loop may run it at the same time as the model's other read-only calls
+   */
+  isReadOnly?: boolean;
   run: (input: I, ctx: ToolContext) => Promise<unknown>;
 }
 
@@ -105,6 +110,8 @@ export interface ToolSpec<I> {
 export interface AnyTool {
   readonly name: string;
   readonly needsApproval: boolean;
+  /** may run alongside other read-only calls (see ToolSpec.isReadOnly) */
+  readonly isReadOnly: boolean;
   readonly definition: ToolDefinition;
   /** An error message for the model, or null when the input is fine. */
   validate(input: unknown): string | null;
@@ -131,8 +138,12 @@ export function defineTool<I>({
   properties = {},
   optional = [],
   needsApproval = false,
+  isReadOnly = false,
   run,
 }: ToolSpec<I>): Tool<I> {
+  if (isReadOnly && needsApproval) {
+    throw new Error(`${name}: a tool that asks first changes something, so it isn't read-only.`);
+  }
   const isOptional = new Set<string>(optional);
   const parameters: ToolParameters = {
     type: 'object',
@@ -145,6 +156,7 @@ export function defineTool<I>({
   return {
     name,
     needsApproval,
+    isReadOnly,
     run,
     validate: (input) => validateInput(parameters, input),
     // validate() has checked the input against the schema `I` describes.

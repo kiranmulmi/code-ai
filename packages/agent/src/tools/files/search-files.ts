@@ -17,6 +17,7 @@ interface SearchInput {
 
 export const searchFiles = defineTool<SearchInput>({
   name: 'search_files',
+  isReadOnly: true,
   description:
     'Search the contents of text files in the workspace folder, like grep. Returns "path:line: text" for each matching line. Call this to find where something is defined or used before reading whole files.',
   properties: {

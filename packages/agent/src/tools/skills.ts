@@ -46,6 +46,7 @@ export function skillFilesNote(skill: Pick<Skill, 'name' | 'files'>): string {
 
 export const useSkill = defineTool<{ name: string }>({
   name: 'use_skill',
+  isReadOnly: true,
   description:
     'Load one of the workspace\'s skills: instructions the user wrote for a kind of task (a workflow, a checklist, a house style). Call this before starting a task that matches a skill listed under "Skills in this workspace", then follow what it says. Don\'t call it for skills the user already picked for the message: those are in the message in full.',
   properties: {
@@ -62,6 +63,7 @@ export const useSkill = defineTool<{ name: string }>({
 
 export const readSkillFile = defineTool<{ skill: string; path: string; start_line?: number }>({
   name: 'read_skill_file',
+  isReadOnly: true,
   description:
     "Read one of the files a skill comes with (references, templates, examples), listed after the skill's instructions when you load it with use_skill. Call this when the skill's instructions point to one of its files. Long files come back in parts; continue with start_line.",
   properties: {

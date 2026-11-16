@@ -8,6 +8,7 @@ import {
 } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
+  DEFAULT_DISABLED_TOOLS,
   LIMITS,
   workspaceInputSchema,
   workspaceUpdateSchema,
@@ -122,7 +123,8 @@ export function WorkspaceFormPage() {
   const [folderPath, setFolderPath] = useState('');
   const [instructions, setInstructions] = useState('');
   const [planning, setPlanning] = useState<WorkspacePlanning>('default');
-  const [disabledTools, setDisabledTools] = useState<ToolGroup[]>([]);
+  // A new workspace starts with the shared defaults; editing replaces them with the saved choice.
+  const [disabledTools, setDisabledTools] = useState<ToolGroup[]>([...DEFAULT_DISABLED_TOOLS]);
   const [voiceMode, setVoiceMode] = useState(false);
   // This browser's voice choices: edited here, written when the form saves (Cancel drops them).
   const [voicePrefs, setVoicePrefs] = useState<VoicePrefs>(readVoicePrefs);
@@ -592,7 +594,7 @@ export function WorkspaceFormPage() {
               <Field
                 id="workspace-tools"
                 label="Tools"
-                hint="Turn off what this workspace doesn't need: every message gets smaller. The clock and calculator are always on; attachment, skill and MCP tools come when needed."
+                hint="Turn off what this workspace doesn't need: every message gets smaller. Asking you a question is always on; attachment, skill and MCP tools come when needed."
               >
                 <div id="workspace-tools">
                   <ToolGroupSwitches disabled={disabledTools} onChange={setDisabledTools} />

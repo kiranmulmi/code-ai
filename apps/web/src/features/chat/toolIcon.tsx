@@ -1,8 +1,6 @@
 import type { ComponentType, SVGProps } from 'react';
 import {
   BrainIcon,
-  CalculatorIcon,
-  ClockIcon,
   CopyIcon,
   EditIcon,
   FileIcon,
@@ -54,11 +52,9 @@ const TOOL_ICONS: Readonly<Record<string, Icon>> = {
   create_plan: FlagIcon,
   update_plan: FlagIcon,
   add_plan_steps: FlagIcon,
-  get_current_time: ClockIcon,
   use_skill: SkillIcon,
   read_skill_file: SkillIcon,
   copy_skill_file: SkillIcon,
-  calculator: CalculatorIcon,
   ask_user: QuestionIcon,
   load_mcp_tools: ServerIcon,
 };

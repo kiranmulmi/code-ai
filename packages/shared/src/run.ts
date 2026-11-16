@@ -108,6 +108,7 @@ export function groupTokens(groups: readonly TokenGroup[]): number {
 export interface RunResult {
   text: string;
   status: RunStatus;
+  /** working steps (model calls that could use tools); `calls` lists every call */
   steps: number;
   toolsUsed: string[];
   usage: Usage;
@@ -129,8 +130,8 @@ export type AgentEvent =
   /** After each model call: how full the model's context window was (input plus output). */
   | { type: 'context'; usedTokens: number; windowTokens: number }
   /**
-   * The run's tokens so far, so they show live. `steps` and `usage` count every call made, as
-   * `RunResult` does at the end. Servers report a call's tokens only once it ends, so while one
+   * The run's tokens so far, so they show live. `usage` counts every call made and `steps` the
+   * working steps (not the planner or summaries), as `RunResult` does at the end. Servers report a call's tokens only once it ends, so while one
    * streams (planner and summaries too) these come with `isEstimated`: its input counted from
    * the request up front, its output from what has streamed so far (a few times a second).
    * The event after the call ends has the server's counts and no `isEstimated`.

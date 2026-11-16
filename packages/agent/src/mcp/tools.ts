@@ -58,6 +58,8 @@ export function toAgentTools(sources: readonly McpToolSource[], call: CallMcpToo
     return {
       name,
       needsApproval,
+      // A server's own readOnlyHint isn't trusted: its tools run one at a time, in order.
+      isReadOnly: false,
       definition: {
         type: 'function',
         function: { name, description: describe(server, tool), parameters },

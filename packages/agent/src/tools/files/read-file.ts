@@ -8,6 +8,7 @@ const MAX_CHARS = 18_000;
 
 export const readFile = defineTool<{ path: string; start_line?: number; end_line?: number }>({
   name: 'read_file',
+  isReadOnly: true,
   description:
     'Read a text file in the workspace folder. Call this when you need what a file says, and before changing part of it. Long files come back in parts with line numbers in the header; ask for the next part with start_line.',
   properties: {

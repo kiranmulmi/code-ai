@@ -59,12 +59,12 @@ import {
   shrinkToolResults,
   transcriptChunks,
 } from './context.js';
-import type { ToolDefinition } from './tools/define.js';
+import { withoutReason, type ToolDefinition } from './tools/define.js';
 import { ATTACHMENT_TOOLS, SKILL_TOOLS, buildToolset } from './tools/index.js';
 import type { AnyTool, AskUserFn, ToolContext } from './tools/define.js';
 import type { WorkspaceTasks } from './background-tasks.js';
 import { Planner, decide } from './planner.js';
-import { Conversation, type ModelMessage } from './memory/short-term.js';
+import { Conversation, type ModelMessage, type ToolCall } from './memory/short-term.js';
 import { renderMemories, type MemoryStore } from './memory/long-term.js';
 import {
   Budget,
@@ -75,7 +75,7 @@ import {
   type AskFn,
 } from './guardrails.js';
 import { createLogger, type AgentLogger } from './logger.js';
-import { errorMessage } from './errors.js';
+import { errorMessage, isRecord } from './errors.js';
 
 export type { ApproveFn, AskFn };
 
@@ -213,7 +213,8 @@ export function createAgent(options: AgentOptions): Agent {
       const sofar = budget.usage();
       emit({
         type: 'usage',
-        steps: budget.steps + 1,
+        // Only a working step counts as one; the planner and summaries don't.
+        steps: budget.steps + (kind === 'step' ? 1 : 0),
         usage: {
           ...sofar,
           inputTokens: sofar.inputTokens + estimatedInput,
@@ -291,6 +292,8 @@ export function createAgent(options: AgentOptions): Agent {
   };
   // Rebuilt at the start of each run with the workspace's skills as they are then.
   const voiceReplies = options.voiceReplies ?? false;
+  // Without the planning step the model is told to make its own plans.
+  const hasPlanningStep = config.planning === 'auto';
   // Kept in its sections too, for the token usage breakdown.
   let systemSections = systemPromptSections(
     instructions,
@@ -298,7 +301,7 @@ export function createAgent(options: AgentOptions): Agent {
     '',
     toolset.deferredSummary,
     disabledTools,
-    { voiceReplies },
+    { voiceReplies, hasPlanningStep },
   );
   let systemPrompt = systemSections.map((section) => section.text).join('');
   let skillList = '';
@@ -426,6 +429,27 @@ export function createAgent(options: AgentOptions): Agent {
     }
   }
 
+  /** A built-in read-only tool the workspace has on: it may run alongside others like it. */
+  function canRunAlongside(name: string): boolean {
+    const tool = toolset.byName.get(name);
+    return Boolean(tool?.isReadOnly && !tool.needsApproval && !toolset.disabled.has(name));
+  }
+
+  /** The model's calls in order, with each run of read-only calls grouped to run together. */
+  function batchCalls(calls: readonly ToolCall[]): ToolCall[][] {
+    const batches: ToolCall[][] = [];
+    for (const call of calls) {
+      const last = batches.at(-1);
+      const isReadOnly = canRunAlongside(call.function.name);
+      if (last && isReadOnly && last.every((c) => canRunAlongside(c.function.name))) {
+        last.push(call);
+      } else {
+        batches.push([call]);
+      }
+    }
+    return batches;
+  }
+
   /** The workspace's skills, one line each; a problem reading them only leaves them out. */
   async function readSkills(): Promise<string> {
     if (!skillStore) return '';
@@ -474,7 +498,7 @@ export function createAgent(options: AgentOptions): Agent {
       skillList,
       toolset.deferredSummary,
       disabledTools,
-      { voiceReplies },
+      { voiceReplies, hasPlanningStep },
     );
     systemPrompt = systemSections.map((section) => section.text).join('');
     // Tools this chat already called stay sent: its earlier calls refer to them.
@@ -505,6 +529,7 @@ export function createAgent(options: AgentOptions): Agent {
       skills: skills.map((skill) => skill.name),
     });
 
+    const repeats: RepeatLog = new Map();
     let planThisRun = false; // the check step only applies to plans made for this request
     let checksLeft = config.maxPlanChecks;
     let answerBeforeCheck: string | null = null; // the answer given before the last check, if any
@@ -616,30 +641,44 @@ export function createAgent(options: AgentOptions): Agent {
           return finish('done', text || '(The model returned an empty response.)');
         }
 
-        // Every tool call needs a matching result before the next model call.
-        for (const call of calls) {
-          const { name, arguments: args } = call.function;
+        // Every tool call needs a matching result before the next model call. Read-only calls
+        // next to each other run at the same time; the rest one at a time, in order.
+        for (const batch of batchCalls(calls)) {
           if (isStopped()) {
-            // The model asked for it, so it still needs a result; it just doesn't run.
-            conversation.addToolResult(call.id, toolError('Stopped by the user before this ran.'));
+            // The model asked for them, so they still need results; they just don't run.
+            for (const call of batch) {
+              conversation.addToolResult(
+                call.id,
+                toolError('Stopped by the user before this ran.'),
+              );
+            }
             continue;
           }
-          toolsUsed.push(name);
-          logger.step(`${name} ${summarize(args)}`);
-          emit({ type: 'tool_call', id: call.id, name, args });
-          const result =
-            finishReason === 'length'
-              ? toolError(
-                  "Your output hit the token limit, so this call's arguments were cut off. Retry with smaller input.",
-                )
-              : await runTool(name, args);
-          conversation.addToolResult(call.id, result);
-          emit({ type: 'tool_result', id: call.id, name, ...toolResultPreview(result) });
-          if (PLAN_TOOLS.has(name)) emit({ type: 'plan', plan: planner.plan });
-          if (name === 'create_plan' && !result.startsWith('Error: ')) planThisRun = true; // re-planned mid-task
-          if (MEMORY_TOOLS.has(name) && !result.startsWith('Error: ')) {
-            memoryShown = await readMemories(); // the model knows its own changes
-          }
+          const results = await Promise.all(
+            batch.map(async (call) => {
+              const { name, arguments: args } = call.function;
+              toolsUsed.push(name);
+              logger.step(`${name} ${summarize(args)}`);
+              emit({ type: 'tool_call', id: call.id, name, args });
+              const ran =
+                finishReason === 'length'
+                  ? toolError(
+                      "Your output hit the token limit, so this call's arguments were cut off. Retry with smaller input.",
+                    )
+                  : await runTool(name, args);
+              const result = noteRepeat(repeats, name, args, ran);
+              if (result !== ran) logger.warn(`${name} was called again with the same result`);
+              emit({ type: 'tool_result', id: call.id, name, ...toolResultPreview(result) });
+              if (PLAN_TOOLS.has(name)) emit({ type: 'plan', plan: planner.plan });
+              if (name === 'create_plan' && !ran.startsWith('Error: ')) planThisRun = true; // re-planned mid-task
+              if (MEMORY_TOOLS.has(name) && !ran.startsWith('Error: ')) {
+                memoryShown = await readMemories(); // the model knows its own changes
+              }
+              return { id: call.id, result };
+            }),
+          );
+          // In the order the model asked, whichever finished first.
+          for (const { id, result } of results) conversation.addToolResult(id, result);
         }
         if (isStopped()) return finish('stopped', STOPPED_TEXT);
         // Only now: every tool call needs its result before any other message.
@@ -892,6 +931,36 @@ function describeRun(
   let text = lines.join('\n\n');
   if (text.length > total) text = `…(earlier findings cut)…\n${text.slice(-total)}`;
   return text;
+}
+
+/** Each distinct call this run made (tool and arguments) with the result it last got. */
+type RepeatLog = Map<string, string>;
+
+const REPEATED_CALL_NOTE =
+  "Note: you made this exact call before in this task and got the same result. Don't repeat it: use the result you have, change the arguments, or try another way. If you are waiting for something to change (a background task), say so instead of checking again right away.";
+
+/**
+ * The result, with a note when the same call (same tool, same arguments) last got this exact
+ * result: a model stuck in a loop repeats a call that can't help, until the step limit.
+ */
+function noteRepeat(repeats: RepeatLog, name: string, args: string, result: string): string {
+  const key = `${name} ${canonicalArguments(args)}`;
+  const previous = repeats.get(key);
+  repeats.set(key, result);
+  return previous === result ? `${result}\n\n${REPEATED_CALL_NOTE}` : result;
+}
+
+/** The arguments as sorted JSON without the approval reason, so the same call matches itself. */
+function canonicalArguments(args: string): string {
+  try {
+    return JSON.stringify(withoutReason(JSON.parse(args || '{}')), (_key, value: unknown) =>
+      isRecord(value)
+        ? Object.fromEntries(Object.entries(value).sort(([a], [b]) => a.localeCompare(b)))
+        : value,
+    );
+  } catch {
+    return args;
+  }
 }
 
 // The chat format has no error flag on tool results, so mark errors in the text.

@@ -22,6 +22,7 @@ interface TaskOutputInput {
 
 export const taskOutput = defineTool<TaskOutputInput>({
   name: 'task_output',
+  isReadOnly: true,
   description:
     "Check on background tasks started with run_command background: true. With a task_id, get its state and recent output (stdout and stderr together), e.g. to see whether a dev server is up or why it crashed; without one, list the workspace's tasks.",
   properties: {

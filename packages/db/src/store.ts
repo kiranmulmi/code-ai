@@ -6,6 +6,7 @@
 import fs from 'node:fs/promises';
 import nodePath from 'node:path';
 import {
+  DEFAULT_DISABLED_TOOLS,
   LIMITS,
   type McpConfig,
   type McpServerConfig,
@@ -100,7 +101,7 @@ export class Store {
     path,
     instructions = '',
     planning = 'default',
-    disabledTools = [],
+    disabledTools = [...DEFAULT_DISABLED_TOOLS],
     voiceMode = false,
     hasTerminalTab = false,
     hasGitTab = false,

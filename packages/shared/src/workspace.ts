@@ -4,11 +4,17 @@ import { LIMITS } from './limits.js';
 /**
  * Groups of built-in tools a workspace can turn off (a chat-only workspace doesn't need file
  * or command tools). Off, their definitions and the matching system prompt rules aren't sent,
- * which makes every model call smaller. The clock and calculator are always on; attachment
+ * which makes every model call smaller. ask_user is always on; attachment
  * tools come with attached files, skills and MCP tools with the workspace's own.
  */
 export const TOOL_GROUPS = ['files', 'commands', 'web', 'memory', 'plans'] as const;
 export type ToolGroup = (typeof TOOL_GROUPS)[number];
+
+/**
+ * Groups a new workspace starts with turned off: the user turns the Files tools on for a
+ * workspace on purpose. Only new workspaces get this; saved ones keep their own choice.
+ */
+export const DEFAULT_DISABLED_TOOLS: readonly ToolGroup[] = ['files'];
 
 export const TOOL_GROUP_LABELS: Record<ToolGroup, { label: string; detail: string }> = {
   files: { label: 'Files', detail: 'Read, search, write, move and delete files in the folder' },
@@ -84,7 +90,7 @@ export const workspaceInputSchema = z.object({
   path: folderPath,
   instructions: instructions.default(''),
   planning: planning.default('default'),
-  disabledTools: disabledTools.default([]),
+  disabledTools: disabledTools.default([...DEFAULT_DISABLED_TOOLS]),
   voiceMode: z.boolean().default(false),
   hasTerminalTab: z.boolean().default(false),
   hasGitTab: z.boolean().default(false),
