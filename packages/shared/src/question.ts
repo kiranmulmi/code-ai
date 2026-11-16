@@ -1,14 +1,5 @@
 import { z } from 'zod';
-
-/** What the agent's ask_user tool may ask, and how long an answer may be. */
-export const QUESTION_LIMITS = {
-  questionChars: 500,
-  minOptions: 2,
-  maxOptions: 4,
-  labelChars: 120,
-  descriptionChars: 300,
-  answerChars: 4000,
-} as const;
+import { QUESTION_LIMITS } from './constants.js';
 
 export interface QuestionOption {
   /** What the answer is when picked: short, and the text the agent gets back. */

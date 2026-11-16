@@ -15,6 +15,7 @@ import {
 } from '../../../lib/icons';
 import { languageForPath, languageLabel } from '../../../lib/languages';
 import { readPref, writePref } from '../../../lib/storage';
+import { WEB_APP } from '@app/shared';
 
 // The editor (CodeMirror and its language modes) loads only when the user clicks Edit.
 const CodeEditor = lazy(() =>
@@ -23,7 +24,7 @@ const CodeEditor = lazy(() =>
 
 const WRAP_KEY = 'agent.previewWrap';
 /** Past this many matches the counter says "999+" and only those are highlighted. */
-const MAX_MATCHES = 999;
+const MAX_MATCHES = WEB_APP.maxPreviewMatches;
 
 const TOOL =
   'inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-[12.5px] font-medium transition-colors';

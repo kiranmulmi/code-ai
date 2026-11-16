@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { LIMITS } from './limits.js';
+import { LIMITS } from './constants.js';
 
 /**
  * Groups of built-in tools a workspace can turn off (a chat-only workspace doesn't need file

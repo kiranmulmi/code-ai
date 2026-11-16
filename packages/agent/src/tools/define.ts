@@ -50,7 +50,7 @@ export const APPROVAL_REASON = 'reason';
 export const APPROVAL_REASON_PROPERTY: PropertySchema = {
   type: 'string',
   description:
-    'Why you need this step now, in one short plain sentence for the user, who reads it when deciding whether to allow it. Say what it achieves, e.g. "Run the tests to check the fix works."',
+    'One short sentence for the user, who reads it when approving: what this step achieves.',
 };
 
 /** The input without the approval reason (only the agent loop and the user see it). */

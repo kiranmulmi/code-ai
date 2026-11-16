@@ -3,7 +3,7 @@ import { defineTool } from './define.js';
 export const remember = defineTool<{ fact: string; replaces: string }>({
   name: 'remember',
   description:
-    "Save a lasting fact to long-term memory so it is available in future sessions. Call this when the user shares a preference, a fact about themselves or their work, or explicitly asks you to remember something. Never save one-off questions, what the user asked about, what an attached file or image contains, today's date, search results, or anything that only matters for the current conversation. Save one complete fact per topic: if a saved memory already covers the topic, pass its id in replaces and write the combined fact, instead of adding a near-copy.",
+    "Save a lasting fact for future sessions: a preference, a fact about the user or their work, or something they ask you to remember. Never one-off questions, file contents, today's date, search results or anything that only matters now. One fact per topic: if a saved memory covers the topic, pass its id in replaces with the combined fact.",
   properties: {
     fact: {
       type: 'string',
@@ -58,7 +58,7 @@ export const recall = defineTool<{ query: string }>({
 export const forget = defineTool<{ ids: string[]; all: boolean }>({
   name: 'forget',
   description:
-    'Delete facts from long-term memory. Call this when the user asks you to forget, remove or clear something you saved, or when they say a saved fact is wrong. To delete specific facts, first call recall to get their ids. To delete everything, set all to true. The user is asked to approve before anything is deleted.',
+    'Delete saved facts when the user asks you to forget or clear them, or says one is wrong. Get ids with recall first, or set all to true to delete everything. The user approves first.',
   properties: {
     ids: {
       type: 'array',

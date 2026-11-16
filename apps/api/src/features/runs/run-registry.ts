@@ -1,12 +1,13 @@
 import { randomUUID } from 'node:crypto';
 import type { ApproveFn, AskUserFn, SteeringInbox, SteeringMessage } from '@app/agent';
 import type { ApprovalMode, QuestionAnswer, StreamEvent } from '@app/shared';
+import { API_LIMITS } from '@app/shared';
 
-const APPROVAL_TIMEOUT_MS = 5 * 60 * 1000;
+const APPROVAL_TIMEOUT_MS = API_LIMITS.approvalTimeoutMs;
 /** A question takes thought, so it waits longer than an approval before it counts as skipped. */
-const QUESTION_TIMEOUT_MS = 30 * 60 * 1000;
+const QUESTION_TIMEOUT_MS = API_LIMITS.questionTimeoutMs;
 /** Messages sent during a run that the agent hasn't read yet, at most. */
-export const MAX_WAITING_MESSAGES = 10;
+export const MAX_WAITING_MESSAGES = API_LIMITS.maxWaitingMessages;
 
 type Settle = (allowed: boolean) => void;
 type Reply = (answer: QuestionAnswer) => void;

@@ -3,13 +3,14 @@
 // it doesn't recognise.
 import { isRecord } from '../errors.js';
 import { bytesOf, decodeFields, stringOf } from './wire.js';
+import { CURSOR_TIMEOUTS } from '@app/shared';
 
 const API_URL = 'https://api2.cursor.sh';
 /** The Cursor CLI build these requests present as (OmniRoute's tested pin). */
 export const CLIENT_VERSION = 'cli-2026.07.08-0c04a8a';
-const REQUEST_TIMEOUT_MS = 15_000;
+const REQUEST_TIMEOUT_MS = CURSOR_TIMEOUTS.requestTimeoutMs;
 /** How long the chat stream's address is reused before asking again. */
-const AGENT_URL_TTL_MS = 60 * 60_000;
+const AGENT_URL_TTL_MS = CURSOR_TIMEOUTS.agentUrlTtlMs;
 
 /** What every request to Cursor carries. */
 export function cursorHeaders(accessToken: string): Record<string, string> {

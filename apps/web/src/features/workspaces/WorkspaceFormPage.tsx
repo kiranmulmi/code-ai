@@ -8,6 +8,7 @@ import {
 } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
+  WEB_APP,
   DEFAULT_DISABLED_TOOLS,
   LIMITS,
   workspaceInputSchema,
@@ -56,7 +57,7 @@ import { APP_NAME } from '../../lib/brand';
 type FieldErrors = { name?: string; path?: string; instructions?: string };
 
 /** Wait for a pause in typing before asking whether the folder is free. */
-const FOLDER_CHECK_DELAY_MS = 300;
+const FOLDER_CHECK_DELAY_MS = WEB_APP.folderCheckDelayMs;
 
 const TABS = [
   { id: 'general', label: 'General' },

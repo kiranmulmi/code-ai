@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { LIMITS } from './limits.js';
+import { LIMITS } from './constants.js';
 
 /** How a file differs from the last commit (staged and unstaged changes together). */
 export type GitFileStatus = 'modified' | 'added' | 'deleted' | 'untracked' | 'conflicted';

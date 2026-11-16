@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ATTACHMENT_LIMITS } from './constants.js';
 
 /**
  * A file the user attached in a chat. It is kept privately in the workspace's
@@ -19,13 +20,6 @@ export interface Attachment {
 /** What the agent can do with it: look at it, read its text, or only copy it. */
 export const ATTACHMENT_KINDS = ['image', 'pdf', 'document', 'text', 'other'] as const;
 export type AttachmentKind = (typeof ATTACHMENT_KINDS)[number];
-
-export const ATTACHMENT_LIMITS = {
-  /** Per file, after base64 decoding. */
-  maxBytes: 15 * 1024 * 1024,
-  perMessage: 10,
-  nameLength: 200,
-} as const;
 
 /** Images every vision model accepts. Others (SVG, HEIC, TIFF) are kept as plain files. */
 export const IMAGE_TYPES: Record<string, string> = {

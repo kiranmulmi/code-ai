@@ -2,29 +2,42 @@
 //
 //   - The request's size is estimated (characters / 4), then corrected by the input token
 //     counts the server reports for what was actually sent (`ContextMeter`).
-//   - At 80% of the usable window (the window minus room for the reply), the older part of the
+//   - At 80% of the usable window (the window minus room for the reply), or at
+//     COMPACT_AT_TOKENS on a large window, whichever comes first, the older part of the
 //     conversation is summarized (the agent loop calls the model; `compactionCut` says where to
 //     cut, `transcriptChunks` what to send). Recent messages stay word for word.
 //   - If a request is still too big after that, the oldest tool results are shortened for that
 //     call only (`shrinkToolResults`); the saved chat keeps them.
 // Tool output and saved memories are also capped relative to the window (`contextLimits`).
+import { CONTEXT } from '@app/shared';
 import type { ModelMessage } from './memory/short-term.js';
 import type { ToolDefinition } from './tools/define.js';
 
 /** Summarize older messages once a request reaches this share of the usable window. */
-export const COMPACT_AT = 0.8;
+export const COMPACT_AT = CONTEXT.summarizeAtShare;
+/**
+ * ...or this many tokens, whichever comes first. Every step resends the whole conversation, so
+ * on a large window (200k+) waiting for 80% makes each call of a long chat cost far more than
+ * the work needs. Small windows reach COMPACT_AT first and are unaffected.
+ */
+export const COMPACT_AT_TOKENS = CONTEXT.summarizeAtTokens;
 /** Past this share (after summarizing), the oldest tool results are shortened for the call. */
-export const HARD_LIMIT = 0.95;
+export const HARD_LIMIT = CONTEXT.hardLimitShare;
 /** The newest messages kept word for word when summarizing: this share of the usable window. */
-const KEEP_RECENT = 0.25;
+const KEEP_RECENT = CONTEXT.keepRecentShare;
 /** One summarizing call reads at most this share of the usable window of transcript. */
-const SUMMARY_CHUNK = 0.5;
+const SUMMARY_CHUNK = CONTEXT.summaryChunkShare;
 
-export const CHARS_PER_TOKEN = 4;
+export const CHARS_PER_TOKEN = CONTEXT.charsPerToken;
+/**
+ * The most any one tool result may be (about 3k tokens). Every result is sent again with each
+ * later step, so a big one costs many times over; tools page or narrow instead.
+ */
+export const MAX_TOOL_OUTPUT_CHARS = CONTEXT.maxToolOutputChars;
 /** Roles, separators and the like that every message adds. */
-const MESSAGE_OVERHEAD = 4;
+const MESSAGE_OVERHEAD = CONTEXT.messageOverheadTokens;
 /** What an attached image roughly costs (it depends on its size and the model). */
-export const IMAGE_TOKENS = 1_500;
+export const IMAGE_TOKENS = CONTEXT.imageTokens;
 
 export function textTokens(text: string): number {
   return Math.ceil(text.length / CHARS_PER_TOKEN);
@@ -53,7 +66,10 @@ export interface ContextBudget {
  * tenth of the window.
  */
 export function contextBudget(window: number, maxOutputTokens: number | null): ContextBudget {
-  const reserve = Math.min(maxOutputTokens ?? Math.round(window * 0.1), Math.round(window / 2));
+  const reserve = Math.min(
+    maxOutputTokens ?? Math.round(window * CONTEXT.replyReserveShare),
+    Math.round(window / 2),
+  );
   return { window, reserve, usable: window - reserve };
 }
 
@@ -64,8 +80,14 @@ export function contextLimits({ usable }: ContextBudget): {
 } {
   const chars = usable * CHARS_PER_TOKEN;
   return {
-    toolOutputChars: Math.max(2_000, Math.min(20_000, Math.floor(chars * 0.15))),
-    memoryChars: Math.max(1_000, Math.min(6_000, Math.floor(chars * 0.05))),
+    toolOutputChars: Math.max(
+      CONTEXT.minToolOutputChars,
+      Math.min(MAX_TOOL_OUTPUT_CHARS, Math.floor(chars * CONTEXT.toolOutputShare)),
+    ),
+    memoryChars: Math.max(
+      CONTEXT.minMemoryChars,
+      Math.min(CONTEXT.maxMemoryChars, Math.floor(chars * CONTEXT.memoryShare)),
+    ),
   };
 }
 
@@ -124,9 +146,20 @@ export function compactionCut(
   return cut >= 2 ? cut : null;
 }
 
-/** The share of the usable window kept word for word when summarizing. */
-export function keepRecentTokens({ usable }: ContextBudget): number {
-  return Math.floor(usable * KEEP_RECENT);
+/** The request size (tokens) at which older messages are summarized. */
+export function compactThreshold({ usable }: ContextBudget): number {
+  return Math.min(Math.floor(usable * COMPACT_AT), COMPACT_AT_TOKENS);
+}
+
+/**
+ * The newest messages kept word for word when summarizing: a share of the usable window, but
+ * never more than a third of the threshold, so a summary always frees a good part of the request.
+ */
+export function keepRecentTokens(budget: ContextBudget): number {
+  return Math.min(
+    Math.floor(budget.usable * KEEP_RECENT),
+    Math.floor(compactThreshold(budget) / 3),
+  );
 }
 
 /**
@@ -137,7 +170,13 @@ export function transcriptChunks(
   messages: readonly ModelMessage[],
   { usable }: ContextBudget,
 ): string[] {
-  const perItem = Math.max(500, Math.min(4_000, Math.floor(usable * CHARS_PER_TOKEN * 0.05)));
+  const perItem = Math.max(
+    CONTEXT.summaryItemMinChars,
+    Math.min(
+      CONTEXT.summaryItemMaxChars,
+      Math.floor(usable * CHARS_PER_TOKEN * CONTEXT.summaryItemShare),
+    ),
+  );
   const cut = (text: string) =>
     text.length > perItem
       ? `${text.slice(0, perItem)}… [${text.length - perItem} more characters]`

@@ -60,9 +60,11 @@ import { copySkillFile, readSkillFile, useSkill } from '../src/tools/skills.js';
 import { improveSkill, parseImprovedSkill } from '../src/improve-skill.js';
 import { Conversation } from '../src/memory/short-term.js';
 import {
+  compactThreshold,
   compactionCut,
   contextBudget,
   contextLimits,
+  keepRecentTokens,
   shrinkToolResults,
   textTokens,
   transcriptChunks,
@@ -138,9 +140,9 @@ interface Scripted {
 
 /** A fake model that returns scripted responses in order and records each request. */
 function scriptedModel(responses: Scripted[]) {
-  const requests: Omit<ModelRequest, 'onText' | 'onOutput'>[] = [];
+  const requests: Omit<ModelRequest, 'onText' | 'onOutput' | 'onReasoning'>[] = [];
   const callModel: CallModel = async (req) => {
-    const { onText, onOutput, ...rest } = req;
+    const { onText, onOutput, onReasoning: _onReasoning, ...rest } = req;
     requests.push(structuredClone(rest));
     const next = responses.shift();
     if (!next) throw new Error('fake model ran out of responses');
@@ -310,6 +312,9 @@ test('read_file reads whole files or line ranges', async () => {
     '[src/math.ts: lines 2-2 of 4. Continue with start_line 3.]\n  return a + b;',
   );
   await assert.rejects(readFile.run({ path: 'src' }, ctx), /is a folder/);
+  await fs.writeFile(path.join(ctx.workspace, 'min.js'), `a\n${'x'.repeat(5_000)}\nb`);
+  const minified = String(await readFile.run({ path: 'min.js' }, ctx));
+  assert.match(minified, /\[line cut: 4000 more characters\]\nb$/, 'very long lines are cut');
 });
 
 test('find_files and search_files skip generated folders', async () => {
@@ -2249,7 +2254,7 @@ test('attachment and skill tools are sent only when the chat has files or skills
   await agent.run('hello');
   const plain = toolNames(nth(requests, 0));
   assert.ok(!plain.includes('read_attachment') && !plain.includes('use_skill'));
-  assert.doesNotMatch(nth(requests, 0).system ?? '', /\nSkills:\n/);
+  assert.doesNotMatch(nth(requests, 0).system ?? '', /\nSkills:\n|\nAttachments:\n/);
 
   const { store, attachments } = attachmentStore([{ name: 'a.png', bytes: PNG }]);
   const withFiles = createAgent({
@@ -2265,6 +2270,7 @@ test('attachment and skill tools are sent only when the chat has files or skills
   assert.ok(names.includes('read_attachment') && names.includes('view_image'));
   assert.ok(names.includes('use_skill'));
   assert.match(nth(requests, 1).system ?? '', /\nSkills:\n/);
+  assert.match(nth(requests, 1).system ?? '', /\nAttachments:\n/);
 });
 
 test('a tool the chat called before stays sent after its group is turned off, but refuses', async () => {
@@ -2588,7 +2594,12 @@ test('limits scale with the window, and long transcripts are summarized in parts
   assert.equal(small.reserve, 800);
   assert.equal(contextBudget(200_000, 300_000).reserve, 100_000, 'the reply gets at most half');
   assert.ok(contextLimits(small).toolOutputChars < 20_000);
-  assert.equal(contextLimits(contextBudget(1_000_000, null)).toolOutputChars, 20_000);
+  assert.equal(contextLimits(contextBudget(1_000_000, null)).toolOutputChars, 12_000);
+  // Summarizing starts at 80% of a small window, but at 80k tokens on a large one.
+  assert.equal(compactThreshold(small), Math.floor(small.usable * 0.8));
+  const large = contextBudget(1_000_000, null);
+  assert.equal(compactThreshold(large), 80_000);
+  assert.ok(keepRecentTokens(large) <= 80_000 / 3, 'a summary frees most of the request');
   const long: ModelMessage[] = Array.from({ length: 20 }, (_, i) => ({
     role: 'user',
     content: `${i} ${'y'.repeat(3_000)}`,
@@ -2600,8 +2611,13 @@ test('limits scale with the window, and long transcripts are summarized in parts
 
 test('near the context window, older messages are summarized and the chat goes on', async () => {
   const setup = await tempSetup();
-  const requests: Omit<ModelRequest, 'onText' | 'onOutput'>[] = [];
-  const callModel: CallModel = async ({ onText: _onText, onOutput: _onOutput, ...req }) => {
+  const requests: Omit<ModelRequest, 'onText' | 'onOutput' | 'onReasoning'>[] = [];
+  const callModel: CallModel = async ({
+    onText: _onText,
+    onOutput: _onOutput,
+    onReasoning: _onReasoning,
+    ...req
+  }) => {
     requests.push(structuredClone(req));
     const isSummary = req.system === COMPACTION_PROMPT;
     return {

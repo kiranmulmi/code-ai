@@ -1,8 +1,9 @@
 import fs from 'node:fs/promises';
 import { defineTool } from '../define.js';
 import { globToRegExp, locate, walk } from './walk.js';
+import { TOOL_LIMITS } from '@app/shared';
 
-const MAX_RESULTS = 200;
+const MAX_RESULTS = TOOL_LIMITS.findFiles.maxResults;
 
 export const findFiles = defineTool<{ pattern: string; path?: string }>({
   name: 'find_files',

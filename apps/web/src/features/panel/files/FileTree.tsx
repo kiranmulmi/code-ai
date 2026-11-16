@@ -18,6 +18,7 @@ import { NameInput } from './NameInput';
 import { RowMenu, type RowMenuItem } from '../../../components/RowMenu';
 import { fileTint } from './fileTint';
 import { REVEAL_LABEL } from './revealLabel';
+import { WEB_APP } from '@app/shared';
 
 interface FileNode {
   name: string;
@@ -30,7 +31,7 @@ interface FolderNode extends FileNode {
 }
 
 /** Up to this many files, every folder starts open; above it, they start closed. */
-const OPEN_ALL_UP_TO = 40;
+const OPEN_ALL_UP_TO = WEB_APP.openAllFoldersUpTo;
 const INDENT_PX = 14;
 
 /**

@@ -1,8 +1,8 @@
 import { z } from 'zod';
-import { ATTACHMENT_LIMITS } from './attachment.js';
+import { ATTACHMENT_LIMITS, SKILL_LIMITS } from './constants.js';
 import type { ChatSummary } from './chat.js';
 import { REASONING_EFFORTS } from './model.js';
-import { SKILL_LIMITS, skillNameSchema } from './skill.js';
+import { skillNameSchema } from './skill.js';
 import type { NumberedPlanStep, Plan } from './plan.js';
 import type { QuestionAnswer, QuestionOption } from './question.js';
 
@@ -121,6 +121,8 @@ export type AgentEvent =
   | { type: 'planning' }
   | { type: 'route'; mode: 'direct' | 'plan'; reason: string; steps: number }
   | { type: 'model_call'; step: number }
+  /** The model started streaming reasoning ("thinking") text: sent once per model call. */
+  | { type: 'reasoning' }
   | { type: 'text_delta'; text: string }
   | { type: 'tool_call'; id: string; name: string; args: string }
   | { type: 'tool_result'; id: string; name: string; ok: boolean; preview: string }

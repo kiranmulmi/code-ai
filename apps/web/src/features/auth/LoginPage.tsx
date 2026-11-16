@@ -10,6 +10,7 @@ import { OUTLINE_BUTTON, PRIMARY_BUTTON, TEXT_LINK } from './authStyles';
 import { isEmail, MIN_PASSWORD_LENGTH } from './password';
 import { PasswordInput, PasswordStrengthMeter } from './PasswordInput';
 import { ProblemBox } from './ProblemBox';
+import { WEB_APP } from '@app/shared';
 
 type View =
   | { kind: 'signIn' }
@@ -20,7 +21,7 @@ type View =
 type GoogleState = 'checking' | 'on' | 'off';
 
 /** Seconds before the same email can be sent again (Supabase limits how often it sends). */
-const RESEND_AFTER_S = 60;
+const RESEND_AFTER_S = WEB_APP.resendEmailAfterS;
 
 /** Whether the Supabase project has Google sign-in turned on, from its public settings. */
 function useGoogleSignIn(supabaseUrl: string, anonKey: string): GoogleState {

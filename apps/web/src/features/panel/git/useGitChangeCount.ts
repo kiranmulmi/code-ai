@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
 import { usePageVisible } from '../../../lib/usePageVisible';
 import { fetchGitChanges } from './api';
+import { WEB_APP } from '@app/shared';
 
 /**
  * Every 10 s, so changes made outside the agent (an editor, a terminal) show soon. It's also
  * checked on each run start/end and when the browser tab is shown again. The API logs these
  * quiet reads at debug only (`POLLED_ROUTES`).
  */
-export const GIT_POLL_MS = 10_000;
+export const GIT_POLL_MS = WEB_APP.gitPollMs;
 
 /**
  * How many files changed since the last commit, for the Git diff tab's label (null when

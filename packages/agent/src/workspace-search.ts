@@ -3,12 +3,13 @@
 import fs from 'node:fs/promises';
 import type { FileContentMatch } from '@app/shared';
 import { isBinary, walk } from './tools/files/walk.js';
+import { FILES_PANEL } from '@app/shared';
 
-const MAX_WALKED = 50_000;
-const MAX_FILE_BYTES = 1_000_000;
-const MAX_LINE_CHARS = 240;
-const MAX_LINES_PER_FILE = 50;
-const TIME_LIMIT_MS = 6_000;
+const MAX_WALKED = FILES_PANEL.searchMaxWalked;
+const MAX_FILE_BYTES = FILES_PANEL.searchMaxFileBytes;
+const MAX_LINE_CHARS = FILES_PANEL.searchMaxLineChars;
+const MAX_LINES_PER_FILE = FILES_PANEL.searchMaxLinesPerFile;
+const TIME_LIMIT_MS = FILES_PANEL.searchTimeLimitMs;
 
 export interface NameSearch {
   paths: string[];

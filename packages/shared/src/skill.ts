@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { SKILL_LIMITS, WRITER_LIMITS } from './constants.js';
 
 /**
  * A skill: instructions for one kind of task (a workflow, a checklist, a house style),
@@ -28,24 +29,6 @@ export interface SkillFile {
   path: string;
   size: number;
 }
-
-export const SKILL_LIMITS = {
-  nameLength: 64,
-  descriptionLength: 1024,
-  bodyChars: 40_000,
-  /** skills one workspace can have (all of them are listed to the agent) */
-  count: 100,
-  /** skills the user can pick for one message */
-  perMessage: 5,
-  /** An uploaded skill folder: at most this many files (SKILL.md included)… */
-  fileCount: 100,
-  /** …each at most this large… */
-  fileBytes: 2 * 1024 * 1024,
-  /** …and together at most this large. */
-  totalBytes: 10 * 1024 * 1024,
-  /** a file's path inside the skill folder */
-  pathLength: 240,
-} as const;
 
 /** The file in a skill folder that holds its name, description and instructions. */
 export const SKILL_MAIN_FILE = 'SKILL.md';
@@ -108,7 +91,7 @@ export const skillInputSchema = z.object({
 export type SkillInput = z.infer<typeof skillInputSchema>;
 
 /** Longest request the skill writer takes ("what should this skill do?"). */
-export const SKILL_REQUEST_MAX_CHARS = 2000;
+export const SKILL_REQUEST_MAX_CHARS = WRITER_LIMITS.skillRequestChars;
 
 /**
  * `POST /v1/prompts/skill`: the skill form's AI writer. Writes the instructions from a request

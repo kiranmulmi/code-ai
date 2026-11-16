@@ -2,11 +2,12 @@ import type { GitChangedFile, GitChanges, GitFileDiff, GitFileStatus } from '@ap
 import { NotFoundError } from '../../lib/errors.js';
 import type { WorkspacesService } from '../workspaces/workspaces.service.js';
 import { runGit } from './run-git.js';
+import { GIT_LIMITS } from '@app/shared';
 
 /** git's empty tree: the base to diff against in a repository with no commit yet. */
 const EMPTY_TREE = '4b825dc642cb6eb9a060e54bf8d69288fbee4904';
-const MAX_FILES = 500;
-const MAX_DIFF_BYTES = 400_000;
+const MAX_FILES = GIT_LIMITS.maxFiles;
+const MAX_DIFF_BYTES = GIT_LIMITS.maxDiffBytes;
 
 const DIFF_ARGS = ['--no-color', '--no-ext-diff', '--no-textconv', '--no-renames'];
 

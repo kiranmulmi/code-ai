@@ -2,6 +2,7 @@ import { createClient, isAuthRetryableFetchError } from '@supabase/supabase-js';
 import type { AuthConfig, AuthUser } from '@app/shared';
 import type { AuthSettings } from '../../config/env.js';
 import { ForbiddenError, UnauthorizedError, UpstreamError } from '../../lib/errors.js';
+import { API_LIMITS } from '@app/shared';
 
 /** A verified access token: whose it is and until when (seconds since the epoch). */
 export interface VerifiedToken {
@@ -25,7 +26,7 @@ export interface AuthService {
 }
 
 /** Tokens already checked, so polling routes don't verify the same one again and again. */
-const CACHE_SIZE = 200;
+const CACHE_SIZE = API_LIMITS.authTokenCacheSize;
 
 /**
  * Supabase's own check (`getClaims`): the signature against the project's published keys,

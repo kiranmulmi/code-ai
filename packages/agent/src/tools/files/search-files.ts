@@ -2,10 +2,11 @@ import fs from 'node:fs/promises';
 import { defineTool } from '../define.js';
 import { errorMessage } from '../../errors.js';
 import { globToRegExp, isBinary, locate, walk } from './walk.js';
+import { TOOL_LIMITS } from '@app/shared';
 
-const MAX_MATCHES = 150;
-const MAX_FILE_BYTES = 1_000_000;
-const MAX_LINE_CHARS = 200;
+const MAX_MATCHES = TOOL_LIMITS.searchFiles.maxMatches;
+const MAX_FILE_BYTES = TOOL_LIMITS.searchFiles.maxFileBytes;
+const MAX_LINE_CHARS = TOOL_LIMITS.searchFiles.maxLineChars;
 
 interface SearchInput {
   query: string;
@@ -19,7 +20,7 @@ export const searchFiles = defineTool<SearchInput>({
   name: 'search_files',
   isReadOnly: true,
   description:
-    'Search the contents of text files in the workspace folder, like grep. Returns "path:line: text" for each matching line. Call this to find where something is defined or used before reading whole files.',
+    'Search text file contents in the workspace folder, like grep. Returns "path:line: text" per match. Use it to find where something is defined or used before reading whole files; narrow with path or glob.',
   properties: {
     query: { type: 'string', description: 'Text to look for, or a regular expression.' },
     path: { type: 'string', description: 'Folder or file to search. Default "." (everything).' },

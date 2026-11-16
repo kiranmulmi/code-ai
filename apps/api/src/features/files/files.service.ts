@@ -11,6 +11,7 @@ import {
   searchFileContents,
 } from '@app/agent';
 import {
+  FILES_PANEL,
   LIMITS,
   type CreatedEntry,
   type FileContent,
@@ -32,11 +33,11 @@ import { revealInFileManager } from './reveal.js';
 import type { WorkspacesService } from '../workspaces/workspaces.service.js';
 
 /** Enough for most projects; past it, the deepest files are the ones left out (see walk.ts). */
-const MAX_LISTED_FILES = 5_000;
+const MAX_LISTED_FILES = FILES_PANEL.maxListedFiles;
 /** Ignored paths reported (a fully ignored folder counts once): plenty for the tree. */
-const MAX_IGNORED = 2_000;
-const MAX_NAME_RESULTS = 200;
-const MAX_CONTENT_MATCHES = 300;
+const MAX_IGNORED = FILES_PANEL.maxIgnored;
+const MAX_NAME_RESULTS = FILES_PANEL.maxNameResults;
+const MAX_CONTENT_MATCHES = FILES_PANEL.maxContentMatches;
 
 /** A file's version: changes when its content does. */
 const versionOf = (content: string) => createHash('sha1').update(content).digest('hex');

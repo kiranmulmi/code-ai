@@ -4,6 +4,7 @@
 //   decide()  - one model call before the agent acts: "direct" or a plan
 //   create(), update(), addSteps() - plan state, also driven by the plan tools
 import {
+  PLANNING,
   STEP_STATUSES,
   type NumberedPlanStep,
   type Plan,
@@ -24,7 +25,7 @@ const ICONS: Record<StepStatus, string> = {
   skipped: '[-]',
   failed: '[!]',
 };
-const MAX_STEPS = 20;
+const MAX_STEPS = PLANNING.maxPlanSteps;
 
 export const isStepStatus = (value: unknown): value is StepStatus =>
   (STEP_STATUSES as readonly unknown[]).includes(value);
@@ -180,7 +181,7 @@ export async function decide({
 /** Recent user/assistant text only (no tool traffic), so the planner call stays small. */
 function summarizeHistory(
   messages: readonly ModelMessage[],
-  { maxMessages = 8, maxChars = 1200 } = {},
+  { maxMessages = PLANNING.historyMessages, maxChars = PLANNING.historyMessageChars } = {},
 ): string {
   return messages
     .filter(

@@ -1,8 +1,9 @@
 import { useMemo } from 'react';
 import { isJson, tokenizeJson } from '../lib/json-highlight';
+import { WEB_APP } from '@app/shared';
 
 /** Past this, colouring costs more than it helps (a lockfile, a big dump). */
-const MAX_HIGHLIGHT_CHARS = 200_000;
+const MAX_HIGHLIGHT_CHARS = WEB_APP.maxHighlightChars;
 
 /**
  * Text for a `<pre>`: JSON is coloured (when `language` says json, or when it parses as an

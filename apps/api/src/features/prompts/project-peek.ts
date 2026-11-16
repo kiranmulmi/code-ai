@@ -2,6 +2,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { APP_DATA_FOLDER, expandHome } from '@app/agent';
+import { PROJECT_PEEK } from '@app/shared';
 
 /** The files that say what a project is, in the order they are worth reading. */
 const DESCRIBING_FILES = [
@@ -18,9 +19,9 @@ const DESCRIBING_FILES = [
 ];
 /** Top-level names that say nothing about the project. */
 const SKIPPED_NAMES = new Set(['node_modules', APP_DATA_FOLDER]);
-const MAX_NAMES = 60;
-const MAX_FILE_CHARS = 2500;
-const MAX_FILES = 2;
+const MAX_NAMES = PROJECT_PEEK.maxNames;
+const MAX_FILE_CHARS = PROJECT_PEEK.maxFileChars;
+const MAX_FILES = PROJECT_PEEK.maxFiles;
 
 /**
  * A short look at a workspace folder for the instructions assistant: its top-level names and

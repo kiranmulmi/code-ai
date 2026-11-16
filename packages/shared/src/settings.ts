@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { AGENT_SETTING_DEFAULTS, SETTINGS_LIMITS } from './constants.js';
 import { APPROVAL_MODES, type ApprovalMode } from './info.js';
 
 export const LOG_LEVELS = ['debug', 'info', 'silent'] as const;
@@ -35,21 +36,11 @@ export interface AgentSettings {
 
 export const DEFAULT_AGENT_SETTINGS: AgentSettings = {
   planning: 'off',
-  maxSteps: 30,
-  maxTotalTokens: 400_000,
-  maxInputChars: 20_000,
+  ...AGENT_SETTING_DEFAULTS,
   approval: 'ask',
   searxngUrl: 'http://localhost:8080',
   logLevel: 'info',
 };
-
-/** Bounds the API enforces and the settings form shows. */
-export const SETTINGS_LIMITS = {
-  maxSteps: { min: 1, max: 200 },
-  maxTotalTokens: { min: 1_000, max: 50_000_000 },
-  maxInputChars: { min: 100, max: 1_000_000 },
-  searxngUrl: 500,
-} as const;
 
 const wholeNumber = (label: string, { min, max }: { min: number; max: number }) =>
   z

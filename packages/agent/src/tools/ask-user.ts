@@ -6,7 +6,7 @@ const { questionChars, minOptions, maxOptions, labelChars, descriptionChars } = 
 
 export const askUser = defineTool<{ question: string; options: unknown[] }>({
   name: 'ask_user',
-  description: `Ask the user one question and wait for the answer, with ${minOptions} to ${maxOptions} options they pick from (they can also type their own answer, or skip). Use it when you need a decision only the user can make before going on: which of several approaches, names or versions to use, or whether to go ahead with a change. Don't end your reply with a question listing choices; ask with this instead. Don't ask what you can find out with your tools, and don't ask for permission to run a tool (tools that need it ask by themselves).`,
+  description: `Ask the user one question with ${minOptions} to ${maxOptions} options to pick from (they can also type an answer or skip), and wait. For decisions only the user can make: which approach, name or version, or whether to go ahead. Use it instead of ending your reply with a list of choices. Don't ask what your tools can find out, or for permission to run a tool (those ask by themselves).`,
   properties: {
     question: {
       type: 'string',

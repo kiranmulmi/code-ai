@@ -5,6 +5,7 @@ import { toJsxRuntime, type Jsx } from 'hast-util-to-jsx-runtime';
 import { common, createLowlight } from 'lowlight';
 import { createElement, type ReactNode } from 'react';
 import { Fragment, jsx, jsxs } from 'react/jsx-runtime';
+import { WEB_APP } from '@app/shared';
 
 const lowlight = createLowlight(common);
 
@@ -33,7 +34,7 @@ function collect(node: TreeNode, classes: string[], out: Piece[]): void {
 }
 
 /** Past this, highlighting costs more than it helps (a bundle, a lockfile). */
-const MAX_CHARS = 100_000;
+const MAX_CHARS = WEB_APP.maxCodeBlockHighlightChars;
 
 /**
  * `code` highlighted as a whole (so a string or comment that spans lines stays coloured),

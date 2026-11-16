@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from 'react';
 import { AlertCircleIcon, CheckIcon, CrossIcon, InfoIcon, WarnIcon } from './icons';
+import { WEB_APP } from '@app/shared';
 
 /**
  * success: it worked. error: it failed. warning: it partly worked, or something changed
@@ -28,7 +29,7 @@ type ShowToast = (message: string, kind?: ToastKind) => void;
 const ToastContext = createContext<ShowToast | null>(null);
 
 /** Older toasts drop off beyond this many, so a burst can't cover the screen. */
-const MAX_VISIBLE = 4;
+const MAX_VISIBLE = WEB_APP.maxToasts;
 const LEAVE_MS = 180;
 
 /**

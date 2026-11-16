@@ -5,9 +5,10 @@ import { spawn, type SpawnOptions } from 'node:child_process';
 import nodePath from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { HttpError } from '../../lib/errors.js';
+import { API_LIMITS } from '@app/shared';
 
 /** Past this, an opener that hasn't exited is taken to have worked (some stay running). */
-const WAIT_MS = 5_000;
+const WAIT_MS = API_LIMITS.revealWaitMs;
 
 /** The command's exit code, or null when it isn't installed. */
 function run(command: string, args: string[], options: SpawnOptions = {}): Promise<number | null> {

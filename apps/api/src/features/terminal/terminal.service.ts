@@ -9,11 +9,12 @@ import { withoutAppSecrets } from '@app/agent';
 import * as pty from 'node-pty';
 import type { WorkspacesService } from '../workspaces/workspaces.service.js';
 import { ValidationError } from '../../lib/errors.js';
+import { API_LIMITS } from '@app/shared';
 
 /** Output kept for replay when the browser reattaches. */
-const SCROLLBACK_CHARS = 200_000;
+const SCROLLBACK_CHARS = API_LIMITS.terminalScrollbackChars;
 /** A ticket must be used this soon after it is issued. */
-const TICKET_MS = 30_000;
+const TICKET_MS = API_LIMITS.terminalTicketMs;
 
 export interface TerminalSession {
   id: string;

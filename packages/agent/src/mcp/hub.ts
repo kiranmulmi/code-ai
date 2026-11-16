@@ -12,7 +12,7 @@ import {
   ToolListChangedNotificationSchema,
   type Tool as McpTool,
 } from '@modelcontextprotocol/sdk/types.js';
-import { mcpTransportOf, type McpServerConfig } from '@app/shared';
+import { MCP_LIMITS, mcpTransportOf, type McpServerConfig } from '@app/shared';
 import { errorCode, errorMessage } from '../errors.js';
 import type { AgentLogger } from '../logger.js';
 import type { AnyTool } from '../tools/define.js';
@@ -55,8 +55,8 @@ interface Connection {
 }
 
 const CLIENT_INFO = { name: 'nimbrio-ai', version: '0.1.0' };
-const MAX_TOOLS_PER_SERVER = 500;
-const STDERR_LINES = 20;
+const MAX_TOOLS_PER_SERVER = MCP_LIMITS.maxToolsPerServer;
+const STDERR_LINES = MCP_LIMITS.stderrLines;
 
 const key = (folder: string, name: string) => `${folder}\u0000${name}`;
 

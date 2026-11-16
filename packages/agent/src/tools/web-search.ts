@@ -5,9 +5,10 @@
 import { z } from 'zod';
 import { defineTool } from './define.js';
 import { errorMessage } from '../errors.js';
+import { TOOL_LIMITS } from '@app/shared';
 
-const MAX_RESULTS = 8;
-const TIMEOUT_MS = 15_000;
+const MAX_RESULTS = TOOL_LIMITS.webSearch.maxResults;
+const TIMEOUT_MS = TOOL_LIMITS.webSearch.timeoutMs;
 
 // SearXNG's reply, read leniently: a field of an unexpected type is treated as missing.
 const optionalText = z.string().optional().catch(undefined);
@@ -31,7 +32,7 @@ export const webSearch = defineTool<{ query: string; category: string; time_rang
   name: 'web_search',
   isReadOnly: true,
   description:
-    "Search the web and get the top results (title, link, snippet). Call this for anything that may have changed since your training: news, current office holders, prices, recent releases, today's events, or any fact you aren't sure of. Search before answering rather than guessing, and cite the links you used.",
+    "Search the web; returns the top results (title, link, snippet). Use it for anything that may have changed since your training or that you aren't sure of, and cite the links you used.",
   properties: {
     query: {
       type: 'string',

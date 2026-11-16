@@ -1,16 +1,19 @@
 import fs from 'node:fs/promises';
 import { defineTool } from '../define.js';
 import { isBinary, locate } from './walk.js';
+import { TOOL_LIMITS } from '@app/shared';
 
-const MAX_FILE_BYTES = 5_000_000;
+const MAX_FILE_BYTES = TOOL_LIMITS.readFile.maxFileBytes;
 /** Kept under the tool output limit, so a long file is cut at a line, with a note. */
-const MAX_CHARS = 18_000;
+const MAX_CHARS = TOOL_LIMITS.readFile.partChars;
+/** Longer lines (minified code, data) are cut: they cost many tokens and rarely help. */
+const MAX_LINE_CHARS = TOOL_LIMITS.readFile.maxLineChars;
 
 export const readFile = defineTool<{ path: string; start_line?: number; end_line?: number }>({
   name: 'read_file',
   isReadOnly: true,
   description:
-    'Read a text file in the workspace folder. Call this when you need what a file says, and before changing part of it. Long files come back in parts with line numbers in the header; ask for the next part with start_line.',
+    'Read a text file in the workspace folder (before changing it, too). Long files come in parts; continue with start_line. When you know which lines you need (from search_files), read just those.',
   properties: {
     path: { type: 'string', description: 'File path relative to the workspace folder.' },
     start_line: { type: 'integer', description: 'First line to read (1-based). Default 1.' },
@@ -41,7 +44,11 @@ export const readFile = defineTool<{ path: string; start_line?: number; end_line
     const shownLines: string[] = [];
     let chars = 0;
     for (let i = first - 1; i < last; i += 1) {
-      const line = lines[i] ?? '';
+      const full = lines[i] ?? '';
+      const line =
+        full.length > MAX_LINE_CHARS
+          ? `${full.slice(0, MAX_LINE_CHARS)}… [line cut: ${full.length - MAX_LINE_CHARS} more characters]`
+          : full;
       if (chars + line.length > MAX_CHARS && shownLines.length > 0) break;
       shownLines.push(line);
       chars += line.length + 1;

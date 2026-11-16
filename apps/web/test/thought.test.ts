@@ -100,3 +100,24 @@ test('durations read as seconds, then minutes', () => {
   assert.equal(thoughtDuration(65_000), '1m 5s');
   assert.equal(thoughtDuration(120_000), '2m');
 });
+
+test('the status says "Working…" until the model streams reasoning, then "Thinking…"', () => {
+  const status = (state: ConversationState) => {
+    const turn = state.turns.at(-1);
+    return turn?.role === 'agent' ? turn.status : undefined;
+  };
+  const sent = play([send]);
+  assert.equal(status(sent), 'Working…');
+  const calling = conversationReducer(sent, {
+    type: 'event',
+    event: { type: 'model_call', step: 1 },
+    at: 1_000,
+  });
+  assert.equal(status(calling), 'Working…');
+  const reasoning = conversationReducer(calling, {
+    type: 'event',
+    event: { type: 'reasoning' },
+    at: 1_100,
+  });
+  assert.equal(status(reasoning), 'Thinking…');
+});

@@ -1,11 +1,11 @@
 import { z } from 'zod';
-import { LIMITS } from './limits.js';
+import { CONTEXT, LIMITS } from './constants.js';
 
 /**
  * The context window the agent assumes for a model that doesn't say (most current models take
  * at least this many tokens of input and output together).
  */
-export const DEFAULT_CONTEXT_WINDOW = 128_000;
+export const DEFAULT_CONTEXT_WINDOW = CONTEXT.defaultContextWindow;
 
 /** How hard a reasoning model thinks before answering, chosen per message. */
 export const REASONING_EFFORTS = ['low', 'medium', 'high'] as const;

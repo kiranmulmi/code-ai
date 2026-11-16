@@ -5,13 +5,13 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import mammoth from 'mammoth';
 import { extractText } from 'unpdf';
-import { formatBytes, type Attachment } from '@app/shared';
+import { TOOL_LIMITS, formatBytes, type Attachment } from '@app/shared';
 import { assertCanChange } from '../guardrails.js';
 import { defineTool, type ToolContext } from './define.js';
 import { locate } from './files/walk.js';
 
 /** Kept under the tool output limit, so long text is cut at a page or line, with a note. */
-const MAX_CHARS = 18_000;
+const MAX_CHARS = TOOL_LIMITS.readAttachmentPartChars;
 
 async function findAttachment(ctx: ToolContext, id: string): Promise<Attachment> {
   const attachment = await ctx.attachments?.get(id.trim());

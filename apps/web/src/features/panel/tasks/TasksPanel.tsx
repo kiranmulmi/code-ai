@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { TASK_COMMAND_MAX_CHARS, type BackgroundTask } from '@app/shared';
+import { WEB_APP, TASK_COMMAND_MAX_CHARS, type BackgroundTask } from '@app/shared';
 import { Button } from '../../../components/Button';
 import { IconButton } from '../../../components/IconButton';
 import { Spinner } from '../../../components/Spinner';
@@ -14,7 +14,7 @@ import { fetchTask, startTask, stopTask } from './api';
 import type { useRunningTasks } from './useRunningTasks';
 
 /** How often an open task's output is fetched again. */
-const OUTPUT_POLL_MS = 1_500;
+const OUTPUT_POLL_MS = WEB_APP.taskOutputPollMs;
 
 /**
  * The Tasks tab: commands running in the background, such as a dev server or a watcher,

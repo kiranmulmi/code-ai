@@ -11,6 +11,8 @@
 // Every model call is kept inside the model's context window (context.ts): near it, older
 // messages are summarized; past it, the oldest tool results are shortened for that call.
 import {
+  CONTEXT,
+  TOKEN_USAGE,
   DEFAULT_CONTEXT_WINDOW,
   groupTokens,
   toolResultPreview,
@@ -49,7 +51,7 @@ import {
 } from './usage-breakdown.js';
 import {
   CHARS_PER_TOKEN,
-  COMPACT_AT,
+  compactThreshold,
   HARD_LIMIT,
   ContextMeter,
   compactionCut,
@@ -192,6 +194,15 @@ export function createAgent(options: AgentOptions): Agent {
   };
   const isStopped = () => signal?.aborted === true;
   const emit = options.onEvent ?? (() => {});
+  /** For one model call: reports, once, that the model began reasoning. */
+  const reasoningOnce = () => {
+    let reported = false;
+    return () => {
+      if (reported) return;
+      reported = true;
+      emit({ type: 'reasoning' });
+    };
+  };
   /**
    * One model call for a request: timed, and its tokens recorded on the request's budget with
    * what they went to (`step` names a step's parts).
@@ -492,13 +503,14 @@ export function createAgent(options: AgentOptions): Agent {
       skills: skills.map((skill) => skill.name),
     });
     skillList = await readSkills();
+    const hasAttachments = attachments.length > 0 || conversation.hasAttachments();
     systemSections = systemPromptSections(
       instructions,
       filesDir,
       skillList,
       toolset.deferredSummary,
       disabledTools,
-      { voiceReplies, hasPlanningStep },
+      { voiceReplies, hasPlanningStep, hasAttachments },
     );
     systemPrompt = systemSections.map((section) => section.text).join('');
     // Tools this chat already called stay sent: its earlier calls refer to them.
@@ -507,7 +519,7 @@ export function createAgent(options: AgentOptions): Agent {
       for (const call of message.tool_calls ?? []) activeTools.add(call.function.name);
     }
     // The attachment tools while the chat has files, use_skill while there are skills.
-    if (attachments.length || conversation.hasAttachments()) {
+    if (hasAttachments) {
       for (const name of ATTACHMENT_TOOLS) activeTools.add(name);
     }
     if (skillList || skills.length) for (const name of SKILL_TOOLS) activeTools.add(name);
@@ -580,6 +592,7 @@ export function createAgent(options: AgentOptions): Agent {
             images: await imagesFor(sent.messages),
             tools: sent.tools,
             onText: (text) => emit({ type: 'text_delta', text }),
+            onReasoning: reasoningOnce(),
           },
           { sections: systemSections, infos: sent.infos },
         );
@@ -710,7 +723,7 @@ export function createAgent(options: AgentOptions): Agent {
     const tools = toolset.definitionsFor(activeTools);
     let view = conversation.forModel();
     let size = meter.estimate(systemPrompt, tools, view.messages);
-    if (size.tokens > COMPACT_AT * contextWindow.usable) {
+    if (size.tokens > compactThreshold(contextWindow)) {
       if (await compact(view, request, runStart, budget, size.tokens, tools)) {
         view = conversation.forModel();
         size = meter.estimate(systemPrompt, tools, view.messages);
@@ -875,6 +888,7 @@ export function createAgent(options: AgentOptions): Agent {
         system: LIMIT_SUMMARY_PROMPT,
         messages: [{ role: 'user', content }],
         onText: (text) => emit({ type: 'text_delta', text }),
+        onReasoning: reasoningOnce(),
       });
       const text = (message.content ?? '').trim();
       if (!text) return fallback;
@@ -906,7 +920,7 @@ export function createAgent(options: AgentOptions): Agent {
 const STOPPED_TEXT = 'Stopped by the user.';
 
 /** How often a streaming call's estimated tokens are reported, at most. */
-const LIVE_USAGE_INTERVAL_MS = 250;
+const LIVE_USAGE_INTERVAL_MS = TOKEN_USAGE.liveIntervalMs;
 
 const PLAN_TOOLS = new Set(['create_plan', 'update_plan', 'add_plan_steps']);
 const MEMORY_TOOLS = new Set(['remember', 'forget']);
@@ -914,7 +928,7 @@ const MEMORY_TOOLS = new Set(['remember', 'forget']);
 /** This run's messages as plain text (for the summary call), newest kept if too long. */
 function describeRun(
   messages: readonly ModelMessage[],
-  { perItem = 3000, total = 60_000 } = {},
+  { perItem = CONTEXT.limitSummaryItemChars, total = CONTEXT.limitSummaryTotalChars } = {},
 ): string {
   const cut = (text: string) => (text.length > perItem ? `${text.slice(0, perItem)}…` : text);
   const lines: string[] = [];

@@ -2,10 +2,11 @@
 // keeping a long output's start and end. Used by run_command and background tasks.
 import { existsSync } from 'node:fs';
 import type { ChildProcess } from 'node:child_process';
+import { TOOL_LIMITS } from '@app/shared';
 
 /** Output kept: the start (what ran) and the end (where errors and summaries are). */
-const HEAD_CHARS = 3_000;
-const TAIL_CHARS = 12_000;
+const HEAD_CHARS = TOOL_LIMITS.runCommand.outputHeadChars;
+const TAIL_CHARS = TOOL_LIMITS.runCommand.outputTailChars;
 
 /** The shell to run commands with: bash where there is one, as the tool promises. */
 export function shellFor(command: string): { file: string; args: string[] } {

@@ -22,10 +22,11 @@ import {
   signOutCursor,
   startCursorLogin,
 } from './api';
+import { WEB_APP } from '@app/shared';
 
-const POLL_MS = 2000;
+const POLL_MS = WEB_APP.providerLoginPollMs;
 /** Failed polls in a row (Cursor unreachable, say) before giving up on a sign-in. */
-const MAX_POLL_FAILURES = 3;
+const MAX_POLL_FAILURES = WEB_APP.providerLoginMaxFailures;
 
 const dateFormat = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' });
 const formatDate = (iso: string | null) => (iso ? dateFormat.format(new Date(iso)) : '');

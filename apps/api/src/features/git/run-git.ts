@@ -3,10 +3,11 @@
 // prompt, no optional locks, and none of this app's secrets in the environment.
 import { spawn } from 'node:child_process';
 import { withoutAppSecrets } from '@app/agent';
+import { GIT_LIMITS } from '@app/shared';
 
 /** Output kept by default: enough for a big repository's status. */
-const MAX_GIT_OUTPUT_BYTES = 4_000_000;
-const TIMEOUT_MS = 15_000;
+const MAX_GIT_OUTPUT_BYTES = GIT_LIMITS.maxOutputBytes;
+const TIMEOUT_MS = GIT_LIMITS.timeoutMs;
 const GIT_ARGS = ['-c', 'core.fsmonitor=false', '-c', 'core.quotepath=false', '--no-pager'];
 
 export interface GitResult {

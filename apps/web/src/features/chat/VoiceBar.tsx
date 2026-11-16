@@ -9,6 +9,7 @@ import { startRecognition, type HeardPhrase, type RecognitionHandle } from './us
 import { useSpeechOutput } from './useSpeechOutput';
 import { useThinkingSound } from './useThinkingSound';
 import { useVoicePrefs } from './voicePrefs';
+import { WEB_APP } from '@app/shared';
 
 /** idle: not talking; listening: hearing you; replying: the agent works and talks back. */
 type Phase = 'idle' | 'listening' | 'replying';
@@ -23,9 +24,9 @@ const joinPhrases = (phrases: HeardPhrase[]) => phrases.map((phrase) => phrase.t
  * detection cuts in after well under a second, so recognition runs continuously and this
  * timer decides instead (restarted by every word heard).
  */
-const SEND_AFTER_PAUSE_MS = 1000;
+const SEND_AFTER_PAUSE_MS = WEB_APP.voiceSendAfterPauseMs;
 /** Nothing at all heard for this long: stop listening. */
-const NO_SPEECH_MS = 8000;
+const NO_SPEECH_MS = WEB_APP.voiceNoSpeechMs;
 
 const TONE_TEXT: Record<Tone, string> = {
   coral: 'text-coral',

@@ -4,13 +4,13 @@
 // skill's own files.
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { formatBytes, type Skill } from '@app/shared';
+import { TOOL_LIMITS, formatBytes, type Skill } from '@app/shared';
 import { assertCanChange } from '../guardrails.js';
 import { defineTool, type ToolContext } from './define.js';
 import { isBinary, locate } from './files/walk.js';
 
 /** Kept under the tool output limit, so a long file is cut at a line, with a note. */
-const MAX_CHARS = 18_000;
+const MAX_CHARS = TOOL_LIMITS.readSkillFilePartChars;
 
 async function findSkill(ctx: ToolContext, name: string): Promise<Skill> {
   if (!ctx.skills) throw new Error('This workspace has no skills.');

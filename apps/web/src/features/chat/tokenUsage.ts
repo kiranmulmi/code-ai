@@ -1,6 +1,7 @@
 import type { ModelCallKind, TokenGroup, TokenGroupId, TokenItem, Usage } from '@app/shared';
 import { shorten } from '../../lib/format';
 import type { Turn, TurnUsage } from './conversation';
+import { TOKEN_USAGE } from '@app/shared';
 
 /** One reply's tokens, labelled with the message that asked for it. */
 export type MessageUsage = TurnUsage & {
@@ -42,7 +43,7 @@ export const TOKEN_GROUP_LABELS: Record<TokenGroupId, string> = {
 };
 
 /** Items listed per group when adding breakdowns up; the rest are summed as "Others". */
-const MAX_ITEMS = 12;
+const MAX_ITEMS = TOKEN_USAGE.itemsInTotal;
 
 /**
  * Several calls' breakdowns added up, group by group and item by item (a tool result re-sent

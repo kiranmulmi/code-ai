@@ -10,7 +10,8 @@ export {
   type PagedResponse,
 } from './envelope.js';
 
-export { LIMITS } from './limits.js';
+// Tunable numbers: edit them in constants.ts.
+export * from './constants.js';
 export {
   TERMINAL_SOCKET_PATH,
   type TerminalClientMessage,
@@ -29,7 +30,6 @@ export {
 } from './prompt.js';
 export {
   ATTACHMENT_KINDS,
-  ATTACHMENT_LIMITS,
   IMAGE_TYPES,
   attachmentKind,
   attachmentUploadSchema,
@@ -54,7 +54,6 @@ export {
   DEFAULT_AGENT_SETTINGS,
   LOG_LEVELS,
   PLANNING_MODES,
-  SETTINGS_LIMITS,
   agentSettingsSchema,
   readAgentSettings,
   type AgentSettings,
@@ -99,7 +98,6 @@ export {
 } from './workspace.js';
 
 export {
-  TOOL_RESULT_PREVIEW_CHARS,
   chatRenameSchema,
   toolResultPreview,
   type ChatDetail,
@@ -111,7 +109,6 @@ export {
 export { type Memory, type MemoryRemoval } from './memory.js';
 
 export {
-  FILE_EDIT_MAX_CHARS,
   FILE_ENTRY_KINDS,
   FILE_SEARCH_MODES,
   fileContentQuerySchema,
@@ -174,7 +171,6 @@ export {
 } from './run.js';
 
 export {
-  QUESTION_LIMITS,
   questionAnswerSchema,
   type QuestionAnswer,
   type QuestionOption,
@@ -207,7 +203,6 @@ export {
 } from './mcp.js';
 
 export {
-  SKILL_LIMITS,
   SKILL_MAIN_FILE,
   SKILL_REQUEST_MAX_CHARS,
   SKILL_NAME_PATTERN,
@@ -224,7 +219,6 @@ export {
   type SkillUpload,
 } from './skill.js';
 export {
-  TASK_COMMAND_MAX_CHARS,
   taskStartSchema,
   type BackgroundTask,
   type BackgroundTaskDetail,

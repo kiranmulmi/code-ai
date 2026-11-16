@@ -14,11 +14,12 @@ import type {
 } from '@app/shared';
 import type { AppContext } from '../../context.js';
 import { NotFoundError, UpstreamError, ValidationError } from '../../lib/errors.js';
+import { API_LIMITS } from '@app/shared';
 
 /** How long a started sign-in waits for the user before it has to be started again. */
-export const LOGIN_TTL_MS = 10 * 60_000;
+export const LOGIN_TTL_MS = API_LIMITS.providerLoginTtlMs;
 /** Sign-ins waiting at once; starting more forgets the oldest. */
-const MAX_PENDING_LOGINS = 10;
+const MAX_PENDING_LOGINS = API_LIMITS.maxPendingProviderLogins;
 
 interface PendingLogin extends CursorLoginParams {
   expiresAt: number;

@@ -10,6 +10,7 @@ import {
   type AnyTool,
   type JsonObjectSchema,
 } from '../tools/define.js';
+import { MCP_LIMITS } from '@app/shared';
 
 export interface McpToolSource {
   server: string;
@@ -25,7 +26,7 @@ export type CallMcpTool = (
 ) => Promise<unknown>;
 
 const MAX_NAME = 64; // the limit OpenAI-compatible APIs put on function names
-const MAX_DESCRIPTION = 2000;
+const MAX_DESCRIPTION = MCP_LIMITS.maxDescriptionChars;
 
 /** "mcp__github__create_issue": the server in the name, so the model and the approval card show where it runs. */
 export function agentToolName(server: string, tool: string): string {

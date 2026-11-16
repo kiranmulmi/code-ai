@@ -3,13 +3,14 @@ import type { BackgroundTask } from '@app/shared';
 import { errorMessage } from '../../../lib/api';
 import { usePageVisible } from '../../../lib/usePageVisible';
 import { fetchRunningTasks } from './api';
+import { WEB_APP } from '@app/shared';
 
 /**
  * How often the list is checked: tasks start and stop on their own (a server crashes). It is
  * also checked on each run start/end and when the browser tab is shown again. The API logs these
  * quiet reads at debug only (`POLLED_ROUTES`).
  */
-const POLL_MS = 10_000;
+const POLL_MS = WEB_APP.runningTasksPollMs;
 
 /**
  * The workspace's running background tasks, kept fresh by polling while the chat screen is

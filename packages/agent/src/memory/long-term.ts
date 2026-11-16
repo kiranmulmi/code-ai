@@ -5,7 +5,7 @@
 import fs from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
-import type { Memory } from '@app/shared';
+import { CONTEXT, type Memory } from '@app/shared';
 import { errorCode } from '../errors.js';
 import { serialized, writeFileAtomic } from '../file-io.js';
 
@@ -88,7 +88,10 @@ export const normalizeId = (id: unknown): string | null => {
  */
 export function renderMemories(
   entries: readonly Pick<Memory, 'id' | 'fact'>[],
-  { max = 40, maxChars = 6000 }: { max?: number; maxChars?: number } = {},
+  {
+    max = CONTEXT.maxMemoriesShown,
+    maxChars = CONTEXT.maxMemoryChars,
+  }: { max?: number; maxChars?: number } = {},
 ): string {
   const lines: string[] = [];
   let chars = 0;

@@ -1,6 +1,6 @@
 import { BulbIcon } from '../../lib/icons';
 
-/** Statuses where the model is thinking ("Thinking…", "Planning…"), not running a tool. */
+/** Statuses where the model is reasoning ("Thinking…", "Planning…"), not working on the task. */
 const THINKING = /^(Thinking|Planning)/;
 
 /**

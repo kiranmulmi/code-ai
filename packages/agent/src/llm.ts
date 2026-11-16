@@ -48,6 +48,8 @@ export interface ModelRequest {
    * reasoning), so the caller can count the call's tokens before the server reports them.
    */
   onOutput?: (piece: string) => void;
+  /** Called with each piece of reasoning ("thinking") text, for servers that stream it. */
+  onReasoning?: (piece: string) => void;
   /** Cancels the call (the user stopped the run). */
   signal?: AbortSignal;
   /**
@@ -94,6 +96,7 @@ export function createModelCaller(config: ModelSettings): CallModel {
     images,
     onText,
     onOutput,
+    onReasoning,
     signal,
   }) {
     if (!config.model) {
@@ -147,7 +150,10 @@ export function createModelCaller(config: ModelSettings): CallModel {
         // Not in OpenAI's types: the reasoning text some servers stream (DeepSeek, vLLM, Ollama,
         // OpenRouter). Not kept, only counted.
         const reasoning = reasoningPiece(delta);
-        if (reasoning) onOutput?.(reasoning);
+        if (reasoning) {
+          onOutput?.(reasoning);
+          onReasoning?.(reasoning);
+        }
 
         // Tool calls arrive in pieces: the first piece has the id and name, later
         // pieces add to the arguments string. `index` says which call a piece is for.

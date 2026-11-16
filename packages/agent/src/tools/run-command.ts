@@ -4,13 +4,14 @@ import { defineTool } from './define.js';
 import { commandEnv, refuseCommand } from '../guardrails.js';
 import { locate } from './files/walk.js';
 import { BoundedOutput, isProcessGroup, shellFor, signalGroup } from './shell.js';
+import { TOOL_LIMITS } from '@app/shared';
 
-const DEFAULT_TIMEOUT_SECONDS = 120;
+const DEFAULT_TIMEOUT_SECONDS = TOOL_LIMITS.runCommand.defaultTimeoutSeconds;
 /** A background command's first output (or early exit) is reported after this long. */
-const BACKGROUND_STARTUP_MS = 4_000;
-const MAX_TIMEOUT_SECONDS = 600;
+const BACKGROUND_STARTUP_MS = TOOL_LIMITS.runCommand.backgroundStartupMs;
+const MAX_TIMEOUT_SECONDS = TOOL_LIMITS.runCommand.maxTimeoutSeconds;
 /** After the shell exits or times out: how long leftovers get to stop before SIGKILL. */
-const KILL_GRACE_MS = 1_500;
+const KILL_GRACE_MS = TOOL_LIMITS.runCommand.killGraceMs;
 
 interface CommandInput {
   command: string;
@@ -30,7 +31,7 @@ interface CommandResult {
 export const runCommand = defineTool<CommandInput>({
   name: 'run_command',
   description:
-    'Run a bash command in the workspace folder and get its exit code and output (stdout and stderr together). Call this to install dependencies, run tests, builds, linters, type checks, scripts or git commands, and to check that a change works. Not for reading, searching or editing files: the file tools do that better. Commands get no input, so use non-interactive flags. Anything a command leaves running is stopped when it finishes. To keep something running after it returns (a dev server, a watcher), set background: true: it starts as a background task, the reply has its first few seconds of output, task_output reads more and stop_task ends it.',
+    'Run a bash command in the workspace folder; returns exit code and output (stdout and stderr). For installs, tests, builds, linters, scripts and git, not for reading or editing files. No input: use non-interactive flags. Anything left running is stopped at the end unless background: true (then task_output reads more, stop_task ends it).',
   properties: {
     command: {
       type: 'string',
@@ -47,7 +48,7 @@ export const runCommand = defineTool<CommandInput>({
     background: {
       type: 'boolean',
       description:
-        "Keep it running as a background task (no timeout) and return after its first few seconds. For servers and watchers only; don't add & to the command.",
+        "Keep it running as a background task (servers, watchers). Don't add & to the command.",
     },
   },
   optional: ['cwd', 'timeout_seconds', 'background'],

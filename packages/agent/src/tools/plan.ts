@@ -4,7 +4,7 @@ import { STEP_STATUSES } from '../planner.js';
 export const createPlan = defineTool<{ goal: string; steps: string[]; done_when: string }>({
   name: 'create_plan',
   description:
-    "Write a step-by-step plan for a task with several distinct steps: before you start it, or to re-plan when what you've learned changes the approach (it replaces the current plan). If a plan for this request is already at the start of your turn, don't make another unless you are re-planning. Don't use it for simple questions.",
+    "Write a step-by-step plan for a task with several distinct steps, or re-plan when the approach changes (it replaces the current plan). Not for simple questions, and not again if this request's plan is already at the start of your turn.",
   properties: {
     goal: { type: 'string', description: 'What the finished task achieves, in one sentence.' },
     steps: {
@@ -30,7 +30,7 @@ export const updatePlan = defineTool<{
 }>({
   name: 'update_plan',
   description:
-    "Mark a plan step's progress: in_progress when you start the first step, then done (or skipped or failed) when you finish one, with a short note on the result. When finishing a step, give the step you start next as next_step, so one call does both. Call it in the same turn as other tool calls when you can.",
+    "Mark a plan step's progress, with a short note. When finishing a step, set next_step to the one you start, so one call does both. Call it alongside other tool calls when you can.",
   properties: {
     step_number: { type: 'integer', description: '1-based step number from the plan.' },
     status: { type: 'string', enum: STEP_STATUSES },
@@ -49,7 +49,7 @@ export const updatePlan = defineTool<{
 export const addPlanSteps = defineTool<{ steps: string[] }>({
   name: 'add_plan_steps',
   description:
-    'Add steps to the end of the current plan when you discover more work, for example a sub-company whose own subsidiaries still need looking up. Keeps the existing steps and their progress.',
+    'Add steps to the end of the current plan when you discover more work. Existing steps and progress are kept.',
   properties: {
     steps: {
       type: 'array',

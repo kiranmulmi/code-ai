@@ -7,13 +7,14 @@ import { randomUUID } from 'node:crypto';
 import type { BackgroundTask, BackgroundTaskDetail } from '@app/shared';
 import { commandEnv } from './guardrails.js';
 import { BoundedOutput, isProcessGroup, shellFor, signalGroup } from './tools/shell.js';
+import { TOOL_LIMITS } from '@app/shared';
 
 /** Running tasks one workspace may have at once. */
-const MAX_RUNNING = 10;
+const MAX_RUNNING = TOOL_LIMITS.backgroundTasks.maxRunning;
 /** Stopped tasks kept per workspace, so their last output can still be read. */
-const KEEP_STOPPED = 10;
+const KEEP_STOPPED = TOOL_LIMITS.backgroundTasks.keepStopped;
 /** After SIGTERM: how long a task gets to stop before SIGKILL. */
-const STOP_GRACE_MS = 3_000;
+const STOP_GRACE_MS = TOOL_LIMITS.backgroundTasks.stopGraceMs;
 
 interface Entry {
   task: BackgroundTask;

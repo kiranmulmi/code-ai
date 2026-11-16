@@ -26,11 +26,12 @@ import {
   type TurnUsage,
 } from './protocol.js';
 import { FLAG_END_STREAM, takeFrames } from './wire.js';
+import { CURSOR_TIMEOUTS } from '@app/shared';
 
 /** No frame at all (Cursor sends heartbeats while it works) for this long: give up. */
-const IDLE_TIMEOUT_MS = 120_000;
+const IDLE_TIMEOUT_MS = CURSOR_TIMEOUTS.idleTimeoutMs;
 /** After the first tool call, how long to wait for more in the same turn (parallel calls). */
-const TOOL_CALL_GRACE_MS = 400;
+const TOOL_CALL_GRACE_MS = CURSOR_TIMEOUTS.toolCallGraceMs;
 
 /** Said before the conversation when there are tools: Cursor's models otherwise narrate. */
 const TOOL_DIRECTIVE = [
@@ -153,7 +154,7 @@ function runTurn(
   settings: ModelSettings,
   body: Buffer,
   tools: CursorTool[],
-  { onText, onOutput, signal }: ModelRequest,
+  { onText, onOutput, onReasoning, signal }: ModelRequest,
   hasImages: boolean,
 ): Promise<ModelResponse> {
   const isComposer = /^composer(-|$)/i.test(settings.model);
@@ -259,10 +260,15 @@ function runTurn(
         } else if (update.kind === 'thinking') {
           // All of it is output, shown or not; composer's reply is in it, so counted once here.
           onOutput?.(update.text);
-          if (!isComposer) continue;
+          if (!isComposer) {
+            onReasoning?.(update.text);
+            continue;
+          }
           const before = composerReply(state.thinking);
           state.thinking += update.text;
           const after = composerReply(state.thinking);
+          // Before `</think>` it's still reasoning; after it, the reply.
+          if (!state.thinking.includes('</think>')) onReasoning?.(update.text);
           if (after.length > before.length && after.startsWith(before)) {
             emitText(after.slice(before.length));
           }

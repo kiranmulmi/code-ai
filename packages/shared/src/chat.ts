@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { TOOL_RESULT_PREVIEW_CHARS } from './constants.js';
 import type { Attachment } from './attachment.js';
 import type { Plan } from './plan.js';
 import type { ModelCallUsage, RunStatus } from './run.js';
@@ -11,9 +12,6 @@ export interface ChatSummary {
   updatedAt: string | null;
   isRunning: boolean;
 }
-
-/** How much of a tool result the chat shows (live and after a reload); the model gets all of it. */
-export const TOOL_RESULT_PREVIEW_CHARS = 600;
 
 /**
  * A tool result as the chat shows it. The chat format has no error flag on tool results,

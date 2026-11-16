@@ -8,6 +8,7 @@ import type { ModelReply } from './llm.js';
 import type { ModelMessage } from './memory/short-term.js';
 import type { PromptSection } from './prompt.js';
 import type { ToolDefinition } from './tools/define.js';
+import { CONTEXT, TOKEN_USAGE } from '@app/shared';
 
 /** How a message of a step's request came about (by position in the messages sent). */
 export interface MessageInfo {
@@ -27,10 +28,10 @@ export interface StepParts {
 }
 
 /** Roles, separators and the like that each message or tool call adds (as context.ts). */
-const OVERHEAD = 4;
+const OVERHEAD = CONTEXT.messageOverheadTokens;
 /** Items listed per group; the rest are summed as "Others". */
-const MAX_ITEMS = 8;
-const LABEL_CHARS = 80;
+const MAX_ITEMS = TOKEN_USAGE.itemsPerCall;
+const LABEL_CHARS = TOKEN_USAGE.labelChars;
 
 /** Tokens added up by group, then item. */
 class Tally {

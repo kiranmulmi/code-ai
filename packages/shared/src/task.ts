@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { TASK_COMMAND_MAX_CHARS } from './constants.js';
 
 /**
  * A command the agent started in the background (run_command with `background: true`): a dev
@@ -27,8 +28,6 @@ export interface BackgroundTaskDetail extends BackgroundTask {
   /** stdout and stderr together, colour codes removed: the start and the most recent part */
   output: string;
 }
-
-export const TASK_COMMAND_MAX_CHARS = 4_000;
 
 /** POST /v1/workspaces/:id/tasks: the user starts a command in the background themselves. */
 export const taskStartSchema = z.object({

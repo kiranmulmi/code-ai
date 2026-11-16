@@ -1,5 +1,6 @@
 /** The shortest password the app accepts for a new account or a reset. */
-export const MIN_PASSWORD_LENGTH = 8;
+import { WEB_APP } from '@app/shared';
+export const MIN_PASSWORD_LENGTH = WEB_APP.minPasswordLength;
 
 export type PasswordStrength = 0 | 1 | 2 | 3;
 

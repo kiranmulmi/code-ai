@@ -1,14 +1,15 @@
 import fs from 'node:fs/promises';
 import { defineTool } from '../define.js';
 import { locate, walk } from './walk.js';
+import { TOOL_LIMITS } from '@app/shared';
 
-const MAX_ENTRIES = 400;
+const MAX_ENTRIES = TOOL_LIMITS.listFiles.maxEntries;
 
 export const listFiles = defineTool<{ path?: string; depth?: number }>({
   name: 'list_files',
   isReadOnly: true,
   description:
-    "List the files and folders in the workspace folder as an indented tree. Call this to get your bearings in a project or before reading a file whose exact name you don't know. Generated folders such as node_modules and .git are shown but not opened.",
+    'List files and folders in the workspace folder as an indented tree, to get your bearings. Generated folders (node_modules, .git) are shown but not opened.',
   properties: {
     path: {
       type: 'string',

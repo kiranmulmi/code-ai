@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { LIMITS } from './limits.js';
+import { FILE_EDIT_MAX_CHARS, LIMITS } from './constants.js';
 
 export interface WorkspaceFiles {
   /** The workspace folder (absolute). */
@@ -23,9 +23,6 @@ export interface FileContent {
   /** a hash of the content: a save sends it back, so changes made meanwhile aren't overwritten */
   version: string;
 }
-
-/** Largest file the editor saves (characters); the preview opens files up to 200 KB. */
-export const FILE_EDIT_MAX_CHARS = 400_000;
 
 /** PUT /v1/workspaces/:id/files/content: save a file edited in the preview. */
 export const fileWriteSchema = z.object({
@@ -113,12 +110,10 @@ export interface FolderCheck {
   problem: string | null;
 }
 
-const LIMITS_FOLDER_PATH = 1024;
-
 /** POST /v1/folders/pick: opens the system's folder dialog on this machine. */
 export const folderPickSchema = z.object({
   /** where the dialog starts (a missing folder starts it at home) */
-  startAt: z.string().max(LIMITS_FOLDER_PATH).optional(),
+  startAt: z.string().max(LIMITS.folderPath).optional(),
 });
 
 export interface FolderPick {

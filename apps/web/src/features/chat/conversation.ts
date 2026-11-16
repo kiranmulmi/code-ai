@@ -707,6 +707,11 @@ function applyEvent(state: ConversationState, event: RunEvent, at: number): Conv
       plan = { ...plan, activity: 'Writing up what was found' };
       break;
     case 'model_call':
+      // "Thinking…" only once the model streams reasoning; until then it is working.
+      draft.setStatus('Working…');
+      plan = { ...plan, activity: 'Working on the next step' };
+      break;
+    case 'reasoning':
       draft.setStatus('Thinking…');
       plan = { ...plan, activity: 'Thinking about the next step' };
       break;
@@ -763,7 +768,7 @@ function applyEvent(state: ConversationState, event: RunEvent, at: number): Conv
       // with the run's tokens so far.
       const liveMeta = draft.agent?.liveMeta ?? null;
       draft.addUser(event.text, [], [], event.sentAt, true);
-      draft.ensureAgent('Thinking…').liveMeta = liveMeta;
+      draft.ensureAgent('Working…').liveMeta = liveMeta;
       break;
     }
     case 'done':
@@ -797,7 +802,7 @@ export function conversationReducer(
         action.skills,
         new Date(action.at).toISOString(),
       );
-      draft.ensureAgent('Thinking…');
+      draft.ensureAgent('Working…');
       return draft.result(state);
     }
     case 'event':

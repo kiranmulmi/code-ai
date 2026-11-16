@@ -9,6 +9,8 @@ import os from 'node:os';
 import type { ApprovalMode, ModelCallUsage, Usage } from '@app/shared';
 import type { AgentConfig } from './config.js';
 import { errorCode } from './errors.js';
+import { MAX_TOOL_OUTPUT_CHARS } from './context.js';
+import { CONTEXT } from '@app/shared';
 
 /** Prompts the human and returns their answer. */
 export type AskFn = (question: string) => Promise<string>;
@@ -44,7 +46,7 @@ export function checkInput(
  * of new input (Anthropic, OpenAI's recent models); counted in full, long tasks ran out of
  * tokens long before they ran out of steps.
  */
-export const CACHED_INPUT_WEIGHT = 0.1;
+export const CACHED_INPUT_WEIGHT = CONTEXT.cachedInputWeight;
 
 export class Budget {
   /** Working steps (model calls that can use tools); planner and summary calls aren't steps. */
@@ -311,8 +313,6 @@ export function commandEnv(base: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
 }
 
 // ---------- Tool output size ----------
-
-const MAX_TOOL_OUTPUT_CHARS = 20_000;
 
 /**
  * Long tool output fills the context window fast; cut it and say so. The agent passes a smaller

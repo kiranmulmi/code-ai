@@ -9,9 +9,10 @@ import type { ModelsService } from '../models/models.service.js';
 import type { SkillsService } from '../skills/skills.service.js';
 import type { WorkspacesService } from '../workspaces/workspaces.service.js';
 import { MAX_WAITING_MESSAGES } from './run-registry.js';
+import { CHAT_TITLES } from '@app/shared';
 
 /** The app writes a chat's title from its first few messages, then leaves it be. */
-const TITLE_MESSAGES = 3;
+const TITLE_MESSAGES = CHAT_TITLES.fromMessages;
 
 export interface RunStream {
   send: (event: StreamEvent) => void;

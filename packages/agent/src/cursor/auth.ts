@@ -3,13 +3,14 @@
 // the tokens. The verifier never leaves this server.
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { isRecord } from '../errors.js';
+import { CURSOR_TIMEOUTS } from '@app/shared';
 
 const LOGIN_URL = 'https://cursor.com/loginDeepControl';
 const POLL_URL = 'https://api2.cursor.sh/auth/poll';
 const REFRESH_URL = 'https://api2.cursor.sh/auth/exchange_user_api_key';
-const REQUEST_TIMEOUT_MS = 15_000;
+const REQUEST_TIMEOUT_MS = CURSOR_TIMEOUTS.requestTimeoutMs;
 /** Renew a little early, so a token isn't handed out moments before it stops working. */
-const EXPIRY_SKEW_MS = 5 * 60_000;
+const EXPIRY_SKEW_MS = CURSOR_TIMEOUTS.tokenExpirySkewMs;
 
 /** What a sign-in or a renewal hands over. */
 export interface CursorTokens {

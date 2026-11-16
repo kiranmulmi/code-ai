@@ -22,7 +22,11 @@ const INTRO = `You are a capable, careful assistant that works on the user's req
  */
 function guidance(
   off: ReadonlySet<ToolGroup>,
-  { hasSkills, hasPlanningStep }: { hasSkills: boolean; hasPlanningStep: boolean },
+  {
+    hasSkills,
+    hasPlanningStep,
+    hasAttachments,
+  }: { hasSkills: boolean; hasPlanningStep: boolean; hasAttachments: boolean },
 ): string[] {
   const on = (group: ToolGroup) => !off.has(group);
   // With the planning step off, the model decides itself whether a request needs a plan.
@@ -94,9 +98,11 @@ function guidance(
 - Tools that ask first take a \`reason\`: one short, specific sentence on why you need this step now (for example "Run the tests to check the fix works"). It is what the user reads when deciding, so always fill it in.
 - Files are the user's own: don't read or repeat secrets such as .env files or keys unless asked.`
       : null,
-    `Attachments:
+    hasAttachments
+      ? `Attachments:
 - Files the user attaches are listed with their ids in their message. They are kept outside the workspace folder, so the file tools can't see them.
-- Read PDFs, Word documents and text files with read_attachment, and look at images with view_image, before answering about them. Copy one into the project with save_attachment only when it should become part of it.`,
+- Read PDFs, Word documents and text files with read_attachment, and look at images with view_image, before answering about them. Copy one into the project with save_attachment only when it should become part of it.`
+      : null,
     on('commands')
       ? `Commands:
 - run_command runs bash in the workspace folder. Use it to install dependencies, run tests, builds, linters and scripts, and to check your changes actually work: after changing code, run the project's tests or build when it has them, and report the real result.
@@ -122,13 +128,18 @@ export function basePrompt(
   {
     hasSkills = true,
     hasPlanningStep = true,
+    hasAttachments = true,
   }: {
     hasSkills?: boolean;
+    /** the chat has attached files: the guidance on reading them is included */
+    hasAttachments?: boolean;
     /** a planning step runs before the agent (planning: auto); else the agent plans itself */
     hasPlanningStep?: boolean;
   } = {},
 ): string {
-  return [INTRO, ...guidance(new Set(off), { hasSkills, hasPlanningStep })].join('\n\n');
+  return [INTRO, ...guidance(new Set(off), { hasSkills, hasPlanningStep, hasAttachments })].join(
+    '\n\n',
+  );
 }
 
 /** Everything on: the full prompt. */
@@ -172,10 +183,12 @@ export function systemPromptSections(
   {
     voiceReplies = false,
     hasPlanningStep = true,
-  }: { voiceReplies?: boolean; hasPlanningStep?: boolean } = {},
+    hasAttachments = false,
+  }: { voiceReplies?: boolean; hasPlanningStep?: boolean; hasAttachments?: boolean } = {},
 ): PromptSection[] {
   const text = String(instructions ?? '').trim();
-  const base = basePrompt(off, { hasSkills: skills !== '', hasPlanningStep });
+  // Sections for skills and attached files only when the chat has some, so each call is smaller.
+  const base = basePrompt(off, { hasSkills: skills !== '', hasPlanningStep, hasAttachments });
   const sections: PromptSection[] = [
     { label: 'Agent instructions', text: folder ? `${base}\n\nWorkspace folder: ${folder}` : base },
   ];

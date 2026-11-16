@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react';
 import type { FileSearchMode, FileSearchResult } from '@app/shared';
 import { errorMessage } from '../../../lib/api';
 import { searchFiles } from './api';
+import { WEB_APP } from '@app/shared';
 
-const DELAY_MS = 250;
+const DELAY_MS = WEB_APP.fileSearchDelayMs;
 
 export interface FileSearchState {
   result: FileSearchResult | null;

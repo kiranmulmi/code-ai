@@ -39,7 +39,7 @@ import { InputError } from './errors.js';
 import { WorkspaceData } from './workspace-data.js';
 
 /** A skill file is read only up to this size: anything longer can't be a valid skill. */
-const MAX_FILE_BYTES = 256 * 1024;
+const MAX_FILE_BYTES = SKILL_LIMITS.readBytes;
 
 /** Left out of an upload and of a folder's file list: system clutter, not part of a skill. */
 const JUNK_FILES = new Set(['thumbs.db', 'desktop.ini', '__macosx']);
