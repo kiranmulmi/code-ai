@@ -6,6 +6,8 @@ import type {
   InstructionsDraftRequest,
   Workspace,
   WorkspaceDeletion,
+  WorkspaceGroup,
+  WorkspaceGroupInput,
   WorkspaceInput,
   WorkspaceUpdate,
 } from '@app/shared';
@@ -64,4 +66,30 @@ export async function writeInstructions(input: InstructionsDraftRequest): Promis
     jsonBody('POST', input),
   );
   return text;
+}
+
+/** The sidebar folders that collect workspaces (a workspace's `groupId` files it in one). */
+export function fetchWorkspaceGroups(): Promise<WorkspaceGroup[]> {
+  return request<WorkspaceGroup[]>('/workspace-groups');
+}
+
+export function createWorkspaceGroup(input: WorkspaceGroupInput): Promise<WorkspaceGroup> {
+  return request<WorkspaceGroup>('/workspace-groups', jsonBody('POST', input));
+}
+
+export function renameWorkspaceGroup(
+  groupId: string,
+  input: WorkspaceGroupInput,
+): Promise<WorkspaceGroup> {
+  return request<WorkspaceGroup>(
+    `/workspace-groups/${encodeURIComponent(groupId)}`,
+    jsonBody('PATCH', input),
+  );
+}
+
+/** Its workspaces move to the top level; none are deleted. */
+export async function deleteWorkspaceGroup(groupId: string): Promise<void> {
+  await request<unknown>(`/workspace-groups/${encodeURIComponent(groupId)}`, {
+    method: 'DELETE',
+  });
 }

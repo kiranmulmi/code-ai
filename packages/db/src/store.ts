@@ -12,6 +12,7 @@ import {
   type McpServerConfig,
   type ToolGroup,
   type Workspace,
+  type WorkspaceGroup,
   type WorkspacePlanning,
 } from '@app/shared';
 import {
@@ -33,7 +34,7 @@ import { ModelStore } from './models.js';
 import { ProviderStore } from './providers.js';
 import { SettingsStore } from './settings.js';
 import { WorkspaceMcp } from './workspace-mcp.js';
-import { WorkspaceList, type SavedWorkspace } from './workspaces.js';
+import { WorkspaceList, type SavedWorkspace, type SavedWorkspaceGroup } from './workspaces.js';
 import {
   WorkspaceData,
   isUuid,
@@ -142,6 +143,7 @@ export class Store {
       voiceMode,
       hasTerminalTab,
       hasGitTab,
+      groupId,
     }: {
       name?: string;
       path?: string;
@@ -151,10 +153,14 @@ export class Store {
       voiceMode?: boolean;
       hasTerminalTab?: boolean;
       hasGitTab?: boolean;
+      /** The sidebar folder to file it in; null for the top level. */
+      groupId?: string | null;
     },
   ): Promise<Workspace | null> {
     const current = await this.#workspaces.get(id);
     if (!current) return null;
+    // Checked first, so a folder that's gone doesn't leave a half-made change.
+    if (groupId !== undefined && groupId !== null) await this.#requireGroup(groupId);
     const cleanName = name === undefined ? current.name : checkName(name);
     const cleanInstructions = instructions === undefined ? null : checkInstructions(instructions);
     const folder = path === undefined ? current.path : await checkFolder(path);
@@ -175,7 +181,15 @@ export class Store {
         ...(hasGitTab !== undefined ? { hasGitTab } : {}),
       };
       if (Object.keys(settings).length) await new WorkspaceData(folder).writeSettings(settings);
-      const updated = await this.#workspaces.update(id, { name: cleanName, path: folder });
+      // Only filing it in a sidebar folder isn't an edit: it keeps its place in the list.
+      const isOnlyFiling =
+        name === undefined && path === undefined && !Object.keys(settings).length;
+      let updated: SavedWorkspace | null = isOnlyFiling
+        ? current
+        : await this.#workspaces.update(id, { name: cleanName, path: folder });
+      if (updated && groupId !== undefined && groupId !== current.groupId) {
+        updated = await this.#workspaces.setGroup(id, groupId);
+      }
       if (isMoving) await this.#mcpTrust.move(current.path, folder);
       return updated ? toWorkspace(updated) : null;
     } catch (error) {
@@ -226,6 +240,35 @@ export class Store {
     await new WorkspaceData(row.path).remove();
     await this.#mcpTrust.forget(row.path);
     return this.#workspaces.remove(id);
+  }
+
+  // ---------- Workspace folders (sidebar groups) ----------
+
+  async listWorkspaceGroups(): Promise<WorkspaceGroup[]> {
+    return (await this.#workspaces.listGroups()).map(toWorkspaceGroup);
+  }
+
+  async createWorkspaceGroup(name: string): Promise<WorkspaceGroup> {
+    return toWorkspaceGroup(await this.#workspaces.addGroup(checkGroupName(name)));
+  }
+
+  async renameWorkspaceGroup(id: string, name: string): Promise<WorkspaceGroup | null> {
+    if (!isUuid(id)) return null;
+    const renamed = await this.#workspaces.renameGroup(id, checkGroupName(name));
+    return renamed ? toWorkspaceGroup(renamed) : null;
+  }
+
+  /** Its workspaces move to the top level; none are deleted. */
+  async deleteWorkspaceGroup(id: string): Promise<boolean> {
+    if (!isUuid(id)) return false;
+    return this.#workspaces.removeGroup(id);
+  }
+
+  async #requireGroup(id: string): Promise<void> {
+    const groups = await this.#workspaces.listGroups();
+    if (!groups.some((group) => group.id === id)) {
+      throw new InputError("That folder doesn't exist any more.");
+    }
   }
 
   // ---------- Chats ----------
@@ -326,12 +369,12 @@ export class Store {
     return new WorkspaceMcp(new WorkspaceData(workspace.path), this.#mcpTrust);
   }
 
-  /** Renames an app-wide MCP server; workspaces that turned it on keep it on under the new name. */
+  /** Renames an app-wide MCP server; workspaces that use it keep it (on or off) under the new name. */
   async renameMcpServer(from: string, to: string): Promise<void> {
     for (const workspace of await this.listWorkspaces()) {
       const mcp = this.mcp(workspace);
       try {
-        if ((await mcp.read()).enabled.includes(from)) await mcp.rename(from, to);
+        if ((await mcp.read()).allowed.includes(from)) await mcp.rename(from, to);
       } catch {
         // A folder that's gone or unreadable: nothing to keep on there.
       }
@@ -449,6 +492,7 @@ async function toWorkspace(
     hasTerminalTab,
     hasGitTab,
     path: row.path,
+    groupId: row.groupId,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
     ...(withChatCount
@@ -458,6 +502,21 @@ async function toWorkspace(
         }
       : {}),
   };
+}
+
+function toWorkspaceGroup(row: SavedWorkspaceGroup): WorkspaceGroup {
+  return { id: row.id, name: row.name, createdAt: row.createdAt };
+}
+
+function checkGroupName(name: unknown): string {
+  const clean = String(name ?? '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!clean) throw new InputError('Give the folder a name.');
+  if (clean.length > LIMITS.workspaceName) {
+    throw new InputError(`Keep the name under ${LIMITS.workspaceName} characters.`);
+  }
+  return clean;
 }
 
 function checkName(name: unknown): string {

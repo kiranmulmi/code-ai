@@ -1,4 +1,4 @@
-import { hostOf, parseArgs, shorten } from '../../lib/format';
+import { hostOf, inlineArgs, parseArgs, shorten } from '../../lib/format';
 
 /** The plan panel shows these; in the chat they would only repeat it. */
 export const PLAN_TOOL_NAMES: ReadonlySet<string> = new Set([
@@ -34,6 +34,15 @@ const ACTIVITY: Record<string, (args: Record<string, unknown>) => string> = {
 export function describeActivity(name: string, args: string): string {
   const describe = ACTIVITY[name];
   return describe ? describe(parseArgs(args)) : `Running ${name}`;
+}
+
+/**
+ * The collapsed line for a tool call: the agent's reason for it when it gave one (commands and
+ * other steps that ask first), which says what is going on better than the raw arguments.
+ */
+export function stepSummary(args: string): { text: string; isReason: boolean } {
+  const reason = text(parseArgs(args).reason).trim();
+  return reason ? { text: reason, isReason: true } : { text: inlineArgs(args), isReason: false };
 }
 
 /** How many steps an `add_plan_steps` call adds. */

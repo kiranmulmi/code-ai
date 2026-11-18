@@ -1,5 +1,7 @@
-// Which of the app's MCP servers one workspace has turned on: <folder>/.nimbrio-ai/mcp.json,
-// `{ "enabled": ["Github", ...] }`. The file comes with the folder (a cloned project could
+// Which of the app's MCP servers one workspace uses and has turned on:
+// <folder>/.nimbrio-ai/mcp.json, `{ "allowed": ["Github", "JIRA"], "enabled": ["Github"] }`.
+// `allowed` is chosen in the workspace settings; `enabled` (always among them) is switched
+// in the MCP tab. The file comes with the folder (a cloned project could
 // carry one), so it only takes effect once approved in the app (McpTrust); changes made in
 // the app keep an approved file approved.
 import { serialized } from '@app/agent';
@@ -10,7 +12,9 @@ import type { WorkspaceData } from './workspace-data.js';
 export interface McpState {
   /** where the workspace's choices are saved */
   file: string;
-  /** the servers turned on here, by name */
+  /** the servers this workspace uses, by name (listed in its MCP tab) */
+  allowed: string[];
+  /** the allowed servers turned on here, by name */
   enabled: string[];
   /** false when the file changed outside the app since it was last approved */
   isTrusted: boolean;
@@ -30,26 +34,43 @@ export class WorkspaceMcp {
     const config = await this.data.readMcpWorkspace();
     return {
       file: this.file,
-      enabled: config.enabled,
+      ...choicesOf(config),
       isTrusted: await this.trust.isTrusted(this.data.folder, config),
     };
   }
 
-  /** Turns one server on or off here (a change made in the app). */
+  /**
+   * Turns one server on or off here (the MCP tab). Turning it off keeps it allowed, so it
+   * stays listed and can be turned back on.
+   */
   setEnabled(name: string, isOn: boolean): Promise<McpState> {
-    return this.#update((enabled) =>
-      isOn ? [...new Set([...enabled, name])] : enabled.filter((item) => item !== name),
+    return this.#update(({ allowed, enabled }) =>
+      isOn
+        ? { allowed: unique([...allowed, name]), enabled: unique([...enabled, name]) }
+        : { allowed, enabled: enabled.filter((item) => item !== name) },
     );
   }
 
-  /** Sets which servers are on here, all at once (a change made in the app). */
-  setEnabledList(names: readonly string[]): Promise<McpState> {
-    return this.#update(() => [...new Set(names)]);
+  /**
+   * Sets which servers this workspace uses, all at once (workspace settings). Newly allowed
+   * ones start on; ones still allowed keep their on/off; the rest are off.
+   */
+  setAllowedList(names: readonly string[]): Promise<McpState> {
+    return this.#update(({ allowed, enabled }) => {
+      const next = unique(names);
+      const before = new Set(allowed);
+      const on = new Set(enabled);
+      return { allowed: next, enabled: next.filter((name) => on.has(name) || !before.has(name)) };
+    });
   }
 
-  /** The server was renamed app-wide: keep it on here under its new name. */
+  /** The server was renamed app-wide: keep it here (on or off) under its new name. */
   rename(from: string, to: string): Promise<McpState> {
-    return this.#update((enabled) => enabled.map((item) => (item === from ? to : item)));
+    const swap = (names: string[]) => names.map((item) => (item === from ? to : item));
+    return this.#update(({ allowed, enabled }) => ({
+      allowed: swap(allowed),
+      enabled: swap(enabled),
+    }));
   }
 
   /** The user reviewed the file as it is now and lets its servers start. */
@@ -57,7 +78,7 @@ export class WorkspaceMcp {
     return serialized(`${this.file}#app`, async () => {
       const config = await this.data.readMcpWorkspace();
       await this.trust.trust(this.data.folder, config);
-      return { file: this.file, enabled: config.enabled, isTrusted: true };
+      return { file: this.file, ...choicesOf(config), isTrusted: true };
     });
   }
 
@@ -70,19 +91,30 @@ export class WorkspaceMcp {
     });
   }
 
-  #update(change: (enabled: string[]) => string[]): Promise<McpState> {
+  #update(change: (choices: McpChoices) => McpChoices): Promise<McpState> {
     return serialized(`${this.file}#app`, async () => {
       const before = await this.read();
-      const config: McpWorkspaceConfig = { enabled: change(before.enabled) };
+      const config: McpWorkspaceConfig = change(before);
       await this.data.writeMcpWorkspace(config);
       if (before.isTrusted) await this.trust.trust(this.data.folder, config);
       return {
         file: this.file,
-        enabled: config.enabled,
+        ...choicesOf(config),
         isTrusted: before.isTrusted || (await this.trust.isTrusted(this.data.folder, config)),
       };
     });
   }
+}
+
+type McpChoices = Pick<McpState, 'allowed' | 'enabled'>;
+
+const unique = (names: readonly string[]): string[] => [...new Set(names)];
+
+/** Allowed and on, as the file says; a file without `allowed` allows the ones on. */
+function choicesOf(config: McpWorkspaceConfig): McpChoices {
+  const allowed = unique(config.allowed ?? config.enabled);
+  const isAllowed = new Set(allowed);
+  return { allowed, enabled: unique(config.enabled).filter((name) => isAllowed.has(name)) };
 }
 
 /** The servers that may start in a workspace: the app's servers it turned on, once approved. */
@@ -91,7 +123,7 @@ export function runnableMcpServers(
   state: McpState,
 ): Record<string, McpServerConfig> {
   if (!state.isTrusted) return {};
-  const on = new Set(state.enabled);
+  const on = new Set(state.enabled.filter((name) => state.allowed.includes(name)));
   return Object.fromEntries(
     servers.filter(({ name }) => on.has(name)).map(({ name, server }) => [name, server]),
   );

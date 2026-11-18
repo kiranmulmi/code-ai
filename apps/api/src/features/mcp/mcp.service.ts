@@ -60,29 +60,33 @@ export function createMcpService(
       ]),
     );
     const on = new Set(state.enabled);
+    // Only the servers this workspace uses (chosen in its settings), on or off.
+    const allowed = new Set(state.allowed);
     return {
       file: state.file,
       isTrusted: state.isTrusted,
       fileError: null,
-      servers: servers.map(({ name, server }): McpServerStatus => {
-        const report = reports.get(name);
-        const autoApprove = new Set(server.autoApprove ?? []);
-        return {
-          name,
-          transport: mcpTransportOf(server),
-          config: server,
-          state: !on.has(name)
-            ? 'disabled'
-            : !state.isTrusted
-              ? 'untrusted'
-              : (report?.state ?? 'error'),
-          error: report?.error ?? null,
-          tools: (report?.tools ?? []).map((tool) => ({
-            ...tool,
-            isAutoApproved: autoApprove.has(tool.name),
-          })),
-        };
-      }),
+      servers: servers
+        .filter(({ name }) => allowed.has(name))
+        .map(({ name, server }): McpServerStatus => {
+          const report = reports.get(name);
+          const autoApprove = new Set(server.autoApprove ?? []);
+          return {
+            name,
+            transport: mcpTransportOf(server),
+            config: server,
+            state: !on.has(name)
+              ? 'disabled'
+              : !state.isTrusted
+                ? 'untrusted'
+                : (report?.state ?? 'error'),
+            error: report?.error ?? null,
+            tools: (report?.tools ?? []).map((tool) => ({
+              ...tool,
+              isAutoApproved: autoApprove.has(tool.name),
+            })),
+          };
+        }),
     };
   }
 
@@ -123,7 +127,7 @@ export function createMcpService(
 
     // ---------- One workspace ----------
 
-    /** Every server, on or off here; the ones on (and approved) are started to list tools. */
+    /** The servers this workspace uses, on or off; the ones on (and approved) start to list tools. */
     async overview(workspaceId: string): Promise<McpOverview> {
       const workspace = await workspaces.require(workspaceId);
       const mcp = store.mcp(workspace);
@@ -156,16 +160,16 @@ export function createMcpService(
       return overviewOf(workspace, state);
     },
 
-    /** Which servers are on here, read without starting any (workspace settings). */
+    /** Which servers this workspace uses and has on, read without starting any (settings). */
     async enabled(workspaceId: string): Promise<McpEnabled> {
       const workspace = await workspaces.require(workspaceId);
-      const { enabled, isTrusted } = await store.mcp(workspace).read();
-      return { enabled, isTrusted };
+      const { allowed, enabled, isTrusted } = await store.mcp(workspace).read();
+      return { allowed, enabled, isTrusted };
     },
 
     /**
-     * Turns servers on and off here all at once. Ones turned off stop now; ones turned on
-     * start when a chat or the MCP tab needs them.
+     * Sets which servers this workspace uses, all at once (newly allowed ones start on).
+     * Ones no longer on stop now; ones turned on start when a chat or the MCP tab needs them.
      */
     async setEnabled(workspaceId: string, names: readonly string[]): Promise<McpEnabled> {
       const workspace = await requireIdle(workspaceId);
@@ -174,10 +178,10 @@ export function createMcpService(
       if (unknown) throw new NotFoundError(`There is no MCP server named "${unknown}".`);
       const mcp = store.mcp(workspace);
       const before = new Set((await mcp.read()).enabled);
-      const { enabled, isTrusted } = await mcp.setEnabledList(names);
+      const { allowed, enabled, isTrusted } = await mcp.setAllowedList(names);
       const on = new Set(enabled);
       for (const name of before) if (!on.has(name)) await hub.restart(workspace.path, name);
-      return { enabled, isTrusted };
+      return { allowed, enabled, isTrusted };
     },
 
     /** The user reviewed the workspace's mcp.json as it is now. */

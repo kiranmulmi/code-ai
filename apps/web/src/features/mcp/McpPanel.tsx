@@ -46,7 +46,7 @@ export function McpPanel({ workspaceId, isBusy }: { workspaceId: string; isBusy:
   const chooseServers = (
     <Link
       to={`/workspaces/${encodeURIComponent(workspaceId)}/settings`}
-      state={{ from: pathname }}
+      state={{ from: pathname, tab: 'mcp' }}
       title="Turn MCP servers on or off in the workspace settings"
       className={ADD_LINK}
     >
@@ -54,15 +54,19 @@ export function McpPanel({ workspaceId, isBusy }: { workspaceId: string; isBusy:
     </Link>
   );
 
-  // Only the ones on here; the rest are turned on in the workspace settings.
-  const servers = (data?.servers ?? []).filter((server) => server.state !== 'disabled');
+  // The servers this workspace uses (chosen in its settings), on or off, so one turned off
+  // here can be turned back on; the ones on come first.
+  const servers = [...(data?.servers ?? [])].sort(
+    (a, b) => Number(a.state === 'disabled') - Number(b.state === 'disabled'),
+  );
+  const onCount = servers.filter((server) => server.state !== 'disabled').length;
   const needsReview = data !== null && !data.isTrusted && data.fileError === null;
 
   return (
     <>
       <div className="mb-1.5 flex min-h-8 items-center justify-between gap-2">
         <span className="eyebrow">
-          {servers.length ? `${plural(servers.length, 'server')} on` : 'MCP servers'}
+          {servers.length ? `${onCount} of ${plural(servers.length, 'server')} on` : 'MCP servers'}
         </span>
         <div className="flex items-center gap-1">
           <IconButton
@@ -134,10 +138,10 @@ export function McpPanel({ workspaceId, isBusy }: { workspaceId: string; isBusy:
 
           {servers.length === 0 && !data.fileError ? (
             <div className="border border-dashed border-line px-5 py-8 text-center">
-              <div className="font-bold text-ink">No MCP servers on here</div>
+              <div className="font-bold text-ink">No MCP servers in this workspace</div>
               <p className="mx-auto mt-1 max-w-[42ch] text-[13px] leading-relaxed text-ink-3">
-                MCP servers give the agent more tools, like GitHub, a database or a browser. Turn
-                them on for this workspace in its settings.
+                MCP servers give the agent more tools, like GitHub, a database or a browser. Choose
+                which ones this workspace uses in its settings.
               </p>
               <div className="mt-3 flex justify-center">{chooseServers}</div>
             </div>
@@ -188,7 +192,8 @@ export function McpPanel({ workspaceId, isBusy }: { workspaceId: string; isBusy:
             >
               Settings → MCP servers
             </Link>
-            ; which ones are on here is chosen in the workspace settings and saved in{' '}
+            ; which ones this workspace uses is chosen in its settings, and each is switched on or
+            off here. Both are saved in{' '}
             <span className="font-mono [overflow-wrap:anywhere]">{data.file}</span>. Each MCP tool
             asks before it runs unless you turn on Always allow (for that tool everywhere).
           </p>

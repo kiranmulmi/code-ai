@@ -29,6 +29,7 @@ test('a workspace starts with every server off, and turning one on saves just it
   const { folder, mcp } = await setup();
   assert.deepEqual(await mcp.read(), {
     file: path.join(folder, '.nimbrio-ai', 'mcp.json'),
+    allowed: [],
     enabled: [],
     isTrusted: true,
   });
@@ -38,7 +39,7 @@ test('a workspace starts with every server off, and turning one on saves just it
   assert.equal(state.isTrusted, true);
   assert.deepEqual(
     JSON.parse(await fs.readFile(path.join(folder, '.nimbrio-ai', 'mcp.json'), 'utf8')),
-    { enabled: ['github'] },
+    { allowed: ['github'], enabled: ['github'] },
     'no settings or tokens in the workspace folder',
   );
   assert.deepEqual(Object.keys(runnableMcpServers(servers, await mcp.read())), ['github']);
@@ -69,11 +70,36 @@ test('a file changed outside the app runs nothing until it is approved', async (
 test('workspace settings set the whole list at once, keeping the approval', async () => {
   const { mcp } = await setup();
   await mcp.setEnabled('github', true);
-  let state = await mcp.setEnabledList(['docs', 'docs']);
-  assert.deepEqual(state.enabled, ['docs'], 'replaced, without duplicates');
+  let state = await mcp.setAllowedList(['docs', 'docs']);
+  assert.deepEqual(state.allowed, ['docs'], 'replaced, without duplicates');
+  assert.deepEqual(state.enabled, ['docs'], 'a newly allowed server starts on');
   assert.equal(state.isTrusted, true);
-  state = await mcp.setEnabledList([]);
+  state = await mcp.setAllowedList([]);
   assert.deepEqual(runnableMcpServers(servers, state), {});
+});
+
+test('turning a server off in the MCP tab keeps it allowed, and settings keep it off', async () => {
+  const { mcp } = await setup();
+  await mcp.setAllowedList(['github', 'docs']);
+  let state = await mcp.setEnabled('github', false);
+  assert.deepEqual(state.allowed, ['github', 'docs'], 'still listed');
+  assert.deepEqual(state.enabled, ['docs']);
+  assert.deepEqual(Object.keys(runnableMcpServers(servers, state)), ['docs']);
+
+  state = await mcp.setAllowedList(['github', 'docs']);
+  assert.deepEqual(state.enabled, ['docs'], 'saving the settings again keeps it off');
+
+  state = await mcp.setEnabled('github', true);
+  assert.deepEqual(state.enabled.sort(), ['docs', 'github']);
+});
+
+test('an mcp.json from before `allowed` allows the servers that are on', async () => {
+  const { data, mcp } = await setup();
+  await data.ensure();
+  await fs.writeFile(data.mcpFile, JSON.stringify({ enabled: ['github'] }));
+  const state = await mcp.read();
+  assert.deepEqual(state.allowed, ['github']);
+  assert.deepEqual(state.enabled, ['github']);
 });
 
 test('a renamed server stays on, and a server the app no longer has is skipped', async () => {
@@ -104,6 +130,7 @@ test('an old mcp.json with full settings is read as legacy and turns nothing on'
   assert.equal(await data.readLegacyMcp(), null, 'now the new kind');
   assert.deepEqual(await mcp.read(), {
     file: data.mcpFile,
+    allowed: ['github'],
     enabled: ['github'],
     isTrusted: true,
   });

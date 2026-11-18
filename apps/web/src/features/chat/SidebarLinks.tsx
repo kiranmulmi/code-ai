@@ -1,6 +1,8 @@
 import type { ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import type { AppInfo } from '@app/shared';
+import { Badge } from '../../components/Badge';
+import { ThemeToggle } from '../../layout/ThemeToggle';
 import { errorMessage } from '../../lib/api';
 import { GearIcon, InstallIcon, PlusIcon, WarnIcon } from '../../lib/icons';
 import { useInstallApp } from '../../lib/installApp';
@@ -47,23 +49,64 @@ function SidebarLink({
 }
 
 /**
- * The bottom of the chats sidebar: the open workspace's settings, New workspace, and Install app while Chrome
- * offers it. A warning takes the top when the server can't be reached. The app-wide settings
- * (models, MCP servers, agent) open from Preferences in the footer; who is signed in, and Sign
- * out, are in `AccountMenu` below the workspace switcher.
+ * Preferences: the app settings (models, MCP servers, agent) in a popup, open even while the
+ * agent works. A badge says when approvals aren't "ask", since that changes what the agent may
+ * do without asking. At `xl` the chat screen has no top bar, so the theme switch sits here.
+ */
+function PreferencesRow({ approval }: { approval: AppInfo['approval'] | null }) {
+  const { pathname } = useLocation();
+  return (
+    <div className="flex items-center gap-1">
+      <Link
+        to="/settings/models"
+        state={{ from: pathname }}
+        title="Models, MCP servers and agent settings"
+        className={`${ROW} min-w-0 flex-1 transition-colors hover:bg-subtle hover:text-ink`}
+      >
+        <span className="grid h-6 w-6 shrink-0 place-items-center rounded-lg bg-accent-soft text-accent-2">
+          <GearIcon size={12} />
+        </span>
+        <span className="min-w-0 truncate">Preferences</span>
+        {approval === 'auto' ? (
+          <Badge tone="yellow">auto-approve</Badge>
+        ) : approval === 'deny' ? (
+          <Badge tone="red">refuse</Badge>
+        ) : null}
+      </Link>
+      <span className="hidden shrink-0 xl:contents">
+        <ThemeToggle size="sm" />
+      </span>
+    </div>
+  );
+}
+
+/**
+ * The sidebar links: the open workspace's settings, New workspace, Preferences (the app-wide
+ * settings), and Install app while Chrome offers it (all at the bottom of the chats drawer;
+ * split between the two sidebars at `xl`). A warning takes the top when the server can't be
+ * reached. Who is signed in, and Sign out, are in `AccountMenu` below the workspace switcher.
  */
 export function SidebarLinks({
   info,
   error,
   workspaceId,
   isBusy,
+  only,
 }: {
   info: AppInfo | null;
   error: unknown;
-  workspaceId: string;
+  workspaceId?: string;
   isBusy: boolean;
+  /**
+   * At `xl` the links are split: `workspace` (Workspace settings, under the chats) and `app`
+   * (the offline warning, New workspace, Preferences, Install app, in the workspace sidebar).
+   * Unset shows all.
+   */
+  only?: 'workspace' | 'app';
 }) {
-  const isOffline = Boolean(error) && !info;
+  const hasWorkspace = only !== 'app' && workspaceId !== undefined;
+  const hasApp = only !== 'workspace';
+  const isOffline = hasApp && Boolean(error) && !info;
   const { canInstall, install } = useInstallApp();
   const toast = useToast();
   return (
@@ -78,23 +121,30 @@ export function SidebarLinks({
           Can&apos;t reach the server
         </p>
       )}
-      <span className="block px-3 pb-1.5 text-[10.5px] font-bold uppercase tracking-[0.14em] text-ink-4">
-        Settings
-      </span>
-      <SidebarLink
-        to={`/workspaces/${workspaceId}/settings`}
-        icon={<GearIcon size={12} />}
-        label="Workspace settings"
-        isBusy={isBusy}
-      />
-      <SidebarLink
-        to="/workspaces/new"
-        icon={<PlusIcon size={12} />}
-        label="New workspace"
-        isBusy={isBusy}
-      />
+      {hasWorkspace && (
+        <>
+          <span className="block px-3 pb-1.5 text-[10.5px] font-bold uppercase tracking-[0.14em] text-ink-4">
+            Settings
+          </span>
+          <SidebarLink
+            to={`/workspaces/${workspaceId}/settings`}
+            icon={<GearIcon size={12} />}
+            label="Workspace settings"
+            isBusy={isBusy}
+          />
+        </>
+      )}
+      {hasApp && (
+        <SidebarLink
+          to="/workspaces/new"
+          icon={<PlusIcon size={12} />}
+          label="New workspace"
+          isBusy={isBusy}
+        />
+      )}
+      {hasApp && <PreferencesRow approval={info?.approval ?? null} />}
       {/* Only while Chrome offers it: gone once installed, and inside the installed app. */}
-      {canInstall && (
+      {hasApp && canInstall && (
         <button
           type="button"
           onClick={() => {

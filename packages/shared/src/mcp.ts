@@ -59,9 +59,16 @@ export const mcpConfigSchema = z
 
 export type McpConfig = z.infer<typeof mcpConfigSchema>;
 
-/** A workspace's mcp.json now: just which of the app's servers are on there. */
+/**
+ * A workspace's mcp.json now: which of the app's servers it uses (`allowed`, chosen in the
+ * workspace settings) and which of those are on right now (`enabled`, switched in the MCP
+ * tab). Files from before `allowed` existed allow just the ones that are on.
+ */
 export const mcpWorkspaceSchema = z
-  .object({ enabled: z.array(z.string().regex(MCP_SERVER_NAME, NAME_RULE)).default([]) })
+  .object({
+    enabled: z.array(z.string().regex(MCP_SERVER_NAME, NAME_RULE)).default([]),
+    allowed: z.array(z.string().regex(MCP_SERVER_NAME, NAME_RULE)).optional(),
+  })
   .passthrough();
 
 export type McpWorkspaceConfig = z.infer<typeof mcpWorkspaceSchema>;
@@ -102,15 +109,18 @@ export interface McpServerEntry {
 }
 export type McpServerPatch = z.input<typeof mcpServerPatchSchema>;
 
-/** Which of the app's servers are on in one workspace, set all at once (workspace settings). */
+/** Which of the app's servers one workspace uses, set all at once (workspace settings). */
 export const mcpEnabledSchema = z.object({
   enabled: z.array(z.string().regex(MCP_SERVER_NAME, NAME_RULE)).max(200),
 });
 
 export type McpEnabledInput = z.input<typeof mcpEnabledSchema>;
 
-/** A workspace's on/off choices without starting anything. */
+/** A workspace's choices without starting anything. */
 export interface McpEnabled {
+  /** the servers this workspace uses (listed in its MCP tab) */
+  allowed: string[];
+  /** the allowed ones that are on right now */
   enabled: string[];
   /** false when its mcp.json changed outside the app and still needs a review (MCP tab) */
   isTrusted: boolean;

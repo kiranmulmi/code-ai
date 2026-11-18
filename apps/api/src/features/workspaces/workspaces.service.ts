@@ -1,4 +1,11 @@
-import type { Workspace, WorkspaceDeletion, WorkspaceInput, WorkspaceUpdate } from '@app/shared';
+import type {
+  Workspace,
+  WorkspaceDeletion,
+  WorkspaceGroup,
+  WorkspaceGroupInput,
+  WorkspaceInput,
+  WorkspaceUpdate,
+} from '@app/shared';
 import type { AppContext } from '../../context.js';
 import { ConflictError, NotFoundError } from '../../lib/errors.js';
 
@@ -34,6 +41,25 @@ export function createWorkspacesService({ store, runs, mcp, tasks }: AppContext)
         await tasks.closeWorkspace(current.path);
       }
       return updated;
+    },
+
+    // Sidebar folders: only a way to file workspaces, nothing on disk changes.
+    listGroups: (): Promise<WorkspaceGroup[]> => store.listWorkspaceGroups(),
+
+    createGroup: ({ name }: WorkspaceGroupInput): Promise<WorkspaceGroup> =>
+      store.createWorkspaceGroup(name),
+
+    async renameGroup(id: string, { name }: WorkspaceGroupInput): Promise<WorkspaceGroup> {
+      const renamed = await store.renameWorkspaceGroup(id, name);
+      if (!renamed) throw new NotFoundError("That folder doesn't exist.");
+      return renamed;
+    },
+
+    async removeGroup(id: string): Promise<{ id: string }> {
+      if (!(await store.deleteWorkspaceGroup(id))) {
+        throw new NotFoundError("That folder doesn't exist.");
+      }
+      return { id };
     },
 
     async remove(id: string): Promise<WorkspaceDeletion> {

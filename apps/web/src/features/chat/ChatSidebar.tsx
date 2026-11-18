@@ -125,8 +125,14 @@ export function ChatSidebar({
         } ${isCollapsed ? 'xl:invisible xl:opacity-0' : ''}`}
       >
         <SidebarResizer width={width.width} onResize={width.setWidth} onReset={width.reset} />
-        <div className="titlebar flex h-12 shrink-0 items-center gap-1 border-b border-line pl-[calc(1rem+var(--titlebar-inset))] pr-2">
-          <BrandLink isHiddenInDesktopApp />
+        <div className="titlebar flex h-12 shrink-0 items-center gap-1 border-b border-line pl-[calc(1rem+var(--titlebar-inset))] pr-2 xl:pl-4">
+          {/* At xl the workspace sidebar to the left carries the brand and the top-left corner. */}
+          <span className="xl:hidden">
+            <BrandLink isHiddenInDesktopApp />
+          </span>
+          <span className="hidden text-[10.5px] font-semibold uppercase tracking-wider text-ink-3 xl:block">
+            Chats
+          </span>
           <IconButton onClick={onClose} aria-label="Hide chats" className="ml-auto xl:hidden">
             <ChevronRightIcon size={12} className="rotate-180" />
           </IconButton>
@@ -207,9 +213,22 @@ export function ChatSidebar({
           onDeleted={onDeleted}
         />
 
-        <SidebarLinks info={info} error={infoError} workspaceId={workspaceId} isBusy={isBusy} />
+        {/* The drawer has every link; at xl only Workspace settings, the rest is in the workspace sidebar. */}
+        <div className="shrink-0 xl:hidden">
+          <SidebarLinks info={info} error={infoError} workspaceId={workspaceId} isBusy={isBusy} />
+        </div>
+        <div className="hidden shrink-0 border-t border-line xl:block">
+          <SidebarLinks
+            info={info}
+            error={infoError}
+            workspaceId={workspaceId}
+            isBusy={isBusy}
+            only="workspace"
+          />
+        </div>
 
-        <div className="shrink-0">
+        {/* At xl the workspace sidebar switches workspaces; the drawer keeps this button. */}
+        <div className="shrink-0 xl:hidden">
           <WorkspaceSwitcher
             variant="sidebar"
             opensUp
@@ -220,7 +239,9 @@ export function ChatSidebar({
           />
         </div>
 
-        <AccountMenu />
+        <div className="shrink-0 xl:hidden">
+          <AccountMenu />
+        </div>
       </nav>
     </>
   );

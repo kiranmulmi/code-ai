@@ -377,3 +377,39 @@ test('MCP servers are kept app-wide and imported once from old workspace files',
   await store.renameMcpServer('github', 'gh');
   assert.deepEqual((await store.mcp(ws).read()).enabled.sort(), ['docs', 'gh']);
 });
+
+test('sidebar folders collect workspaces and give them back when deleted', async () => {
+  const store = db();
+  const a = await store.createWorkspace({ name: 'Group A', path: folder('group-a') });
+  const b = await store.createWorkspace({ name: 'Group B', path: folder('group-b') });
+  assert.equal(a.groupId, null, 'a new workspace starts at the top level');
+
+  const work = await store.createWorkspaceGroup('  Client   work ');
+  assert.equal(work.name, 'Client work');
+  await assert.rejects(store.createWorkspaceGroup('  '), { message: /Give the folder a name/ });
+
+  const filed = await store.updateWorkspace(a.id, { groupId: work.id });
+  assert.equal(filed?.groupId, work.id);
+  assert.equal((await store.getWorkspace(a.id))?.groupId, work.id, 'it is saved');
+  await assert.rejects(
+    store.updateWorkspace(b.id, { groupId: '00000000-0000-4000-8000-000000000000' }),
+    { message: /doesn't exist/ },
+  );
+
+  const renamed = await store.renameWorkspaceGroup(work.id, 'Clients');
+  assert.equal(renamed?.name, 'Clients');
+  assert.deepEqual(
+    (await store.listWorkspaceGroups()).map((g) => g.name),
+    ['Clients'],
+  );
+
+  const back = await store.updateWorkspace(a.id, { groupId: null });
+  assert.equal(back?.groupId, null, 'null moves it back to the top level');
+
+  await store.updateWorkspace(b.id, { groupId: work.id });
+  assert.equal(await store.deleteWorkspaceGroup(work.id), true);
+  assert.deepEqual(await store.listWorkspaceGroups(), []);
+  const kept = await store.getWorkspace(b.id);
+  assert.equal(kept?.groupId, null, 'its workspaces stay, at the top level');
+  assert.equal(await store.deleteWorkspaceGroup(work.id), false);
+});

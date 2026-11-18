@@ -12,10 +12,15 @@ import { SkillDialogProvider } from '../skills/SkillDialogProvider';
 import { useSkills } from '../skills/useSkills';
 import { parsePanelTab, visiblePanelTabs, type PanelTab } from '../panel/panelTabs';
 import { SidePanel } from '../panel/SidePanel';
-import { PreferencesLink } from './PreferencesLink';
 import { usePanelWidth } from '../panel/usePanelWidth';
 import { useWorkspace } from '../workspaces/useWorkspace';
+import { useWorkspaceGroups } from '../workspaces/useWorkspaceGroups';
 import { useWorkspaces } from '../workspaces/useWorkspaces';
+import {
+  WORKSPACE_RAIL_WIDTH,
+  WORKSPACE_SIDEBAR_WIDTH,
+  WorkspaceSidebar,
+} from '../workspaces/WorkspaceSidebar';
 import { onWorkspaceSaved } from '../workspaces/workspaceEvents';
 import { rememberLastWorkspace } from '../workspaces/lastWorkspace';
 import { improvePrompt } from './api';
@@ -51,6 +56,7 @@ export function ChatScreen({
   const info = useAppInfo();
   const workspace = useWorkspace(workspaceId);
   const workspaces = useWorkspaces();
+  const workspaceGroups = useWorkspaceGroups();
   const chats = useChats(workspaceId);
   const memories = useMemories(workspaceId);
   const skills = useSkills(workspaceId);
@@ -68,6 +74,10 @@ export function ChatScreen({
     'agent.sidebarCollapsed',
     parseFlag,
   );
+  const [isWorkspacesCollapsed, setIsWorkspacesCollapsed] = useStoredState(
+    'agent.workspacesCollapsed',
+    parseFlag,
+  );
   const [isPanelDrawerOpen, setIsPanelDrawerOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
@@ -75,6 +85,7 @@ export function ChatScreen({
   const { reload: reloadMemories } = memories;
   const { reload: reloadFiles } = files;
   const { reload: reloadWorkspaces } = workspaces;
+  const { reload: reloadWorkspaceGroups } = workspaceGroups;
   const { reload: reloadWorkspace } = workspace;
 
   // A workspace saved in the popup over this screen: show its new name, folder, instructions.
@@ -194,9 +205,10 @@ export function ChatScreen({
     '--panel-col': isPanelCollapsed ? '0px' : `${panelWidth.width}px`,
     '--sidebar-w': `${sidebarWidth.width}px`,
     '--sidebar-col': isSidebarCollapsed ? '0px' : `${sidebarWidth.width}px`,
+    '--workspaces-col': `${isWorkspacesCollapsed ? WORKSPACE_RAIL_WIDTH : WORKSPACE_SIDEBAR_WIDTH}px`,
   } as CSSProperties;
   const columns =
-    'lg:grid-cols-[minmax(0,1fr)_var(--panel-col)] xl:grid-cols-[var(--sidebar-col)_minmax(0,1fr)_var(--panel-col)]';
+    'lg:grid-cols-[minmax(0,1fr)_var(--panel-col)] xl:grid-cols-[var(--workspaces-col)_var(--sidebar-col)_minmax(0,1fr)_var(--panel-col)]';
   const workspaceList = workspaces.data ?? [];
 
   return (
@@ -216,10 +228,29 @@ export function ChatScreen({
           }}
         />
         <div
-          // One row; the footer (Preferences) sits at the bottom of the side panel.
+          // One row; Preferences is at the bottom of the workspace sidebar (or the chats drawer).
           className={`panel-grid grid min-h-0 flex-1 grid-cols-1 grid-rows-[minmax(0,1fr)] lg:transition-[grid-template-columns] lg:duration-300 lg:ease-[cubic-bezier(0.2,0,0,1)] motion-reduce:transition-none ${columns}`}
           style={panelStyle}
         >
+          <WorkspaceSidebar
+            current={workspace.data}
+            workspaces={workspaceList}
+            isBusy={isBusy}
+            info={info.data}
+            infoError={info.error}
+            groups={workspaceGroups.data ?? []}
+            isCollapsed={isWorkspacesCollapsed}
+            onToggle={() => setIsWorkspacesCollapsed(!isWorkspacesCollapsed)}
+            onFiled={(workspaceId, groupId) =>
+              workspaces.setData((list) =>
+                list ? list.map((w) => (w.id === workspaceId ? { ...w, groupId } : w)) : list,
+              )
+            }
+            onChanged={() => {
+              reloadWorkspaces();
+              reloadWorkspaceGroups();
+            }}
+          />
           <ChatSidebar
             isOpen={isSidebarOpen}
             isCollapsed={isSidebarCollapsed}
@@ -333,7 +364,6 @@ export function ChatScreen({
             isBusy={isBusy}
             onCloseDrawer={() => setIsPanelDrawerOpen(false)}
             onHide={togglePanel}
-            footer={<PreferencesLink approval={info.data?.approval ?? null} />}
           />
         </div>
       </div>

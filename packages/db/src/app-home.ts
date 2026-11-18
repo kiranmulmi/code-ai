@@ -2,7 +2,7 @@
 // no database):
 //
 //   ~/.nimbrio-ai/
-//     workspaces.json        the list of workspaces: id, name, folder (WorkspaceList)
+//     workspaces.json        the workspaces (id, name, folder) and sidebar folders (WorkspaceList)
 //     models.json            the models the agent can run on, with their API keys (ModelStore)
 //     agent-settings.json    how the agent behaves: Settings -> Agent (SettingsStore)
 //     mcp-servers.json       the MCP servers, in the { mcpServers } shape (McpServerStore)

@@ -4,6 +4,7 @@ import { CodeHighlight } from '../../components/CodeHighlight';
 import { CodeText } from '../../components/CodeText';
 import { Spinner } from '../../components/Spinner';
 import { inlineArgs, prettyJson } from '../../lib/format';
+import { stepSummary } from './tools';
 import { ChevronRightIcon, CrossIcon } from '../../lib/icons';
 import { languageForPath } from '../../lib/languages';
 import type { ToolItem } from './conversation';
@@ -110,13 +111,20 @@ function ResultText({ item }: { item: ToolItem }) {
 
 /** One tool call. Click it to see the input and result, which open in a card below it. */
 export function ToolStep({ item }: { item: ToolItem }) {
-  const summary = inlineArgs(item.args);
+  const summary = stepSummary(item.args);
   return (
     <details className="group text-[12.5px]">
       <summary className="flex h-8 cursor-pointer list-none items-center gap-2.5 rounded-lg px-2.5 text-[11px] transition-colors hover:bg-surface group-open:bg-surface [&::-webkit-details-marker]:hidden">
         <StepIcon name={item.name} state={item.state} />
         <span className="shrink-0 font-mono font-semibold text-ink-3">{item.name}</span>
-        <span className="min-w-0 flex-1 truncate font-mono text-ink-3 opacity-75">{summary}</span>
+        <span
+          title={summary.isReason ? inlineArgs(item.args) : undefined}
+          className={`min-w-0 flex-1 truncate ${
+            summary.isReason ? 'text-[12px] text-ink-2' : 'font-mono text-ink-3 opacity-75'
+          }`}
+        >
+          {summary.text}
+        </span>
         {item.state === 'error' && <Badge tone="red">failed</Badge>}
         <ChevronRightIcon
           size={10}

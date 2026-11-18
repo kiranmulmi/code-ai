@@ -33,11 +33,11 @@ const workspaceServer = (workspaceId: string, name: string) =>
 /** Starts the servers that are on (and approved) to list their tools, so it can take a moment. */
 export const fetchMcpOverview = (workspaceId: string) => request<McpOverview>(base(workspaceId));
 
-/** Which servers are on here, without starting any (the workspace form). */
+/** Which servers this workspace uses and has on, without starting any (the workspace form). */
 export const fetchMcpEnabled = (workspaceId: string) =>
   request<McpEnabled>(`${base(workspaceId)}/enabled`);
 
-/** Sets which servers are on here, all at once; ones turned off stop. */
+/** Sets which servers this workspace uses, all at once; ones no longer used stop. */
 export const saveMcpEnabled = (workspaceId: string, enabled: string[]) =>
   request<McpEnabled>(`${base(workspaceId)}/enabled`, jsonBody('PUT', { enabled }));
 

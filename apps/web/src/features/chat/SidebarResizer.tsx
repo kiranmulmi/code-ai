@@ -34,7 +34,10 @@ export function SidebarResizer({
         setIsDragging(true);
       }}
       onPointerMove={(event) => {
-        if (isDragging) onResize(event.clientX);
+        if (!isDragging) return;
+        // Measured from the sidebar's own left edge, wherever its column starts.
+        const left = event.currentTarget.parentElement?.getBoundingClientRect().left ?? 0;
+        onResize(event.clientX - left);
       }}
       onPointerUp={() => setIsDragging(false)}
       onPointerCancel={() => setIsDragging(false)}

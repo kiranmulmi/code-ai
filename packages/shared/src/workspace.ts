@@ -49,9 +49,21 @@ export interface Workspace {
   hasGitTab: boolean;
   createdAt: string | null;
   updatedAt: string | null;
+  /** The sidebar folder (WorkspaceGroup) it's filed in; null at the top level. */
+  groupId: string | null;
   chatCount?: number;
   /** In the list: when a chat here last changed, else when the workspace did. */
   lastActiveAt?: string | null;
+}
+
+/**
+ * A folder in the workspace sidebar that collects workspaces. Only a way to file them: it has
+ * nothing to do with the folders on disk, and deleting it moves its workspaces to the top level.
+ */
+export interface WorkspaceGroup {
+  id: string;
+  name: string;
+  createdAt: string | null;
 }
 
 export interface WorkspaceDeletion {
@@ -106,7 +118,23 @@ export const workspaceUpdateSchema = z.object({
   voiceMode: z.boolean().optional(),
   hasTerminalTab: z.boolean().optional(),
   hasGitTab: z.boolean().optional(),
+  /** Files it in a sidebar folder; null moves it back to the top level. */
+  groupId: z.string().uuid().nullable().optional(),
 });
 
+const groupName = z
+  .string()
+  .transform((value) => value.replace(/\s+/g, ' ').trim())
+  .pipe(
+    z
+      .string()
+      .min(1, 'Give the folder a name.')
+      .max(LIMITS.workspaceName, `Keep the name under ${LIMITS.workspaceName} characters.`),
+  );
+
+/** Creating or renaming a sidebar folder. */
+export const workspaceGroupInputSchema = z.object({ name: groupName });
+
+export type WorkspaceGroupInput = z.input<typeof workspaceGroupInputSchema>;
 export type WorkspaceInput = z.input<typeof workspaceInputSchema>;
 export type WorkspaceUpdate = z.input<typeof workspaceUpdateSchema>;

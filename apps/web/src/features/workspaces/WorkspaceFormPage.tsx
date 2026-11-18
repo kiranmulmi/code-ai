@@ -29,7 +29,7 @@ import { Spinner } from '../../components/Spinner';
 import { FormActions, usePageHeader } from '../../layout/pageHeader';
 import { errorMessage, isNotFound } from '../../lib/api';
 import { FolderIcon, TrashIcon } from '../../lib/icons';
-import { fromPath } from '../../lib/routerState';
+import { fromPath, tabFromState } from '../../lib/routerState';
 import { useToast } from '../../lib/toast';
 import {
   checkWorkspaceFolder,
@@ -142,7 +142,11 @@ export function WorkspaceFormPage() {
   const [savedMcp, setSavedMcp] = useState<string[]>([]);
   const [isMcpTrusted, setIsMcpTrusted] = useState(true);
   const [isPickerOpen, setIsPickerOpen] = useState(false);
-  const [tab, setTab] = useState<FormTab>('general');
+  // A link can open the form on a given tab (e.g. the MCP panel's "Choose servers").
+  const [tab, setTab] = useState<FormTab>(() => {
+    const wanted = tabFromState(location.state);
+    return TABS.find((entry) => entry.id === wanted)?.id ?? 'general';
+  });
   const [errors, setErrors] = useState<FieldErrors>({});
   const [loaded, setLoaded] = useState<Workspace | null>(null);
   const [isLoading, setIsLoading] = useState(isEdit);
@@ -218,7 +222,8 @@ export function WorkspaceFormPage() {
         if (!isCurrent) return;
         setMcpServers(servers);
         const known = new Set(servers.map((entry) => entry.name));
-        const on = (state?.enabled ?? []).filter((name) => known.has(name));
+        // The servers this workspace uses; each one's on/off is switched in the MCP tab.
+        const on = (state?.allowed ?? []).filter((name) => known.has(name));
         setMcpEnabled(on);
         setSavedMcp(on);
         setIsMcpTrusted(state?.isTrusted ?? true);
