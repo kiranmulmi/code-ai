@@ -18,6 +18,7 @@ import { useWorkspaceGroups } from '../workspaces/useWorkspaceGroups';
 import { useWorkspaces } from '../workspaces/useWorkspaces';
 import {
   WORKSPACE_RAIL_WIDTH,
+  WORKSPACE_SIDEBAR_MIN_WIDTH,
   WORKSPACE_SIDEBAR_WIDTH,
   WorkspaceSidebar,
 } from '../workspaces/WorkspaceSidebar';
@@ -37,6 +38,12 @@ import { useSidebarWidth } from './useSidebarWidth';
 import { APP_NAME } from '../../lib/brand';
 
 const parseFlag = (stored: string | null) => stored === 'true';
+/** The workspace sidebar's dragged width, remembered apart from the chats sidebar's. */
+const WORKSPACES_SIDEBAR = {
+  key: 'agent.workspacesWidth',
+  defaultWidth: WORKSPACE_SIDEBAR_WIDTH,
+  minWidth: WORKSPACE_SIDEBAR_MIN_WIDTH,
+};
 
 /**
  * The chat screen for one workspace: sidebar (workspaces and chats), the open chat,
@@ -68,6 +75,7 @@ export function ChatScreen({
   const isWide = useMediaQuery('(min-width: 1024px)');
   const panelWidth = usePanelWidth();
   const sidebarWidth = useSidebarWidth();
+  const workspacesWidth = useSidebarWidth(WORKSPACES_SIDEBAR);
   const [tab, setTab] = useStoredState<PanelTab>('agent.panelTab', parsePanelTab);
   const [isPanelCollapsed, setIsPanelCollapsed] = useStoredState('agent.panelCollapsed', parseFlag);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useStoredState(
@@ -205,7 +213,8 @@ export function ChatScreen({
     '--panel-col': isPanelCollapsed ? '0px' : `${panelWidth.width}px`,
     '--sidebar-w': `${sidebarWidth.width}px`,
     '--sidebar-col': isSidebarCollapsed ? '0px' : `${sidebarWidth.width}px`,
-    '--workspaces-col': `${isWorkspacesCollapsed ? WORKSPACE_RAIL_WIDTH : WORKSPACE_SIDEBAR_WIDTH}px`,
+    '--workspaces-w': `${workspacesWidth.width}px`,
+    '--workspaces-col': `${isWorkspacesCollapsed ? WORKSPACE_RAIL_WIDTH : workspacesWidth.width}px`,
   } as CSSProperties;
   const columns =
     'lg:grid-cols-[minmax(0,1fr)_var(--panel-col)] xl:grid-cols-[var(--workspaces-col)_var(--sidebar-col)_minmax(0,1fr)_var(--panel-col)]';
@@ -240,6 +249,7 @@ export function ChatScreen({
             infoError={info.error}
             groups={workspaceGroups.data ?? []}
             isCollapsed={isWorkspacesCollapsed}
+            width={workspacesWidth}
             onToggle={() => setIsWorkspacesCollapsed(!isWorkspacesCollapsed)}
             onFiled={(workspaceId, groupId) =>
               workspaces.setData((list) =>

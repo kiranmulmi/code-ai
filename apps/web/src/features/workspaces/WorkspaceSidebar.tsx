@@ -3,6 +3,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import type { AppInfo, Workspace, WorkspaceGroup } from '@app/shared';
 import { AccountMenu } from '../auth/AccountMenu';
 import { SidebarLinks } from '../chat/SidebarLinks';
+import { SidebarResizer } from '../chat/SidebarResizer';
+import type { useSidebarWidth } from '../chat/useSidebarWidth';
 import { ConfirmDeleteDialog } from '../../components/ConfirmDeleteDialog';
 import { IconButton } from '../../components/IconButton';
 import type { RowMenuItem } from '../../components/RowMenu';
@@ -36,8 +38,14 @@ import {
   isWorkspaceDrag,
 } from './WorkspaceSidebarRows';
 
-/** The expanded column's width; the collapsed rail is `WORKSPACE_RAIL_WIDTH`. ChatScreen sizes the grid. */
+/**
+ * The expanded column's default and smallest widths (the user can drag it wider); the collapsed
+ * rail is `WORKSPACE_RAIL_WIDTH`. ChatScreen sizes the grid and sets `--workspaces-w`.
+ */
 export const WORKSPACE_SIDEBAR_WIDTH = 232;
+export const WORKSPACE_SIDEBAR_MIN_WIDTH = 200;
+/** The expanded column's content width, so it doesn't reflow while the column animates. */
+const EXPANDED_MIN_WIDTH = 'var(--workspaces-w)';
 export const WORKSPACE_RAIL_WIDTH = 64;
 
 /** Closed folders, by id (a UI preference, so localStorage). */
@@ -68,6 +76,7 @@ export function WorkspaceSidebar({
   groups,
   isBusy,
   isCollapsed,
+  width,
   info,
   infoError,
   onToggle,
@@ -83,6 +92,8 @@ export function WorkspaceSidebar({
   info: AppInfo | null;
   infoError: unknown;
   isCollapsed: boolean;
+  /** The expanded column's width, dragged from its right edge. */
+  width: ReturnType<typeof useSidebarWidth>;
   onToggle: () => void;
   /** Show a workspace in its new folder at once, before the lists load again. */
   onFiled: (workspaceId: string, groupId: string | null) => void;
@@ -225,6 +236,14 @@ export function WorkspaceSidebar({
       aria-label="Workspaces"
       className="relative z-10 hidden min-h-0 flex-col overflow-hidden border-r border-line-2 bg-subtle xl:flex"
     >
+      {!isCollapsed && (
+        <SidebarResizer
+          width={width.width}
+          onResize={width.setWidth}
+          onReset={width.reset}
+          label="Resize workspaces sidebar"
+        />
+      )}
       <div
         className={`titlebar flex h-12 shrink-0 items-center border-b border-line ${
           isCollapsed ? 'justify-center' : 'gap-1 pl-[calc(1rem+var(--titlebar-inset))] pr-2'
@@ -270,7 +289,7 @@ export function WorkspaceSidebar({
         </div>
       ) : (
         // Fixed width while the column animates, so it clips instead of squeezing.
-        <div className="shrink-0 px-3 pt-3" style={{ minWidth: WORKSPACE_SIDEBAR_WIDTH }}>
+        <div className="shrink-0 px-3 pt-3" style={{ minWidth: EXPANDED_MIN_WIDTH }}>
           <label className="group/search relative flex items-center">
             <span className="sr-only">Search workspaces</span>
             <SearchIcon
@@ -308,7 +327,7 @@ export function WorkspaceSidebar({
         className={`min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain [scrollbar-width:thin] ${
           isCollapsed ? 'px-2 py-3' : 'px-2 pb-2 pt-3'
         }`}
-        style={isCollapsed ? undefined : { minWidth: WORKSPACE_SIDEBAR_WIDTH }}
+        style={isCollapsed ? undefined : { minWidth: EXPANDED_MIN_WIDTH }}
         {...(isCollapsed ? {} : dropHandlers('top'))}
       >
         {isCollapsed ? (
@@ -415,10 +434,7 @@ export function WorkspaceSidebar({
           <ThemeToggle size="sm" />
         </div>
       ) : (
-        <div
-          className="shrink-0 border-t border-line"
-          style={{ minWidth: WORKSPACE_SIDEBAR_WIDTH }}
-        >
+        <div className="shrink-0 border-t border-line" style={{ minWidth: EXPANDED_MIN_WIDTH }}>
           <SidebarLinks info={info} error={infoError} isBusy={isBusy} only="app" />
           <AccountMenu />
         </div>

@@ -2,15 +2,17 @@ import { useEffect, useState } from 'react';
 
 const KEY_STEP = 24;
 
-/** The drag handle on the chats sidebar's right edge. Arrow keys resize too; double-click resets. */
+/** The drag handle on a sidebar's right edge. Arrow keys resize too; double-click resets. */
 export function SidebarResizer({
   width,
   onResize,
   onReset,
+  label = 'Resize sidebar',
 }: {
   width: number;
   onResize: (width: number) => void;
   onReset: () => void;
+  label?: string;
 }) {
   const [isDragging, setIsDragging] = useState(false);
 
@@ -24,7 +26,7 @@ export function SidebarResizer({
     <div
       role="separator"
       aria-orientation="vertical"
-      aria-label="Resize sidebar"
+      aria-label={label}
       aria-valuenow={width}
       tabIndex={0}
       title="Drag to resize · double-click to reset"
