@@ -84,6 +84,7 @@ import {
   checkInput,
   createApprover,
   limitToolOutput,
+  redactSecrets,
   type ApprovalSource,
   type ApproveFn,
   type AskFn,
@@ -510,12 +511,17 @@ export function createAgent(options: AgentOptions): Agent {
           ? { ...toolContext, notes, delegate: (task: DelegatedTask) => delegate(callId, task) }
           : { ...toolContext, notes };
       const output = await tool.runValidated(input, context);
-      const text = typeof output === 'string' ? output : JSON.stringify(output, null, 2);
+      // Secrets are masked before the result goes anywhere: the model, the chat file, the
+      // live stream and the log all get this text.
+      const text = redactSecrets(
+        typeof output === 'string' ? output : JSON.stringify(output, null, 2),
+      );
       logger.event('tool_result', { tool: name, ok: true, chars: text.length });
       return limitToolOutput(text, limits.toolOutputChars);
     } catch (error) {
-      logger.event('tool_result', { tool: name, ok: false, error: errorMessage(error) });
-      return toolError(errorMessage(error));
+      const message = redactSecrets(errorMessage(error));
+      logger.event('tool_result', { tool: name, ok: false, error: message });
+      return toolError(message);
     }
   }
 

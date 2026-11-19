@@ -326,6 +326,121 @@ export function commandEnv(base: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   };
 }
 
+// ---------- Secrets ----------
+
+/**
+ * Files that usually hold keys and passwords: env files (not their .example/.sample/.template
+ * copies), MCP configs with tokens in headers, package-manager and network credentials,
+ * private keys. read_file and search_files skip them, and copy_path / move_path won't take
+ * them, so a secret can't reach the model by being renamed first. Writing one stays allowed
+ * (creating a .env from .env.example is a normal task).
+ */
+const SECRET_FILE_NAMES: ReadonlySet<string> = new Set([
+  '.mcp.json',
+  '.npmrc',
+  '.netrc',
+  '.pypirc',
+  '.pgpass',
+  '.git-credentials',
+  'credentials',
+  'id_rsa',
+  'id_dsa',
+  'id_ecdsa',
+  'id_ed25519',
+]);
+const SECRET_FILE_PATTERN = /\.(pem|key|p12|pfx|keystore|jks)$/i;
+const ENV_FILE_PATTERN = /^\.env(\..+)?$/i;
+const ENV_TEMPLATE_PATTERN = /\.(example|sample|template|dist)$/i;
+
+/** Whether a path names a file that usually holds secrets (judged by its file name). */
+export function isSecretFile(filePath: string): boolean {
+  const name = (filePath.split(/[\\/]/).pop() ?? '').toLowerCase();
+  if (ENV_FILE_PATTERN.test(name)) return !ENV_TEMPLATE_PATTERN.test(name);
+  return SECRET_FILE_NAMES.has(name) || SECRET_FILE_PATTERN.test(name);
+}
+
+/** Throws when a file tool is asked to read or copy out a secrets file. */
+export function assertNotSecretFile(shownPath: string): void {
+  if (isSecretFile(shownPath)) {
+    throw new Error(
+      `"${shownPath}" usually holds keys or passwords, so the agent can't read, copy or move it. Ask the user for the specific non-secret value you need, or use its .example file.`,
+    );
+  }
+}
+
+/**
+ * For the agent's run_command only (the user's own terminal tab isn't limited): commands that
+ * name this app's data folders are refused. ~/.hamro-ai/ holds every model API key, provider
+ * sign-in and MCP token in plain JSON. A backstop like refuseCommand, not a sandbox: a command
+ * that builds the path at run time gets through, and redactSecrets catches what it prints.
+ * @returns why the command is refused, or null when it may run
+ */
+export function refuseSecretAccess(command: string): string | null {
+  const lower = command.toLowerCase();
+  for (const folder of [APP_DATA_FOLDER, ...LEGACY_APP_DATA_FOLDERS]) {
+    if (lower.includes(folder)) {
+      return `${folder}/ holds this app's API keys, sign-ins, chats and settings; the agent's commands can't touch it.`;
+    }
+  }
+  return null;
+}
+
+export const REDACTED = '[redacted]';
+
+/** A value that looks generated (letters and digits mixed), not a word like "auth.session.token". */
+const looksRandom = (value: string): boolean => /\d/.test(value) && /[a-z]/i.test(value);
+
+/** Well-known token formats, masked wherever they appear. */
+const TOKEN_PATTERNS: readonly RegExp[] = [
+  /-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?(?:-----END [A-Z ]*PRIVATE KEY-----|$)/g,
+  /\b(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{30,}\b/g, // GitHub tokens
+  /\bgithub_pat_[A-Za-z0-9_]{30,}\b/g,
+  /\bglpat-[A-Za-z0-9_-]{20,}\b/g, // GitLab
+  /\bcrsr_[A-Za-z0-9]{20,}\b/g, // Cursor
+  /\bsk-[A-Za-z0-9_-]{20,}\b/g, // OpenAI, Anthropic, OpenRouter, DeepSeek, ...
+  /\bAKIA[0-9A-Z]{16}\b/g, // AWS access key id
+  /\bAIza[0-9A-Za-z_-]{35}\b/g, // Google API key
+  /\bxox[abposr]-[A-Za-z0-9-]{10,}\b/g, // Slack
+  /\b(?:sk|rk|pk)_(?:live|test)_[A-Za-z0-9]{16,}\b/g, // Stripe
+  /\beyJ[A-Za-z0-9_-]{8,}\.eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b/g, // JWT
+];
+
+/** The value after a name that says it's secret, as in JSON, YAML, code or an env file. */
+const SECRET_NAME = String.raw`[\w.-]*(?:api[_-]?key|secret|token|password|passwd|pwd|credential|auth[_-]?key|access[_-]?key|private[_-]?key)[\w.-]*`;
+const QUOTED_SECRET = new RegExp(
+  String.raw`(["']?${SECRET_NAME}["']?\s*[:=]\s*)(["'])([^"'\s]{8,})\2`,
+  'gi',
+);
+const ENV_SECRET = new RegExp(
+  String.raw`^(\s*(?:export\s+)?${SECRET_NAME}\s*=\s*)(?!["'])(\S{8,})`,
+  'gim',
+);
+const BEARER = /\b(Bearer|Basic|token)(\s+)([A-Za-z0-9._~+/=-]{16,})/g;
+const URL_PASSWORD = /\b([a-z][a-z0-9+.-]*:\/\/[^:@\s/]+:)([^@\s/]+)(@)/gi;
+
+/**
+ * Tool output with secrets masked, before it goes to the model, the chat file, the live
+ * stream and the logs. Known token formats are masked anywhere; other values only when a
+ * secret-sounding name comes right before them and they look generated, so ordinary code
+ * (`token: getToken()`, `password: string`) reads as it is.
+ */
+export function redactSecrets(text: string): string {
+  let out = text;
+  for (const pattern of TOKEN_PATTERNS) out = out.replace(pattern, REDACTED);
+  out = out.replace(BEARER, (_m, scheme: string, gap: string) => `${scheme}${gap}${REDACTED}`);
+  out = out.replace(
+    URL_PASSWORD,
+    (_m, start: string, _password: string, at: string) => `${start}${REDACTED}${at}`,
+  );
+  out = out.replace(QUOTED_SECRET, (match, start: string, quote: string, value: string) =>
+    value === REDACTED || !looksRandom(value) ? match : `${start}${quote}${REDACTED}${quote}`,
+  );
+  out = out.replace(ENV_SECRET, (match, start: string, value: string) =>
+    value === REDACTED || !looksRandom(value) ? match : `${start}${REDACTED}`,
+  );
+  return out;
+}
+
 // ---------- Tool output size ----------
 
 /**

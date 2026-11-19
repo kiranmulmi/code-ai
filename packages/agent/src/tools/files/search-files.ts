@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises';
 import { defineTool } from '../define.js';
 import { errorMessage } from '../../errors.js';
+import { assertNotSecretFile, isSecretFile } from '../../guardrails.js';
 import { globToRegExp, isBinary, locate, walk } from './walk.js';
 import { TOOL_LIMITS } from '@app/shared';
 
@@ -50,6 +51,7 @@ export const searchFiles = defineTool<SearchInput>({
     const fileFilter = glob ? globToRegExp(glob) : null;
     const { target, shown } = await locate(ctx, where);
     const isFolder = (await fs.stat(target)).isDirectory();
+    if (!isFolder) assertNotSecretFile(shown);
     const prefix = !isFolder || shown === '.' ? '' : `${shown}/`;
 
     const files = isFolder
@@ -61,6 +63,7 @@ export const searchFiles = defineTool<SearchInput>({
     let filesSearched = 0;
     for await (const entry of files) {
       if (entry.isDirectory || (fileFilter && !fileFilter.test(entry.relative))) continue;
+      if (isSecretFile(entry.relative)) continue; // keys and passwords stay out of matches
       const stat = await fs.stat(entry.absolute).catch(() => null);
       if (!stat?.isFile() || stat.size > MAX_FILE_BYTES) continue;
       const buffer = await fs.readFile(entry.absolute).catch(() => null);

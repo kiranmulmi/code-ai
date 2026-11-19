@@ -1,5 +1,6 @@
 import fs from 'node:fs/promises';
 import { defineTool } from '../define.js';
+import { assertNotSecretFile } from '../../guardrails.js';
 import { isBinary, locate } from './walk.js';
 import { TOOL_LIMITS } from '@app/shared';
 
@@ -25,6 +26,7 @@ export const readFile = defineTool<{ path: string; start_line?: number; end_line
   optional: ['start_line', 'end_line'],
   async run({ path: file, start_line: startLine, end_line: endLine }, ctx) {
     const { target, shown } = await locate(ctx, file);
+    assertNotSecretFile(shown);
     const stat = await fs.stat(target);
     if (stat.isDirectory()) throw new Error(`"${shown}" is a folder; use list_files instead.`);
     if (stat.size > MAX_FILE_BYTES) {

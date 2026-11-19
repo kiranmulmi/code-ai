@@ -1,7 +1,7 @@
 import { spawn } from 'node:child_process';
 import fs from 'node:fs/promises';
 import { defineTool } from './define.js';
-import { commandEnv, refuseCommand } from '../guardrails.js';
+import { commandEnv, refuseCommand, refuseSecretAccess } from '../guardrails.js';
 import { locate } from './files/walk.js';
 import { BoundedOutput, isProcessGroup, shellFor, signalGroup } from './shell.js';
 import { TOOL_LIMITS } from '@app/shared';
@@ -55,7 +55,7 @@ export const runCommand = defineTool<CommandInput>({
   needsApproval: true,
   async run({ command, cwd = '.', timeout_seconds: timeoutSeconds, background = false }, ctx) {
     if (!command.trim()) throw new Error('The command is empty.');
-    const refusal = refuseCommand(command);
+    const refusal = refuseCommand(command) ?? refuseSecretAccess(command);
     if (refusal) throw new Error(`${refusal} This command was not run.`);
     const { target, shown } = await locate(ctx, cwd);
     if (!(await fs.stat(target)).isDirectory()) throw new Error(`"${shown}" is not a folder.`);

@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { defineTool } from '../define.js';
-import { assertCanChange } from '../../guardrails.js';
+import { assertCanChange, assertNotSecretFile } from '../../guardrails.js';
 import { locate } from './walk.js';
 
 export const copyPath = defineTool<{ from: string; to: string }>({
@@ -15,6 +15,7 @@ export const copyPath = defineTool<{ from: string; to: string }>({
   needsApproval: true,
   async run({ from, to }, ctx) {
     const source = await locate(ctx, from);
+    assertNotSecretFile(source.shown);
     const destination = await locate(ctx, to);
     await assertCanChange(destination.root, destination.target);
     const stat = await fs.stat(source.target);
