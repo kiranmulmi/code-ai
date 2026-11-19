@@ -12,7 +12,7 @@ import type { WorkspacesService } from '../workspaces/workspaces.service.js';
 /** Base64 of the largest skill folder, plus room for the paths and the rest of the JSON. */
 export const SKILL_UPLOAD_BODY_LIMIT = `${Math.ceil((SKILL_LIMITS.totalBytes * 4) / 3 / (1024 * 1024)) + 1}mb`;
 
-/** A workspace's skills (its .nimbrio-ai/skills/), written or uploaded from the Skills tab. */
+/** A workspace's skills (its .hamro-ai/<workspace>/skills/), written or uploaded from the Skills tab. */
 export function createSkillsService({ store }: AppContext, workspaces: WorkspacesService) {
   const skillsOf = async (workspaceId: string) =>
     store.skills(await workspaces.require(workspaceId));
@@ -74,7 +74,10 @@ export function createSkillsService({ store }: AppContext, workspaces: Workspace
     },
 
     /** The skills the user picked for a message, checked before the run starts. */
-    async requireAll(workspace: { path: string }, names: readonly string[]): Promise<Skill[]> {
+    async requireAll(
+      workspace: { path: string; name: string },
+      names: readonly string[],
+    ): Promise<Skill[]> {
       const skills = store.skills(workspace);
       const found = await Promise.all([...new Set(names)].map((name) => skills.get(name)));
       const missing = names.filter((name, i) => !found[i]);

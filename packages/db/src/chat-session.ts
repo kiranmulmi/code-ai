@@ -1,5 +1,5 @@
 // Runs one request in a saved chat: load the chat's state from the workspace folder
-// (.nimbrio-ai/), let the agent work with the workspace's memory, files and
+// (.hamro-ai/), let the agent work with the workspace's memory, files and
 // instructions, then save what happened. Shared by the API server and the CLI.
 import {
   createAgent,
@@ -88,7 +88,7 @@ export async function runInChat({
     // The workspace's own specialists, only read when sub-agents are on.
     specialists: agentOptions.config?.subagents ? await workspaceSpecialists(store, workspace) : [],
     extraTools: mcp ? await mcpTools(store, workspace, mcp, agentOptions) : [],
-    tasks: tasks?.forWorkspace(workspace.path, chat.id),
+    tasks: tasks?.forWorkspace(workspace.id, chat.id),
   });
 
   const fromSeq = rows.length;
@@ -138,7 +138,7 @@ async function mcpTools(
         `${state.file} changed outside the app, so its MCP servers stay off until you approve it in the MCP tab.`,
       );
     }
-    const { tools } = await hub.tools(workspace.path, runnableMcpServers(servers, state));
+    const { tools } = await hub.tools(workspace, runnableMcpServers(servers, state));
     return tools;
   } catch (error) {
     logger?.warn(`MCP servers are off for this message: ${errorMessage(error)}`);
@@ -224,6 +224,12 @@ function summarizedCount(rows: readonly ChatMessage[], index: number, upTo: numb
   return count;
 }
 
+/** How long a saved run took, or null when its times can't be read. */
+function runDurationMs(run: RunRecord): number | null {
+  const ms = Date.parse(run.finishedAt) - Date.parse(run.startedAt);
+  return Number.isFinite(ms) && ms >= 0 ? ms : null;
+}
+
 /** A chat's messages as bubbles for the UI, with each run's steps and tokens. */
 export function historyForUi(
   rows: readonly ChatMessage[],
@@ -243,6 +249,7 @@ export function historyForUi(
         cacheWriteTokens: run.cacheWriteTokens,
         calls: run.calls,
         finishedAt: run.finishedAt,
+        durationMs: runDurationMs(run),
       });
     }
   };

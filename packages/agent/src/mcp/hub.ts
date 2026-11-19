@@ -12,7 +12,7 @@ import {
   ToolListChangedNotificationSchema,
   type Tool as McpTool,
 } from '@modelcontextprotocol/sdk/types.js';
-import { MCP_LIMITS, mcpTransportOf, type McpServerConfig } from '@app/shared';
+import { MCP_LIMITS, mcpTransportOf, type McpServerConfig, type Workspace } from '@app/shared';
 import { errorCode, errorMessage } from '../errors.js';
 import type { AgentLogger } from '../logger.js';
 import type { AnyTool } from '../tools/define.js';
@@ -42,8 +42,16 @@ export interface McpHubOptions {
   retryMs?: number;
 }
 
+/**
+ * Whose servers: connections are kept per workspace `id` (several workspaces can share a
+ * folder, each with its own servers), and local servers run in its `path`.
+ */
+export type McpWorkspace = Pick<Workspace, 'id' | 'path'>;
+
 interface Connection {
   fingerprint: string;
+  /** the folder a local server runs in; a moved workspace's server starts again */
+  folder: string;
   client: Client | null;
   starting: Promise<void> | null;
   tools: McpTool[];
@@ -54,11 +62,11 @@ interface Connection {
   stderr: string[];
 }
 
-const CLIENT_INFO = { name: 'nimbrio-ai', version: '0.1.0' };
+const CLIENT_INFO = { name: 'hamro-ai', version: '0.1.0' };
 const MAX_TOOLS_PER_SERVER = MCP_LIMITS.maxToolsPerServer;
 const STDERR_LINES = MCP_LIMITS.stderrLines;
 
-const key = (folder: string, name: string) => `${folder}\u0000${name}`;
+const key = (workspaceId: string, name: string) => `${workspaceId}\u0000${name}`;
 
 export class McpHub {
   readonly #connections = new Map<string, Connection>();
@@ -85,13 +93,13 @@ export class McpHub {
    * approved servers.
    */
   async connect(
-    folder: string,
+    workspace: McpWorkspace,
     servers: Readonly<Record<string, McpServerConfig>>,
   ): Promise<McpServerReport[]> {
-    await this.#closeOthers(folder, new Set(Object.keys(servers)));
+    await this.#closeOthers(workspace.id, new Set(Object.keys(servers)));
     return Promise.all(
       Object.entries(servers).map(async ([name, server]): Promise<McpServerReport> => {
-        const connection = await this.#ensure(folder, name, server);
+        const connection = await this.#ensure(workspace, name, server);
         return {
           name,
           state: connection.client ? 'connected' : 'error',
@@ -107,12 +115,12 @@ export class McpHub {
 
   /** The servers' tools, for createAgent({ extraTools }), and how each server is doing. */
   async tools(
-    folder: string,
+    workspace: McpWorkspace,
     servers: Readonly<Record<string, McpServerConfig>>,
   ): Promise<{ tools: AnyTool[]; reports: McpServerReport[] }> {
-    const reports = await this.connect(folder, servers);
+    const reports = await this.connect(workspace, servers);
     const sources: McpToolSource[] = Object.entries(servers).flatMap(([name, server]) => {
-      const connection = this.#connections.get(key(folder, name));
+      const connection = this.#connections.get(key(workspace.id, name));
       if (!connection?.client) return [];
       return connection.tools.map((tool) => ({
         server: name,
@@ -123,19 +131,19 @@ export class McpHub {
     const tools = toAgentTools(sources, (name, tool, input) => {
       const server = servers[name];
       if (!server) throw new Error(`There is no MCP server named "${name}".`);
-      return this.#call(folder, name, server, tool, input);
+      return this.#call(workspace, name, server, tool, input);
     });
     return { tools, reports };
   }
 
   /** Stop one server; it starts again the next time it's needed. */
-  async restart(folder: string, name: string): Promise<void> {
-    await this.#close(key(folder, name));
+  async restart(workspaceId: string, name: string): Promise<void> {
+    await this.#close(key(workspaceId, name));
   }
 
   /** Stop every server of a workspace (it was deleted or moved). */
-  async closeWorkspace(folder: string): Promise<void> {
-    const prefix = key(folder, '');
+  async closeWorkspace(workspaceId: string): Promise<void> {
+    const prefix = key(workspaceId, '');
     const ids = [...this.#connections.keys()].filter((id) => id.startsWith(prefix));
     await Promise.all(ids.map((id) => this.#close(id)));
   }
@@ -148,11 +156,15 @@ export class McpHub {
 
   // ---------- Connections ----------
 
-  async #ensure(folder: string, name: string, server: McpServerConfig): Promise<Connection> {
-    const id = key(folder, name);
+  async #ensure(
+    { id: workspaceId, path: folder }: McpWorkspace,
+    name: string,
+    server: McpServerConfig,
+  ): Promise<Connection> {
+    const id = key(workspaceId, name);
     const fingerprint = fingerprintOf(server);
     let connection = this.#connections.get(id);
-    if (connection && connection.fingerprint !== fingerprint) {
+    if (connection && (connection.fingerprint !== fingerprint || connection.folder !== folder)) {
       await this.#close(id);
       connection = undefined;
     }
@@ -168,6 +180,7 @@ export class McpHub {
 
     const current: Connection = connection ?? {
       fingerprint,
+      folder,
       client: null,
       starting: null,
       tools: [],
@@ -269,13 +282,13 @@ export class McpHub {
   }
 
   async #call(
-    folder: string,
+    workspace: McpWorkspace,
     name: string,
     server: McpServerConfig,
     tool: string,
     input: Record<string, unknown>,
   ): Promise<unknown> {
-    const connection = await this.#ensure(folder, name, server);
+    const connection = await this.#ensure(workspace, name, server);
     if (!connection.client) {
       throw new Error(`The MCP server "${name}" isn't running: ${connection.error ?? ''}`.trim());
     }
@@ -299,8 +312,8 @@ export class McpHub {
     await client?.close().catch(() => {});
   }
 
-  async #closeOthers(folder: string, keep: ReadonlySet<string>): Promise<void> {
-    const prefix = key(folder, '');
+  async #closeOthers(workspaceId: string, keep: ReadonlySet<string>): Promise<void> {
+    const prefix = key(workspaceId, '');
     const ids = [...this.#connections.keys()].filter(
       (id) => id.startsWith(prefix) && !keep.has(id.slice(prefix.length)),
     );

@@ -71,6 +71,15 @@ export function formatDuration(seconds: number): string {
   return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, '0')}`;
 }
 
+/** "8s", "1m 05s", "1h 02m": a live elapsed time, ticking each second. */
+export function formatElapsed(seconds: number): string {
+  const whole = Math.max(0, Math.floor(seconds));
+  if (whole < 60) return `${whole}s`;
+  const pad = (n: number) => String(n).padStart(2, '0');
+  if (whole < 3600) return `${Math.floor(whole / 60)}m ${pad(whole % 60)}s`;
+  return `${Math.floor(whole / 3600)}h ${pad(Math.floor((whole % 3600) / 60))}m`;
+}
+
 export function hostOf(url: unknown): string {
   if (typeof url !== 'string') return 'a page';
   try {

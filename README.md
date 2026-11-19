@@ -1,4 +1,4 @@
-# Nimbrio AI
+# Hamro AI
 
 A prompt-driven agent written in TypeScript that works with any OpenAI-compatible API: OpenAI, Ollama, LM Studio, OpenRouter, Groq, vLLM and others. There is no hard-coded routing. For each prompt, the model decides what to do next: answer directly, call a tool, make a plan for a multi-step task, or ask a clarifying question. It keeps deciding after every tool result until the job is done or a guardrail stops it.
 
@@ -28,36 +28,36 @@ Needs Node 22.9 or later. There is no database to install: everything is saved i
 
 ### Desktop app
 
-The same app in its own window, for people who don't want Node or a terminal. It runs the API on this machine (on `127.0.0.1:47821`) and shows the web app in an Electron window; workspaces, chats and settings are the same files in `~/.nimbrio-ai/`, so the browser and the desktop app see the same data (use one at a time on the same chat). Sign-in is always off in the desktop app.
+The same app in its own window, for people who don't want Node or a terminal. It runs the API on this machine (on `127.0.0.1:47821`) and shows the web app in an Electron window; workspaces, chats and settings are the same files in `~/.hamro-ai/`, so the browser and the desktop app see the same data (use one at a time on the same chat). Sign-in is always off in the desktop app.
 
 ```bash
 npm run desktop             # build everything and open the desktop app from this checkout
-npm run desktop:dist        # build the installer: apps/desktop/release/Nimbrio AI-<version>-mac-arm64.dmg
+npm run desktop:dist        # build the installer: apps/desktop/release/Hamro AI-<version>-mac-arm64.dmg
 ```
 
-`desktop:dist` builds for the machine it runs on (a Mac builds the macOS `.dmg`; Windows builds an `.exe` installer). The app is ad-hoc signed, not signed with an Apple Developer ID, so the first time someone opens a downloaded copy macOS blocks it: they open it from System Settings → Privacy & Security → Open Anyway. The server's log is in `~/Library/Logs/Nimbrio AI/server.log`.
+`desktop:dist` builds for the machine it runs on (a Mac builds the macOS `.dmg`; Windows builds an `.exe` installer). The app is ad-hoc signed, not signed with an Apple Developer ID, so the first time someone opens a downloaded copy macOS blocks it: they open it from System Settings → Privacy & Security → Open Anyway. The server's log is in `~/Library/Logs/Hamro AI/server.log`.
 
 ## Workspaces and storage
 
 Everything is per **workspace**: its chats, its memories, its folder and its own instructions for the agent (for example a "My app" workspace on `~/code/my-app` and a "Research" workspace on `~/notes/research`). Switch or create workspaces from the menu at the top of the sidebar; the gear opens the workspace's settings.
 
-Each workspace lives in a **folder you choose** on your machine: type the path or click **Browse…** when you create it (a missing folder is created). The agent's file tools work only inside that folder: they list, read, find, search, write, edit, create folders, move, copy and delete. Every change asks for your approval first (set **Settings → Agent → Tool approvals** to "Run without asking" to skip the prompts). Paths that lead outside the folder, the folder itself, and anything in `.git/` are refused, the app's own `.nimbrio-ai/` folder can't be read or changed by them, and the disk root or your home folder can't be a workspace.
+Each workspace lives in a **folder you choose** on your machine: type the path or click **Browse…** when you create it (a missing folder is created). The agent's file tools work only inside that folder: they list, read, find, search, write, edit, create folders, move, copy and delete. Every change asks for your approval first (set **Settings → Agent → Tool approvals** to "Run without asking" to skip the prompts). Paths that lead outside the folder, the folder itself, and anything in `.git/` are refused, the app's own `.hamro-ai/` folder can't be read or changed by them, and the disk root or your home folder can't be a workspace.
 
 The agent can also **run commands** (`run_command`): bash in the workspace folder, for installs, tests, builds, linters, scripts and git. Every command asks for approval, gets no input, stops at a timeout (120 s by default, 600 s at most) and has anything it left running in the background stopped when it ends. Commands never see this app's own settings (`.env` values, model API keys, ...). A few commands are refused even when approvals are off: `sudo`/`su`, recursive deletes of `/`, `~` or `..`, formatting disks, shutting down, and piping a download into a shell. This is a backstop, not a sandbox: a command runs with your user's permissions, so read what you approve.
 
-**Attach files** in the chat with the paperclip, by dropping them on the message box or by pasting (a screenshot, say): images, PDFs, Word documents (`.docx`) and text files such as code, CSV, JSON or Markdown, up to 10 per message and 15 MB each. They upload right away and are kept privately in the workspace's `.nimbrio-ai/uploads/`, not in your project. The agent reads them with its own tools: `read_attachment` (the text of a PDF page by page, a Word document, or a text file), `view_image` (shows an image to the model; this needs a model that can see images) and `save_attachment` (copies one into the workspace folder, with your approval, e.g. to put an uploaded logo into a site).
+**Attach files** in the chat with the paperclip, by dropping them on the message box or by pasting (a screenshot, say): images, PDFs, Word documents (`.docx`) and text files such as code, CSV, JSON or Markdown, up to 10 per message and 15 MB each. They upload right away and are kept privately in the workspace's `.hamro-ai/<workspace>/uploads/`, not in your project. The agent reads them with its own tools: `read_attachment` (the text of a PDF page by page, a Word document, or a text file), `view_image` (shows an image to the model; this needs a model that can see images) and `save_attachment` (copies one into the workspace folder, with your approval, e.g. to put an uploaded logo into a site).
 
-There is no database. The app's own data is global to your machine, so it's kept in files in your home folder, `~/.nimbrio-ai/` (written readable only by you, since some hold API keys and tokens). Run logs (JSONL, for debugging) go to `~/.nimbrio-ai/logs/`; set `AGENT_LOG_DIR` to move them. The app used to be called agentic-ai: on start it moves any old `~/.agentic-ai/` and workspace `.agentic-ai/` folders to the new name.
+There is no database. The app's own data is global to your machine, so it's kept in files in your home folder, `~/.hamro-ai/` (written readable only by you, since some hold API keys and tokens). Run logs (JSONL, for debugging) go to `~/.hamro-ai/logs/`; set `AGENT_LOG_DIR` to move them. The app used to be called agentic-ai: on start it moves any old `~/.agentic-ai/` and workspace `.agentic-ai/` folders to the new name.
 
-| File                  | Holds                                                                   |
-| --------------------- | ----------------------------------------------------------------------- |
-| `workspaces.json`     | the list of workspaces: id, name, folder path                           |
-| `models.json`         | the models (Settings → Models), with their API keys                     |
-| `agent-settings.json` | how the agent behaves (Settings → Agent)                                |
-| `mcp-servers.json`    | MCP servers in the `{ "mcpServers": … }` shape, turned on per workspace |
-| `mcp-trust.json`      | which workspace `mcp.json` files you approved                           |
+| File                  | Holds                                                                    |
+| --------------------- | ------------------------------------------------------------------------ |
+| `workspaces.json`     | the list of workspaces: id, name, folder path                            |
+| `models.json`         | the models (Settings → Models), with their API keys                      |
+| `agent-settings.json` | how the agent behaves (Settings → Agent)                                 |
+| `mcp-servers.json`    | MCP servers in the `{ "mcpServers": … }` shape, turned on per workspace  |
+| `mcp-trust.json`      | which workspace `mcp.json` files you approved (by workspace data folder) |
 
-Everything else is saved in the workspace's own folder, under `.nimbrio-ai/` (it ignores itself in git, and file tools can't reach it). Changing a workspace's folder moves it along; deleting a workspace deletes it, and leaves the rest of the folder alone.
+Everything else is saved in the workspace's own folder, under `.hamro-ai/<workspace>/` (`.hamro-ai/` ignores itself in git, and file tools can't reach it). `<workspace>` is the workspace's name made folder-safe: lowercase letters and digits, accents dropped, any other run of characters one `-`, at most 64 long ("Client Site / v2" is `client-site-v2/`; a name with no letters or digits, such as one in another script, gets `workspace-` and 8 characters from the name). So **several workspaces can use the same folder**, each with its own chats, memory, settings, uploads, skills, agents and MCP choices, as long as their names don't give the same folder name ("Foo" and "foo!" can't share a folder). Renaming a workspace or changing its folder moves its data along; deleting a workspace deletes only its own `.hamro-ai/<workspace>/` (and `.hamro-ai/` once nothing else is in it), and leaves the rest of the folder and other workspaces' data alone.
 
 | File                        | Holds                                                   |
 | --------------------------- | ------------------------------------------------------- |
@@ -71,7 +71,9 @@ Everything else is saved in the workspace's own folder, under `.nimbrio-ai/` (it
 | `skills/<name>.md`          | a skill: name and description up top, then the steps    |
 | `agents/<name>.md`          | a specialist sub-agent, from the Agents tab             |
 
-Adding a folder that already has a `.nimbrio-ai/` folder (say, after deleting the workspace from the list, or on a new machine) brings its chats, memory and settings back.
+Adding a workspace with the same name on a folder that still has its `.hamro-ai/<workspace>/` (say, after deleting the workspace from the list, or on a new machine) brings its chats, memory and settings back.
+
+Before, a folder had one workspace and its files sat right in `.hamro-ai/`. On start the app moves them into `.hamro-ai/<workspace>/` of the listed workspace using that folder (along with your approval of its `mcp.json`); a file the new place already has is left where it was, so nothing is overwritten or lost.
 
 ## How a prompt flows
 
@@ -109,7 +111,7 @@ This is a hybrid of the two common agent patterns: **plan-and-execute** for big 
 - **New chat** starts another chat in the same workspace. The workspace's memories are kept.
 - **Per-workspace planning and tools:** in a workspace's settings, Planning follows Settings → Agent or is on or off just there, and Tools turns off groups it doesn't need (files, commands, web, memory, plans). Off groups' tools and prompt rules aren't sent, so a chat-only workspace (a language tutor, say) uses far fewer tokens per message. Attachment and skill tools are only sent when a chat has files or the workspace has skills.
 - **MCP tools on demand:** the MCP servers you turn on in a workspace are listed to the agent by tool name only; it loads the full definitions of the tools a task needs (`load_mcp_tools`) and only those are sent from then on. A plain message doesn't pay for a server's tools (Atlassian's are ~25K tokens).
-- **Skills:** instructions you write for a kind of task (a ticket workflow, a review checklist) in the Skills tab under the side panel. The agent sees each skill's name and description and loads the one a task needs with `use_skill`; to choose yourself, pick skills for a message with the Skills button in the message box, and they're sent with it in full. A skill guides how the agent works; it never turns approvals off. To give a skill files of its own (references, templates, stylesheets), click **Upload** in the Skills tab and pick a skill folder with a `SKILL.md` at its top (front matter `name` and `description`, then the instructions), such as one from `~/.claude/skills/`. It is kept as `.nimbrio-ai/skills/<name>/`; the agent reads its files with `read_skill_file` and copies them into the project with `copy_skill_file` (which asks first).
+- **Skills:** instructions you write for a kind of task (a ticket workflow, a review checklist) in the Skills tab under the side panel. The agent sees each skill's name and description and loads the one a task needs with `use_skill`; to choose yourself, pick skills for a message with the Skills button in the message box, and they're sent with it in full. A skill guides how the agent works; it never turns approvals off. To give a skill files of its own (references, templates, stylesheets), click **Upload** in the Skills tab and pick a skill folder with a `SKILL.md` at its top (front matter `name` and `description`, then the instructions), such as one from `~/.claude/skills/`. It is kept as `.hamro-ai/<workspace>/skills/<name>/`; the agent reads its files with `read_skill_file` and copies them into the project with `copy_skill_file` (which asks first).
 - **Sub-agents (a team of specialists):** turn on Sub-agents in Settings → Agent and the agent can hand self-contained parts of a task to specialists with `delegate_task`, each working in a fresh context and reporting back:
 
   | Specialist   | Tools              | Notes                                               |
@@ -125,7 +127,7 @@ This is a hybrid of the two common agent patterns: **plan-and-execute** for big 
   - **Team notes:** while a request runs, the agent and its sub-agents share notes (`post_note`, `read_notes`): a researcher posts what it found, and the writer reads it, without everything passing through the main agent's context. They start empty with each message and aren't saved.
   - **At the same time:** several `delegate_task` calls in one step run in parallel, up to **Parallel sub-agents** in Settings → Agent (1–8, default 3); the rest wait their turn. They split the message's remaining token budget, so parallel work can't overspend it. Their approval prompts and questions take turns, so you answer one at a time.
   - **In the chat:** each `delegate_task` step shows its specialist and label with the sub-agent's own tool calls under it, and a sub-agent's approval card names it ("Coder “Fix tests” wants to run…"). In the CLI its lines read `[coder · Fix tests] run_command`.
-  - **Your own specialists:** open the **Agents** tab (next to Skills, under the side panel) and click **New specialist**: a name, when to use it, which tool groups it gets, read-only, which model, and its role. Click a built-in to start from a copy of it. It is used from the next message. A file in the agents folder that can't be used shows at the top of the tab with why (no description, an unknown tool group, a bad file name, a link…), with **Fix**, which rewrites it from the form, and delete. Each one is kept as `.nimbrio-ai/agents/<name>.md`, so you can also write the file yourself:
+  - **Your own specialists:** open the **Agents** tab (next to Skills, under the side panel) and click **New specialist**: a name, when to use it, which tool groups it gets, read-only, which model, and its role. Click a built-in to start from a copy of it. It is used from the next message. A file in the agents folder that can't be used shows at the top of the tab with why (no description, an unknown tool group, a bad file name, a link…), with **Fix**, which rewrites it from the form, and delete. Each one is kept as `.hamro-ai/<workspace>/agents/<name>.md`, so you can also write the file yourself:
 
     ```markdown
     ---
@@ -152,7 +154,7 @@ The API only listens on 127.0.0.1, so other devices on your network can't reach 
 An npm-workspaces monorepo. Apps are things you run; packages are libraries they share.
 
 ```
-nimbrio-ai/
+hamro-ai/
 ├── apps/
 │   ├── api/                Express API (@app/api): /v1 REST + a server-sent-events run stream
 │   │   └── src/            app.ts, index.ts, config/, middleware/, lib/, features/<feature>/
@@ -172,7 +174,7 @@ nimbrio-ai/
 │   │   ├── src/tools/      one file per tool + index.ts registry (files/: the file tools)
 │   │   ├── test/           free tests with a fake model
 │   │   └── evals/          behaviour checks against the real model
-│   ├── db/                 storage (@app/db), files only: ~/.nimbrio-ai workspace list and settings, .nimbrio-ai folder data, Store, runInChat
+│   ├── db/                 storage (@app/db), files only: ~/.hamro-ai workspace list and settings, .hamro-ai folder data, Store, runInChat
 │   ├── shared/             contracts shared by API, web and agent (@app/shared): types, Zod schemas
 │   ├── tsconfig/           shared TypeScript configs
 │   └── eslint-config/      shared ESLint config
@@ -209,13 +211,13 @@ Models are set up in the app, under **Settings → Models** (the "Models" link i
 
 In the chat, the message box has a model picker and, for reasoning models, an effort picker; the choice is remembered in the browser. One model is the **default**: it is used when none is picked and by the CLI (`npm run cli -- --model NAME` picks another; `/models`, `/model NAME` and `/effort low|medium|high|off` switch while chatting).
 
-The model **must support tool (function) calling**, or the agent can only chat and can't use tools or plans. API keys are stored in `~/.nimbrio-ai/models.json` (readable only by you) and are never sent back to the browser; the UI only shows whether a key is saved.
+The model **must support tool (function) calling**, or the agent can only chat and can't use tools or plans. API keys are stored in `~/.hamro-ai/models.json` (readable only by you) and are never sent back to the browser; the UI only shows whether a key is saved.
 
 For web search, set **Settings → Agent → SearXNG URL** (default `http://localhost:8080`) to a SearXNG instance with the JSON format turned on (`search.formats: [html, json]` in its `settings.yml`).
 
 ## Agent settings
 
-Everything about how the agent behaves is set in the app under **Settings → Agent**, saved in `~/.nimbrio-ai/agent-settings.json` and applied from the next message (no restart): tool approvals (ask / run without asking / refuse), planning on or off, max model calls, the token budget and longest message per prompt, sub-agents (on/off, their model, how many work at once), answer review, the SearXNG URL and the console log level. The CLI reads the same settings. `.env` is optional and keeps only server options: `PORT`, `CORS_ORIGIN`, `LOG_LEVEL` (HTTP logs) and `AGENT_LOG_DIR`, plus the `EVAL_*` values for evals.
+Everything about how the agent behaves is set in the app under **Settings → Agent**, saved in `~/.hamro-ai/agent-settings.json` and applied from the next message (no restart): tool approvals (ask / run without asking / refuse), planning on or off, max model calls, the token budget and longest message per prompt, sub-agents (on/off, their model, how many work at once), answer review, the SearXNG URL and the console log level. The CLI reads the same settings. `.env` is optional and keeps only server options: `PORT`, `CORS_ORIGIN`, `LOG_LEVEL` (HTTP logs) and `AGENT_LOG_DIR`, plus the `EVAL_*` values for evals.
 
 Evals (`npm run eval`) don't read the app's saved models, so they take their model from `EVAL_MODEL`, `EVAL_BASE_URL` and `EVAL_API_KEY` in `.env`.
 

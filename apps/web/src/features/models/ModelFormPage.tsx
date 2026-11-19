@@ -352,7 +352,7 @@ export function ModelFormPage() {
           <p className={TIP}>
             {isKeyRemoved
               ? 'The saved key is removed when you save.'
-              : 'Kept in ~/.nimbrio-ai/models.json, readable only by you, sent only to this server, and never shown again.'}
+              : 'Kept in ~/.hamro-ai/models.json, readable only by you, sent only to this server, and never shown again.'}
           </p>
         </div>
 

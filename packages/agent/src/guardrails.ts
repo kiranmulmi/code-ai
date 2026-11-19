@@ -136,22 +136,23 @@ export class Budget {
  * subfolder. File tools can't read or change it: the history and memory are only
  * reachable through the app, so the model can't rewrite or wipe them.
  */
-export const APP_DATA_FOLDER = '.nimbrio-ai';
+export const APP_DATA_FOLDER = '.hamro-ai';
 
 /**
- * The data folder's name before the app was renamed. @app/db moves it to APP_DATA_FOLDER on
- * start; until then (or when both existed) file tools can't reach it either.
+ * The data folder's names before the app was renamed (agentic-ai, then Nimbrio AI), newest
+ * first. @app/db moves them to APP_DATA_FOLDER on start; until then (or when both existed)
+ * file tools can't reach them either.
  */
-export const LEGACY_APP_DATA_FOLDER = '.agentic-ai';
+export const LEGACY_APP_DATA_FOLDERS: readonly string[] = ['.nimbrio-ai', '.agentic-ai'];
 
 /**
- * Whether a relative path goes through an APP_DATA_FOLDER (or its old name), at any depth (a
+ * Whether a relative path goes through an APP_DATA_FOLDER (or an old name), at any depth (a
  * workspace nested in another keeps its own) and in any letter case (macOS disks ignore case).
  */
 export function isInAppData(relativePath: string): boolean {
   return relativePath.split(/[\\/]/).some((part) => {
     const name = part.toLowerCase();
-    return name === APP_DATA_FOLDER || name === LEGACY_APP_DATA_FOLDER;
+    return name === APP_DATA_FOLDER || LEGACY_APP_DATA_FOLDERS.includes(name);
   });
 }
 

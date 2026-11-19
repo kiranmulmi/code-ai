@@ -103,10 +103,12 @@ export const folderCheckQuerySchema = z.object({
   path: z.string().max(LIMITS.folderPath),
   /** the workspace being edited; missing for a new workspace */
   workspaceId: z.string().uuid().optional(),
+  /** the name it will have: workspaces on one folder need names with different slugs */
+  name: z.string().max(LIMITS.workspaceName).optional(),
 });
 
 export interface FolderCheck {
-  /** why the folder can't be used (e.g. another workspace uses it), or null; nothing is created */
+  /** why the folder can't be used (e.g. another workspace there has a too similar name), or null; nothing is created */
   problem: string | null;
 }
 

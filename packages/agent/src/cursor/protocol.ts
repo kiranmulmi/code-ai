@@ -20,7 +20,7 @@ import {
 } from './wire.js';
 
 /** The name our tools go by on Cursor's side, as one MCP server. */
-export const MCP_SERVER = 'nimbrio';
+export const MCP_SERVER = 'hamro';
 
 export interface CursorTool {
   name: string;
@@ -372,7 +372,7 @@ export function kvReply(request: KvRequest, blobs: Map<string, Buffer>): Buffer 
   return frame(messageField(ACM_KV_CLIENT, parts));
 }
 
-const DECLINED = "That tool isn't available here. Use the tools of the nimbrio MCP server instead.";
+const DECLINED = "That tool isn't available here. Use the tools of the hamro MCP server instead.";
 
 /**
  * Declines one of Cursor's own tools, so the model uses ours. The common ones get their typed

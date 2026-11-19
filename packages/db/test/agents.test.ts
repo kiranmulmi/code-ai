@@ -1,4 +1,4 @@
-// Offline tests for a workspace's own specialist sub-agents: .nimbrio-ai/agents/<name>.md.
+// Offline tests for a workspace's own specialist sub-agents: .hamro-ai/<workspace>/agents/<name>.md.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
@@ -15,7 +15,10 @@ import {
 } from '../src/workspace-agents.js';
 
 async function tempAgents(files: Record<string, string> = {}): Promise<WorkspaceAgents> {
-  const agents = new WorkspaceAgents(await fs.mkdtemp(path.join(os.tmpdir(), 'agents-test-')));
+  const agents = new WorkspaceAgents(
+    await fs.mkdtemp(path.join(os.tmpdir(), 'agents-test-')),
+    'Agents Test',
+  );
   if (Object.keys(files).length) await fs.mkdir(agents.dir, { recursive: true });
   for (const [name, text] of Object.entries(files)) {
     await fs.writeFile(path.join(agents.dir, name), text);
@@ -143,7 +146,7 @@ test('a saved specialist is written with every field and reads back the same', a
     "---\nname: security-auditor\ndescription: Checking code for security problems.\ntools: files, web\nread_only: true\nmodel: review\n---\n\nYou are the team's security auditor.\n",
   );
   // The data folder ignores itself in git, as for skills.
-  await fs.access(path.join(agents.folder, '.nimbrio-ai', '.gitignore'));
+  await fs.access(path.join(agents.folder, '.hamro-ai', '.gitignore'));
   // What the file says is what the agent gets.
   const parsed = parseAgentFile('x', formatAgentFile(input({ name: 'x', instructions: '' })));
   assert.ok(!('problem' in parsed));

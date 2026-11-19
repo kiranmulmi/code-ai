@@ -35,10 +35,10 @@ const TOOL_CALL_GRACE_MS = CURSOR_TIMEOUTS.toolCallGraceMs;
 
 /** Said before the conversation when there are tools: Cursor's models otherwise narrate. */
 const TOOL_DIRECTIVE = [
-  'The client has given you tools through the nimbrio MCP server.',
+  'The client has given you tools through the hamro MCP server.',
   'When a tool is needed, issue the actual tool call; do not describe what you are about to do and stop.',
   'Answer directly only when no tool is needed. Call each operation once, then continue after its result.',
-  "Use only the nimbrio tools; Cursor's built-in tools are not available here.",
+  "Use only the hamro tools; Cursor's built-in tools are not available here.",
 ].join('\n');
 
 export function createCursorModelCaller(settings: ModelSettings): CallModel {

@@ -63,6 +63,7 @@ test('a saved chat shows each reply once, a steered message joining the run it w
       cacheWriteTokens: 0,
       calls,
       finishedAt: null,
+      durationMs: null,
     }) as const;
   const detail: ChatDetail = {
     chat: {

@@ -1,4 +1,4 @@
-// The models the agent can run on, app-wide, in ~/.nimbrio-ai/models.json (written 0600).
+// The models the agent can run on, app-wide, in ~/.hamro-ai/models.json (written 0600).
 // API keys are kept there and only ever leave through `settingsFor`, for a run on this
 // machine; the UI sees `hasApiKey`. A Cursor model keeps no key: `settingsFor` gives it the
 // token of the Cursor sign-in (Settings → Model providers).

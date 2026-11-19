@@ -1,12 +1,13 @@
-// Offline tests for the files each workspace keeps in <folder>/.nimbrio-ai (no server needed).
+// Offline tests for the files each workspace keeps in <folder>/.hamro-ai/<workspace> (no server
+// needed).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import type { ChatMessage } from '@app/agent';
-import { TOOL_RESULT_PREVIEW_CHARS } from '@app/shared';
-import { WorkspaceData } from '../src/workspace-data.js';
+import { TOOL_RESULT_PREVIEW_CHARS, workspaceSlug } from '@app/shared';
+import { WorkspaceData, workspaceDataDir } from '../src/workspace-data.js';
 import { WorkspaceAttachments, cleanFileName } from '../src/attachments.js';
 import { historyForUi } from '../src/chat-session.js';
 
@@ -52,9 +53,9 @@ const run = {
   startedAt: new Date(),
 };
 
-test('settings, chats, messages and runs are saved under .nimbrio-ai', async () => {
+test('settings, chats, messages and runs are saved under .hamro-ai', async () => {
   const folder = await tempFolder();
-  const data = new WorkspaceData(folder);
+  const data = new WorkspaceData(folder, 'Test');
   const defaults = {
     instructions: '',
     planning: 'default',
@@ -84,7 +85,7 @@ test('settings, chats, messages and runs are saved under .nimbrio-ai', async () 
   });
   // Hand-edited values the app doesn't know fall back instead of breaking the workspace.
   await fs.writeFile(
-    path.join(folder, '.nimbrio-ai', 'settings.json'),
+    path.join(folder, '.hamro-ai', 'test', 'settings.json'),
     JSON.stringify({
       instructions: 'x',
       planning: 'sometimes',
@@ -104,7 +105,7 @@ test('settings, chats, messages and runs are saved under .nimbrio-ai', async () 
   });
   // An older file's single hasCodingTabs switch turns on both tabs, and isn't written back.
   await fs.writeFile(
-    path.join(folder, '.nimbrio-ai', 'settings.json'),
+    path.join(folder, '.hamro-ai', 'test', 'settings.json'),
     JSON.stringify({ instructions: 'x', hasCodingTabs: true }),
   );
   assert.deepEqual(await data.readSettings(), {
@@ -117,17 +118,18 @@ test('settings, chats, messages and runs are saved under .nimbrio-ai', async () 
   });
   await data.writeSettings({ hasGitTab: false });
   const rewritten = JSON.parse(
-    await fs.readFile(path.join(folder, '.nimbrio-ai', 'settings.json'), 'utf8'),
+    await fs.readFile(path.join(folder, '.hamro-ai', 'test', 'settings.json'), 'utf8'),
   ) as Record<string, unknown>;
   assert.equal(rewritten.hasTerminalTab, true);
   assert.equal(rewritten.hasGitTab, false);
   assert.ok(!('hasCodingTabs' in rewritten), 'the old key is dropped on save');
   await data.writeSettings({ instructions: 'Be brief.', planning: 'default', disabledTools: [] });
   assert.equal(
-    await fs.readFile(path.join(folder, '.nimbrio-ai', '.gitignore'), 'utf8'),
+    await fs.readFile(path.join(folder, '.hamro-ai', '.gitignore'), 'utf8'),
     "# This app's chats, memory and settings. Keep them out of git.\n*\n",
     'the folder keeps itself out of git',
   );
+  await fs.access(path.join(folder, '.hamro-ai', 'test', '.gitignore'));
 
   const chat = await data.createChat('First');
   const messages: ChatMessage[] = [
@@ -193,7 +195,7 @@ test('settings, chats, messages and runs are saved under .nimbrio-ai', async () 
   assert.equal(meta.calls.length, 2, 'the chat gets each call for the usage breakdown');
 
   // A record saved before calls were kept still loads, with none.
-  const runsFile = path.join(folder, '.nimbrio-ai', 'chats', chat.id, 'runs.jsonl');
+  const runsFile = path.join(folder, '.hamro-ai', 'test', 'chats', chat.id, 'runs.jsonl');
   const { calls: _calls, ...older } = JSON.parse((await fs.readFile(runsFile, 'utf8')).trim()) as {
     calls: unknown;
   };
@@ -229,7 +231,7 @@ test('settings, chats, messages and runs are saved under .nimbrio-ai', async () 
   assert.deepEqual([repaired?.inputTokens, repaired?.outputTokens], [9000, 100]);
 
   const lines = await fs.readFile(
-    path.join(folder, '.nimbrio-ai', 'chats', chat.id, 'messages.jsonl'),
+    path.join(folder, '.hamro-ai', 'test', 'chats', chat.id, 'messages.jsonl'),
     'utf8',
   );
   assert.equal(lines.trimEnd().split('\n').length, 5, 'one line per message');
@@ -238,7 +240,7 @@ test('settings, chats, messages and runs are saved under .nimbrio-ai', async () 
 });
 
 test('last chat activity is the newest chat update, or null with no chats', async () => {
-  const data = new WorkspaceData(await tempFolder());
+  const data = new WorkspaceData(await tempFolder(), 'Test');
   assert.equal(await data.lastChatActivity(), null);
   const older = await data.createChat('older');
   const newer = await data.createChat('newer');
@@ -248,7 +250,7 @@ test('last chat activity is the newest chat update, or null with no chats', asyn
 });
 
 test('a save that would skip or repeat messages is refused', async () => {
-  const data = new WorkspaceData(await tempFolder());
+  const data = new WorkspaceData(await tempFolder(), 'Test');
   const chat = await data.createChat('x');
   await data.saveRun(chat.id, {
     fromSeq: 0,
@@ -269,7 +271,7 @@ test('a save that would skip or repeat messages is refused', async () => {
 });
 
 test('renaming during a save keeps both changes', async () => {
-  const data = new WorkspaceData(await tempFolder());
+  const data = new WorkspaceData(await tempFolder(), 'Test');
   const chat = await data.createChat('Old title');
   await Promise.all([
     data.saveRun(chat.id, {
@@ -286,26 +288,26 @@ test('renaming during a save keeps both changes', async () => {
 });
 
 test('concurrent memory writes are all kept', async () => {
-  const memory = new WorkspaceData(await tempFolder()).memory();
+  const memory = new WorkspaceData(await tempFolder(), 'Test').memory();
   await Promise.all(['one', 'two', 'three', 'four'].map((fact) => memory.add(fact)));
   assert.deepEqual((await memory.all()).map((m) => m.fact).sort(), ['four', 'one', 'three', 'two']);
 });
 
 test('chat ids must be UUIDs, so they can never point outside the chats folder', async () => {
-  const data = new WorkspaceData(await tempFolder());
+  const data = new WorkspaceData(await tempFolder(), 'Test');
   await assert.rejects(data.loadMessages('../../etc'), /Not a chat id/);
 });
 
 test('the data moves with the workspace, and removing it leaves the other files', async () => {
   const from = await tempFolder();
   const to = await tempFolder();
-  const data = new WorkspaceData(from);
+  const data = new WorkspaceData(from, 'Test');
   const chat = await data.createChat('Moving');
   await data.memory().add('a fact');
   await fs.writeFile(path.join(from, 'notes.txt'), 'mine');
 
-  await data.moveTo(to);
-  const moved = new WorkspaceData(to);
+  await data.moveTo(to, 'Test');
+  const moved = new WorkspaceData(to, 'Test');
   assert.equal((await moved.readChat(chat.id))?.title, 'Moving');
   assert.deepEqual(
     (await moved.memory().all()).map((m) => m.fact),
@@ -318,15 +320,75 @@ test('the data moves with the workspace, and removing it leaves the other files'
   assert.equal(await fs.readFile(path.join(from, 'notes.txt'), 'utf8'), 'mine');
 });
 
+test('a workspace slug is a readable, safe folder name', () => {
+  assert.equal(workspaceSlug('Client Site / v2'), 'client-site-v2');
+  assert.equal(workspaceSlug('  My   App!! '), 'my-app');
+  assert.equal(workspaceSlug('Foo'), workspaceSlug('foo!'), 'case and symbols only: the same');
+  assert.equal(workspaceSlug('Café Déjà-vu'), 'cafe-deja-vu', 'accents are dropped');
+  assert.equal(workspaceSlug('../../etc/passwd'), 'etc-passwd');
+  assert.equal(workspaceSlug('a\\b'), 'a-b');
+  assert.equal(workspaceSlug('Chats'), 'chats-workspace', "never one of a workspace's own folders");
+  for (const name of ['..', '.', '', '!!!', '日本語', 'Привет']) {
+    const slug = workspaceSlug(name);
+    assert.match(slug, /^workspace-[0-9a-f]{8}$/, `fallback for ${JSON.stringify(name)}`);
+    assert.equal(workspaceSlug(name), slug, 'the same every time');
+  }
+  assert.notEqual(
+    workspaceSlug('日本語'),
+    workspaceSlug('Привет'),
+    'different names, different slugs',
+  );
+  const long = workspaceSlug(`${'a'.repeat(63)}-b-c`);
+  assert.equal(long, 'a'.repeat(63), 'capped at 64, without a trailing -');
+  assert.ok(workspaceSlug('x'.repeat(200)).length <= 64);
+  assert.equal(workspaceDataDir('/p', 'My App'), path.join('/p', '.hamro-ai', 'my-app'));
+});
+
+test('workspaces sharing a folder keep separate data, and removing one leaves the other', async () => {
+  const folder = await tempFolder();
+  const alpha = new WorkspaceData(folder, 'Alpha');
+  const beta = new WorkspaceData(folder, 'Beta Site');
+  const chatA = await alpha.createChat('A');
+  await beta.createChat('B');
+  await alpha.writeSettings({ instructions: 'alpha' });
+  await beta.memory().add('beta fact');
+  assert.deepEqual(
+    (await alpha.listChats()).map((c) => c.title),
+    ['A'],
+  );
+  assert.equal((await beta.readSettings()).instructions, '');
+  assert.deepEqual(await alpha.memory().all(), []);
+  assert.deepEqual((await fs.readdir(path.join(folder, '.hamro-ai'))).sort(), [
+    '.gitignore',
+    'alpha',
+    'beta-site',
+  ]);
+
+  // Renamed: the data moves to the new subfolder.
+  await alpha.moveTo(folder, 'Alpha 2');
+  const renamed = new WorkspaceData(folder, 'Alpha 2');
+  assert.equal((await renamed.readChat(chatA.id))?.title, 'A');
+  assert.equal(await alpha.exists(), false);
+
+  await renamed.remove();
+  assert.equal((await beta.listChats()).length, 1, "the other workspace's data stays");
+  await fs.access(path.join(folder, '.hamro-ai', '.gitignore'));
+  await beta.remove();
+  await assert.rejects(
+    fs.access(path.join(folder, '.hamro-ai')),
+    '.hamro-ai goes once only its .gitignore is left',
+  );
+});
+
 test("a removed workspace folder isn't silently created again", async () => {
   const folder = await tempFolder();
   await fs.rm(folder, { recursive: true });
-  await assert.rejects(new WorkspaceData(folder).createChat('x'), /no longer exists/);
+  await assert.rejects(new WorkspaceData(folder, 'Test').createChat('x'), /no longer exists/);
 });
 
 test('attachments are kept privately in uploads/ and saved with the message they came with', async () => {
   const folder = await tempFolder();
-  const uploads = new WorkspaceAttachments(folder);
+  const uploads = new WorkspaceAttachments(folder, 'Test');
   const pdf = await uploads.save({
     name: '../../etc/Report.pdf',
     type: '',
@@ -338,9 +400,9 @@ test('attachments are kept privately in uploads/ and saved with the message they
   assert.equal(pdf.kind, 'pdf');
   assert.deepEqual(await uploads.get(pdf.id), pdf);
   assert.equal((await uploads.read(pdf.id)).toString(), '%PDF');
-  assert.ok(uploads.filePath(pdf.id).startsWith(path.join(folder, '.nimbrio-ai', 'uploads')));
+  assert.ok(uploads.filePath(pdf.id).startsWith(path.join(folder, '.hamro-ai', 'test', 'uploads')));
   assert.ok(
-    await fs.stat(path.join(folder, '.nimbrio-ai', '.gitignore')),
+    await fs.stat(path.join(folder, '.hamro-ai', '.gitignore')),
     'the data folder keeps itself out of git',
   );
   assert.equal(await uploads.get('not-a-uuid'), null);
@@ -351,7 +413,7 @@ test('attachments are kept privately in uploads/ and saved with the message they
   );
   assert.equal(cleanFileName('\u0000\u0007'), 'file');
 
-  const data = new WorkspaceData(folder);
+  const data = new WorkspaceData(folder, 'Test');
   const chat = await data.createChat('Files');
   const messages: ChatMessage[] = [
     { role: 'user', content: 'Look\n\n[files]', display: '', attachments: [pdf] },
@@ -374,7 +436,7 @@ test('attachments are kept privately in uploads/ and saved with the message they
 
 test('a summary (context compaction) is saved, reloaded and shown as a note', async () => {
   const folder = await tempFolder();
-  const data = new WorkspaceData(folder);
+  const data = new WorkspaceData(folder, 'Test');
   const chat = await data.createChat('Long chat');
   const messages: ChatMessage[] = [
     { role: 'user', content: 'one' },
@@ -397,7 +459,7 @@ test('a summary (context compaction) is saved, reloaded and shown as a note', as
 
 test('tool results are kept and shown with their calls after a reload', async () => {
   const folder = await tempFolder();
-  const data = new WorkspaceData(folder);
+  const data = new WorkspaceData(folder, 'Test');
   const chat = await data.createChat('Tools');
   const call = (id: string, name: string) => ({
     id,
@@ -437,7 +499,7 @@ function nthUser(messages: readonly ChatMessage[], index: number) {
 }
 
 test('earlier plans are saved with the chat and kept when a save leaves them out', async () => {
-  const data = new WorkspaceData(await tempFolder());
+  const data = new WorkspaceData(await tempFolder(), 'Test');
   const chat = await data.createChat('Plans');
   assert.deepEqual(chat.earlierPlans, [], 'a new chat has none');
 
@@ -468,7 +530,7 @@ test('earlier plans are saved with the chat and kept when a save leaves them out
 
 test('a message sent mid-run is saved with its time and shown inside that run', async () => {
   const folder = await tempFolder();
-  const data = new WorkspaceData(folder);
+  const data = new WorkspaceData(folder, 'Test');
   const chat = await data.createChat('Steered');
   const sentAt = '2026-11-07T10:00:00.000Z';
   const messages: ChatMessage[] = [

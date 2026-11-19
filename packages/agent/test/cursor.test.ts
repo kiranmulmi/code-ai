@@ -307,7 +307,7 @@ test("Cursor's own tools are declined with a reason, unknown ones with the gener
     bytesOf(decodeFields(bytesOf(reply, 2) ?? Buffer.alloc(0)), 4) ?? Buffer.alloc(0),
   );
   assert.equal(stringOf(rejected, 1), 'rm -rf x');
-  assert.match(stringOf(rejected, 3), /nimbrio/);
+  assert.match(stringOf(rejected, 3), /hamro/);
 
   const unknown = decodeExecRequest(execMessage(99, [stringField(1, 'x')]));
   if (unknown?.kind !== 'builtin') return assert.fail('expected a builtin request');

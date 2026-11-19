@@ -1,6 +1,6 @@
 // A workspace's own specialist sub-agents, one Markdown file each:
 //
-//   <folder>/.nimbrio-ai/agents/<name>.md
+//   <folder>/.hamro-ai/<workspace>/agents/<name>.md
 //
 //   ---
 //   name: security-auditor
@@ -32,7 +32,6 @@ import {
   type ToolGroup,
 } from '@app/shared';
 import {
-  APP_DATA_FOLDER,
   BUILT_IN_SPECIALISTS,
   errorCode,
   serialized,
@@ -40,7 +39,7 @@ import {
   type Specialist,
 } from '@app/agent';
 import { InputError } from './errors.js';
-import { WorkspaceData } from './workspace-data.js';
+import { WorkspaceData, workspaceDataDir } from './workspace-data.js';
 import { frontMatterValue, splitFrontMatter } from './workspace-skills.js';
 
 export { AGENT_LIMITS, type AgentFileProblem };
@@ -55,11 +54,15 @@ type ReadFile =
   { file: string; specialist: Specialist; updatedAt: string } | { file: string; problem: string };
 
 export class WorkspaceAgents {
-  /** <folder>/.nimbrio-ai/agents */
+  /** <folder>/.hamro-ai/<workspace>/agents */
   readonly dir: string;
 
-  constructor(readonly folder: string) {
-    this.dir = path.join(folder, APP_DATA_FOLDER, 'agents');
+  /** `name`: the workspace's, which names its data subfolder in `folder` */
+  constructor(
+    readonly folder: string,
+    readonly name: string,
+  ) {
+    this.dir = path.join(workspaceDataDir(folder, name), 'agents');
   }
 
   /** The workspace's specialists, by name, for the agent. Broken files are left out. */
@@ -173,7 +176,7 @@ export class WorkspaceAgents {
   }
 
   async #prepare(): Promise<void> {
-    await new WorkspaceData(this.folder).ensure();
+    await new WorkspaceData(this.folder, this.name).ensure();
     await fs.mkdir(this.dir, { recursive: true });
   }
 

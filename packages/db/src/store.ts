@@ -1,8 +1,9 @@
 // All storage, so the rest of the app never touches the data files. There is no database:
 // the app's own data (the list of workspaces, models, agent settings, MCP servers, mcp.json
-// approvals, provider sign-ins) lives in ~/.nimbrio-ai/ (app-home.ts). Everything about one
+// approvals, provider sign-ins) lives in ~/.hamro-ai/ (app-home.ts). Everything about one
 // workspace (including which MCP servers are on), chats, messages, runs, memory and its
-// instructions, lives in the workspace folder under .nimbrio-ai/ (workspace-data.ts).
+// instructions, lives in the workspace folder under .hamro-ai/<workspace>/ (workspace-data.ts),
+// so several workspaces can share a folder.
 import fs from 'node:fs/promises';
 import nodePath from 'node:path';
 import {
@@ -14,6 +15,7 @@ import {
   type Workspace,
   type WorkspaceGroup,
   type WorkspacePlanning,
+  workspaceSlug,
 } from '@app/shared';
 import {
   APP_DATA_FOLDER,
@@ -25,7 +27,7 @@ import {
 } from '@app/agent';
 import { DEFAULT_APP_HOME, appHomeFile } from './app-home.js';
 import { InputError } from './errors.js';
-import { moveLegacyFolders } from './legacy-folders.js';
+import { moveFlatWorkspaceData, moveLegacyFolders } from './legacy-folders.js';
 import { WorkspaceAttachments } from './attachments.js';
 import { WorkspaceSkills } from './workspace-skills.js';
 import { WorkspaceAgents } from './workspace-agents.js';
@@ -63,7 +65,7 @@ export class Store {
   /** Sign-ins with model providers (Cursor), app-wide. */
   readonly providers: ProviderStore;
 
-  /** `appHome`: the folder for the app's own settings files (default ~/.nimbrio-ai). */
+  /** `appHome`: the folder for the app's own settings files (default ~/.hamro-ai). */
   constructor({ appHome = DEFAULT_APP_HOME }: { appHome?: string } = {}) {
     this.#appHome = appHome;
     this.#workspaces = new WorkspaceList(appHomeFile(appHome, 'workspaces'));
@@ -95,8 +97,10 @@ export class Store {
   }
 
   /**
-   * The folder is created if it doesn't exist yet. A folder that already holds
-   * .nimbrio-ai data (from a workspace deleted from the list) brings its chats back.
+   * The folder is created if it doesn't exist yet. Other workspaces may use it too, under
+   * names with another slug (workspaceSlug). Data already in its .hamro-ai/<slug>/ (from a
+   * workspace of that name deleted from the list) brings its chats back, as does data in
+   * the old layout (right in .hamro-ai/) when no other workspace uses the folder.
    */
   async createWorkspace({
     name,
@@ -120,8 +124,12 @@ export class Store {
     const clean = checkName(name);
     const cleanInstructions = checkInstructions(instructions);
     const folder = await checkFolder(path);
-    await this.#assertCanUseFolder(folder);
-    await new WorkspaceData(folder).writeSettings({
+    await this.#assertCanUseFolder(folder, clean);
+    const isFolderShared = (await this.#workspaces.list()).some((w) => w.path === folder);
+    // Data left in the old layout by a workspace deleted from the list: it becomes this one's.
+    if (!isFolderShared)
+      await moveFlatWorkspaceData([{ path: folder, name: clean }], this.#mcpTrust);
+    await new WorkspaceData(folder, clean).writeSettings({
       instructions: cleanInstructions,
       planning,
       disabledTools,
@@ -132,7 +140,10 @@ export class Store {
     return toWorkspace(await this.#workspaces.add(clean, folder));
   }
 
-  /** A new folder takes the workspace's chats, memory and settings along with it. */
+  /**
+   * A new folder or name takes the workspace's chats, memory and settings along with it (the
+   * name names its data subfolder).
+   */
   async updateWorkspace(
     id: string,
     {
@@ -166,10 +177,12 @@ export class Store {
     const cleanInstructions = instructions === undefined ? null : checkInstructions(instructions);
     const folder = path === undefined ? current.path : await checkFolder(path);
 
-    const isMoving = folder !== current.path;
+    const from = new WorkspaceData(current.path, current.name);
+    const to = new WorkspaceData(folder, cleanName);
+    const isMoving = to.dir !== from.dir;
     if (isMoving) {
-      await this.#assertCanUseFolder(folder, current);
-      await new WorkspaceData(current.path).moveTo(folder);
+      await this.#assertCanUseFolder(folder, cleanName, current);
+      await from.moveTo(folder, cleanName);
     }
 
     try {
@@ -181,7 +194,7 @@ export class Store {
         ...(hasTerminalTab !== undefined ? { hasTerminalTab } : {}),
         ...(hasGitTab !== undefined ? { hasGitTab } : {}),
       };
-      if (Object.keys(settings).length) await new WorkspaceData(folder).writeSettings(settings);
+      if (Object.keys(settings).length) await to.writeSettings(settings);
       // Only filing it in a sidebar folder isn't an edit: it keeps its place in the list.
       const isOnlyFiling =
         name === undefined && path === undefined && !Object.keys(settings).length;
@@ -191,11 +204,11 @@ export class Store {
       if (updated && groupId !== undefined && groupId !== current.groupId) {
         updated = await this.#workspaces.setGroup(id, groupId);
       }
-      if (isMoving) await this.#mcpTrust.move(current.path, folder);
+      if (isMoving) await this.#mcpTrust.move(from.dir, to.dir);
       return updated ? toWorkspace(updated) : null;
     } catch (error) {
       // Keep the data where the workspace list says the workspace is.
-      if (isMoving) await new WorkspaceData(folder).moveTo(current.path).catch(() => {});
+      if (isMoving) await to.moveTo(current.path, current.name).catch(() => {});
       throw error;
     }
   }
@@ -203,17 +216,27 @@ export class Store {
   /**
    * Why `requested` can't be the folder of the workspace `workspaceId` (or of a new one), or
    * null. Checked as the user picks a folder, so nothing is created; saving checks it again
-   * along with the rest (absolute, not the disk root or home).
+   * along with the rest (absolute, not the disk root or home). Other workspaces using the
+   * folder are fine unless their name has the same slug as `name` (the workspace's current
+   * name when left out; for a new workspace without one, nothing is checked against them).
    */
-  async folderProblem(requested: string, workspaceId?: string): Promise<string | null> {
+  async folderProblem(
+    requested: string,
+    workspaceId?: string,
+    name?: string,
+  ): Promise<string | null> {
     const expanded = expandHome(requested.trim());
     if (!nodePath.isAbsolute(expanded)) return null;
     const resolved = nodePath.resolve(expanded);
     const folder = await fs.realpath(resolved).catch(() => resolved);
     const current = workspaceId ? await this.#workspaces.get(workspaceId) : null;
-    if (current?.path === folder) return null;
+    const wantedName = name?.trim() || current?.name;
+    if (!wantedName) return null;
+    if (current?.path === folder && workspaceSlug(current.name) === workspaceSlug(wantedName)) {
+      return null;
+    }
     try {
-      await this.#assertCanUseFolder(folder, current ?? undefined);
+      await this.#assertCanUseFolder(folder, wantedName, current ?? undefined);
       return null;
     } catch (error) {
       if (error instanceof InputError) return error.message;
@@ -222,24 +245,30 @@ export class Store {
   }
 
   /**
-   * Another workspace mustn't use the folder. A new workspace takes over data left there (by
-   * one deleted from the list); one moving there can't, as its own data would replace it.
+   * No other workspace on the folder may have a name with the same slug. A new workspace
+   * takes over data left in its subfolder (by one deleted from the list); one moving or
+   * renamed there can't, as its own data would replace it.
    */
-  async #assertCanUseFolder(folder: string, moving?: SavedWorkspace): Promise<void> {
-    await this.#workspaces.assertFolderFree(folder, moving?.id);
-    if (moving && (await new WorkspaceData(folder).exists())) {
+  async #assertCanUseFolder(folder: string, name: string, moving?: SavedWorkspace): Promise<void> {
+    await this.#workspaces.assertFolderFree(folder, name, moving?.id);
+    const target = new WorkspaceData(folder, name);
+    if (moving && (await target.exists())) {
       throw new InputError(
-        `${folder} already has its own ${APP_DATA_FOLDER} folder with another workspace's chats. Pick a different folder, or remove that one first.`,
+        `${folder} already has data for a workspace named like "${name}" (in ${APP_DATA_FOLDER}/${workspaceSlug(name)}). Pick another name or folder, or remove that one first.`,
       );
     }
   }
 
-  /** Deletes the workspace's chats, memory and settings (its .nimbrio-ai folder). Its other files stay. */
+  /**
+   * Deletes the workspace's chats, memory and settings (its .hamro-ai/<workspace> folder).
+   * Its other files, and other workspaces' data in the folder, stay.
+   */
   async deleteWorkspace(id: string): Promise<boolean> {
     const row = await this.#workspaces.get(id);
     if (!row) return false;
-    await new WorkspaceData(row.path).remove();
-    await this.#mcpTrust.forget(row.path);
+    const data = new WorkspaceData(row.path, row.name);
+    await data.remove();
+    await this.#mcpTrust.forget(data.dir);
     return this.#workspaces.remove(id);
   }
 
@@ -278,7 +307,7 @@ export class Store {
   async listChats(workspaceId: string): Promise<Chat[]> {
     const row = await this.#workspaces.get(workspaceId);
     if (!row) return [];
-    const chats = await new WorkspaceData(row.path).listChats();
+    const chats = await new WorkspaceData(row.path, row.name).listChats();
     for (const chat of chats) this.#chatHome.set(chat.id, row.id);
     return chats
       .sort((a, b) => (b.updatedAt ?? '').localeCompare(a.updatedAt ?? ''))
@@ -294,7 +323,7 @@ export class Store {
   async createChat(workspaceId: string, title = 'New chat'): Promise<Chat> {
     const row = await this.#workspaces.get(workspaceId);
     if (!row) throw new Error("That workspace doesn't exist.");
-    const chat = await new WorkspaceData(row.path).createChat(checkTitle(title));
+    const chat = await new WorkspaceData(row.path, row.name).createChat(checkTitle(title));
     this.#chatHome.set(chat.id, row.id);
     return { ...chat, workspaceId: row.id };
   }
@@ -350,29 +379,29 @@ export class Store {
 
   // ---------- Memories ----------
 
-  /** The long-term memory of one workspace: .nimbrio-ai/memory.json in its folder. */
-  memory(workspace: Pick<Workspace, 'path'>): MemoryStore {
-    return new WorkspaceData(workspace.path).memory();
+  /** The long-term memory of one workspace: .hamro-ai/<workspace>/memory.json in its folder. */
+  memory(workspace: Pick<Workspace, 'path' | 'name'>): MemoryStore {
+    return new WorkspaceData(workspace.path, workspace.name).memory();
   }
 
-  /** Files attached in one workspace's chats: .nimbrio-ai/uploads/. */
-  attachments(workspace: Pick<Workspace, 'path'>): WorkspaceAttachments {
-    return new WorkspaceAttachments(workspace.path);
+  /** Files attached in one workspace's chats: .hamro-ai/<workspace>/uploads/. */
+  attachments(workspace: Pick<Workspace, 'path' | 'name'>): WorkspaceAttachments {
+    return new WorkspaceAttachments(workspace.path, workspace.name);
   }
 
-  /** One workspace's skills: .nimbrio-ai/skills/<name>.md, or <name>/SKILL.md with its files. */
-  skills(workspace: Pick<Workspace, 'path'>): WorkspaceSkills {
-    return new WorkspaceSkills(workspace.path);
+  /** One workspace's skills: .hamro-ai/<workspace>/skills/<name>.md, or <name>/SKILL.md with its files. */
+  skills(workspace: Pick<Workspace, 'path' | 'name'>): WorkspaceSkills {
+    return new WorkspaceSkills(workspace.path, workspace.name);
   }
 
-  /** One workspace's own specialist sub-agents: .nimbrio-ai/agents/<name>.md. */
-  agents(workspace: Pick<Workspace, 'path'>): WorkspaceAgents {
-    return new WorkspaceAgents(workspace.path);
+  /** One workspace's own specialist sub-agents: .hamro-ai/<workspace>/agents/<name>.md. */
+  agents(workspace: Pick<Workspace, 'path' | 'name'>): WorkspaceAgents {
+    return new WorkspaceAgents(workspace.path, workspace.name);
   }
 
-  /** Which MCP servers one workspace turned on: .nimbrio-ai/mcp.json, and whether it's approved. */
-  mcp(workspace: Pick<Workspace, 'path'>): WorkspaceMcp {
-    return new WorkspaceMcp(new WorkspaceData(workspace.path), this.#mcpTrust);
+  /** Which MCP servers one workspace turned on: .hamro-ai/<workspace>/mcp.json, and whether it's approved. */
+  mcp(workspace: Pick<Workspace, 'path' | 'name'>): WorkspaceMcp {
+    return new WorkspaceMcp(new WorkspaceData(workspace.path, workspace.name), this.#mcpTrust);
   }
 
   /** Renames an app-wide MCP server; workspaces that use it keep it (on or off) under the new name. */
@@ -388,16 +417,22 @@ export class Store {
   }
 
   /**
-   * The app's data folders had another name: move ~/.agentic-ai and each listed workspace's
-   * .agentic-ai to the new one (legacy-folders.ts). Call it on start, before anything reads
-   * or writes them. Returns what happened, for the log.
+   * The app's data folders had other names: move ~/.nimbrio-ai, ~/.agentic-ai and each listed
+   * workspace's .nimbrio-ai and .agentic-ai to the new one; then move a workspace's data kept
+   * right in .hamro-ai/ (before several workspaces could share a folder) into its
+   * .hamro-ai/<workspace>/, with its MCP approval (legacy-folders.ts). Call it on start, before
+   * anything reads or writes them. Returns what happened, for the log.
    */
   async moveLegacyFolders(): Promise<string[]> {
+    // The app home first: the workspace list may be in an old one.
+    const home = await moveLegacyFolders(this.#appHome, []);
     const workspaces = await this.#workspaces.list();
-    return moveLegacyFolders(
+    const renamed = await moveLegacyFolders(
       this.#appHome,
       workspaces.map((row) => row.path),
     );
+    const flat = await moveFlatWorkspaceData(workspaces, this.#mcpTrust);
+    return [...home, ...renamed, ...flat];
   }
 
   /**
@@ -409,7 +444,7 @@ export class Store {
   async importLegacyMcp(): Promise<string[]> {
     const notes: string[] = [];
     for (const workspace of await this.listWorkspaces()) {
-      const data = new WorkspaceData(workspace.path);
+      const data = new WorkspaceData(workspace.path, workspace.name);
       let legacy: McpConfig | null;
       try {
         legacy = await data.readLegacyMcp();
@@ -421,7 +456,7 @@ export class Store {
       }
       if (!legacy) continue;
       await data.keepLegacyMcp();
-      const isApproved = await this.#mcpTrust.isTrusted(workspace.path, legacy);
+      const isApproved = await this.#mcpTrust.isTrusted(data.dir, legacy);
       const enabled: string[] = [];
       if (isApproved) {
         for (const [name, server] of Object.entries(legacy.mcpServers)) {
@@ -467,7 +502,7 @@ export class Store {
       (a, b) => Number(b.id === remembered) - Number(a.id === remembered),
     );
     for (const row of ordered) {
-      const data = new WorkspaceData(row.path);
+      const data = new WorkspaceData(row.path, row.name);
       const chat = await data.readChat(id);
       if (chat) {
         this.#chatHome.set(id, row.id);
@@ -485,7 +520,7 @@ async function toWorkspace(
   row: SavedWorkspace,
   { withChatCount = false }: { withChatCount?: boolean } = {},
 ): Promise<Workspace> {
-  const data = new WorkspaceData(row.path);
+  const data = new WorkspaceData(row.path, row.name);
   const { instructions, planning, disabledTools, voiceMode, hasTerminalTab, hasGitTab } =
     await data.readSettings();
   return {

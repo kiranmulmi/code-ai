@@ -1,5 +1,5 @@
 // ============================================================================================
-//  Nimbrio AI: tunable numbers, all in one place.
+//  Hamro AI: tunable numbers, all in one place.
 //
 //  Edit a value here, then rebuild (`npm run build:packages`, or restart `npm run dev`) and
 //  every app (API, web, CLI) picks it up. Sizes are in characters unless the name says bytes or
@@ -243,7 +243,7 @@ export const SKILL_LIMITS = {
   readBytes: 256 * 1024,
 } as const;
 
-/** A workspace's own specialist sub-agents (.nimbrio-ai/agents/<name>.md). */
+/** A workspace's own specialist sub-agents (.hamro-ai/<workspace>/agents/<name>.md). */
 export const AGENT_LIMITS = {
   /** specialists read from one workspace (all of them are listed to the agent) */
   count: 20,

@@ -40,7 +40,7 @@ export function loadAgentConfig(env: NodeJS.ProcessEnv = process.env): AgentConf
   const e = envSchema.parse(env);
   return {
     ...DEFAULT_AGENT_SETTINGS,
-    logDir: e.AGENT_LOG_DIR ?? path.join(os.homedir(), '.nimbrio-ai', 'logs'),
+    logDir: e.AGENT_LOG_DIR ?? path.join(os.homedir(), '.hamro-ai', 'logs'),
     maxPlanChecks: 1,
     maxReviews: 1,
   };

@@ -11,7 +11,7 @@
 // into image parts when it sends the request, so the saved chat stays small.
 //
 // The app saves each chat's conversation in the workspace folder
-// (.nimbrio-ai/chats/<id>/messages.jsonl) and rebuilds it with fromRows() for the next request.
+// (.hamro-ai/<workspace>/chats/<id>/messages.jsonl) and rebuilds it with fromRows() for the next request.
 
 import type { Attachment } from '@app/shared';
 

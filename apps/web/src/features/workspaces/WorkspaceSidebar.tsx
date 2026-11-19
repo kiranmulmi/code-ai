@@ -253,7 +253,7 @@ export function WorkspaceSidebar({
           <Link
             to="/"
             aria-label="Home"
-            title="Nimbrio AI"
+            title="Hamro AI"
             className="brand-mark [[data-desktop]_&]:hidden"
           >
             <LogoIcon />

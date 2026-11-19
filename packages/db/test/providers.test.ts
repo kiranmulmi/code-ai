@@ -1,4 +1,4 @@
-// Offline tests for provider sign-ins in ~/.nimbrio-ai/providers.json (here a temp folder).
+// Offline tests for provider sign-ins in ~/.hamro-ai/providers.json (here a temp folder).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';

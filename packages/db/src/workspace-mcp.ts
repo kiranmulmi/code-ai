@@ -1,5 +1,5 @@
 // Which of the app's MCP servers one workspace uses and has turned on:
-// <folder>/.nimbrio-ai/mcp.json, `{ "allowed": ["Github", "JIRA"], "enabled": ["Github"] }`.
+// <folder>/.hamro-ai/<workspace>/mcp.json, `{ "allowed": ["Github", "JIRA"], "enabled": ["Github"] }`.
 // `allowed` is chosen in the workspace settings; `enabled` (always among them) is switched
 // in the MCP tab. The file comes with the folder (a cloned project could
 // carry one), so it only takes effect once approved in the app (McpTrust); changes made in
@@ -35,7 +35,7 @@ export class WorkspaceMcp {
     return {
       file: this.file,
       ...choicesOf(config),
-      isTrusted: await this.trust.isTrusted(this.data.folder, config),
+      isTrusted: await this.trust.isTrusted(this.data.dir, config),
     };
   }
 
@@ -77,7 +77,7 @@ export class WorkspaceMcp {
   approve(): Promise<McpState> {
     return serialized(`${this.file}#app`, async () => {
       const config = await this.data.readMcpWorkspace();
-      await this.trust.trust(this.data.folder, config);
+      await this.trust.trust(this.data.dir, config);
       return { file: this.file, ...choicesOf(config), isTrusted: true };
     });
   }
@@ -87,7 +87,7 @@ export class WorkspaceMcp {
     return serialized(`${this.file}#app`, async () => {
       const config: McpWorkspaceConfig = { enabled: [...enabled] };
       await this.data.writeMcpWorkspace(config);
-      await this.trust.trust(this.data.folder, config);
+      await this.trust.trust(this.data.dir, config);
     });
   }
 
@@ -96,11 +96,11 @@ export class WorkspaceMcp {
       const before = await this.read();
       const config: McpWorkspaceConfig = change(before);
       await this.data.writeMcpWorkspace(config);
-      if (before.isTrusted) await this.trust.trust(this.data.folder, config);
+      if (before.isTrusted) await this.trust.trust(this.data.dir, config);
       return {
         file: this.file,
         ...choicesOf(config),
-        isTrusted: before.isTrusted || (await this.trust.isTrusted(this.data.folder, config)),
+        isTrusted: before.isTrusted || (await this.trust.isTrusted(this.data.dir, config)),
       };
     });
   }

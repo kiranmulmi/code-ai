@@ -16,7 +16,7 @@ function Brand({ isOnColour = false }: { isOnColour?: boolean }) {
       <span
         className={`text-[18px] font-extrabold tracking-[-0.02em] ${isOnColour ? 'text-white' : 'text-ink'}`}
       >
-        Nimbrio {isOnColour ? 'AI' : <span className="highlight">AI</span>}
+        Hamro {isOnColour ? 'AI' : <span className="highlight">AI</span>}
       </span>
     </div>
   );

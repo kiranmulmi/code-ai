@@ -92,6 +92,7 @@ export {
   workspaceGroupInputSchema,
   workspaceInputSchema,
   workspaceUpdateSchema,
+  workspaceSlug,
   type ToolGroup,
   type Workspace,
   type WorkspaceGroup,

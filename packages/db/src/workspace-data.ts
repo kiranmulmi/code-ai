@@ -1,15 +1,23 @@
-// Everything the app keeps about one workspace, stored in the workspace's own folder:
+// Everything the app keeps about one workspace, stored in the workspace's own folder. Several
+// workspaces can share a folder: each has its own subfolder, named after it (workspaceSlug
+// in @app/shared).
 //
-//   <folder>/.nimbrio-ai/
+//   <folder>/.hamro-ai/
 //     .gitignore                  "*", so chat history never ends up in the project's git
-//     settings.json               { instructions, planning, disabledTools, voiceMode, hasTerminalTab, hasGitTab }
-//     mcp.json                    the MCP servers, in the { mcpServers } shape other clients use
-//     memory.json                 long-term memory (LongTermMemory from @app/agent)
-//     chats/<id>/chat.json        title, current and earlier plans, the memory list the model last saw
-//     chats/<id>/messages.jsonl   the conversation, one message per line, append-only
-//     chats/<id>/runs.jsonl       one line per request: status, steps, tokens
-//     uploads/<id>/               files attached in chats (WorkspaceAttachments, attachments.ts)
-//     skills/<name>.md            the user's skills (WorkspaceSkills, workspace-skills.ts)
+//     <workspace>/                one workspace's data, e.g. "Client Site / v2" -> client-site-v2/
+//       .gitignore                  "*" again, so the subfolder stays out of git if moved on its own
+//       settings.json               { instructions, planning, disabledTools, voiceMode, hasTerminalTab, hasGitTab }
+//       mcp.json                    which of the app's MCP servers are on here (workspace-mcp.ts)
+//       memory.json                 long-term memory (LongTermMemory from @app/agent)
+//       chats/<id>/chat.json        title, current and earlier plans, the memory list the model last saw
+//       chats/<id>/messages.jsonl   the conversation, one message per line, append-only
+//       chats/<id>/runs.jsonl       one line per request: status, steps, tokens
+//       uploads/<id>/               files attached in chats (WorkspaceAttachments, attachments.ts)
+//       skills/<name>.md            the user's skills (WorkspaceSkills, workspace-skills.ts)
+//       agents/<name>.md            its own sub-agents (WorkspaceAgents, workspace-agents.ts)
+//
+// Before, one workspace per folder kept these right in .hamro-ai/; moveFlatWorkspaceData
+// (legacy-folders.ts) moves them into the workspace's subfolder on start.
 //
 // File tools can't reach this folder (APP_DATA_FOLDER in @app/agent's guardrails).
 import fs from 'node:fs/promises';
@@ -25,6 +33,7 @@ import {
   groupTokens,
   TOOL_GROUPS,
   WORKSPACE_PLANNING,
+  workspaceSlug,
   mcpConfigSchema,
   mcpWorkspaceSchema,
   type McpConfig,
@@ -274,14 +283,27 @@ function withEstimatedCalls(run: z.infer<typeof runSchema>): z.infer<typeof runS
   };
 }
 
+// ---------- Where a workspace's data lives ----------
+
+/** <folder>/.hamro-ai/<slug>: where the workspace named `name` keeps its data in `folder`. */
+export function workspaceDataDir(folder: string, name: string): string {
+  return path.join(folder, APP_DATA_FOLDER, workspaceSlug(name));
+}
+
 // ---------- One workspace's data ----------
 
 export class WorkspaceData {
-  /** <folder>/.nimbrio-ai */
+  /** <folder>/.hamro-ai/<slug>: this workspace's own data */
   readonly dir: string;
+  /** <folder>/.hamro-ai: the data of every workspace using the folder */
+  readonly root: string;
 
-  constructor(readonly folder: string) {
-    this.dir = path.join(folder, APP_DATA_FOLDER);
+  constructor(
+    readonly folder: string,
+    readonly name: string,
+  ) {
+    this.root = path.join(folder, APP_DATA_FOLDER);
+    this.dir = workspaceDataDir(folder, name);
   }
 
   async exists(): Promise<boolean> {
@@ -299,13 +321,8 @@ export class WorkspaceData {
       );
     }
     await fs.mkdir(path.join(this.dir, 'chats'), { recursive: true });
-    const ignore = path.join(this.dir, '.gitignore');
-    if (!(await pathExists(ignore))) {
-      await writeFileAtomic(
-        ignore,
-        "# This app's chats, memory and settings. Keep them out of git.\n*\n",
-      );
-    }
+    await writeGitignore(this.root);
+    await writeGitignore(this.dir);
   }
 
   // ---------- Settings and memory ----------
@@ -353,7 +370,7 @@ export class WorkspaceData {
     return parseOrExplain(mcpConfigSchema, raw, this.mcpFile);
   }
 
-  /** Keeps the old file next to the new one (it may hold tokens; .nimbrio-ai stays out of git). */
+  /** Keeps the old file next to the new one (it may hold tokens; .hamro-ai stays out of git). */
   async keepLegacyMcp(): Promise<void> {
     await fs.copyFile(this.mcpFile, path.join(this.dir, 'mcp.imported.json'));
   }
@@ -510,23 +527,33 @@ export class WorkspaceData {
 
   // ---------- The whole folder ----------
 
-  /** Delete all of this workspace's chats, memory and settings. */
+  /**
+   * Delete all of this workspace's chats, memory and settings; other workspaces' data in the
+   * folder stays. .hamro-ai itself goes once nothing but its .gitignore is left.
+   */
   async remove(): Promise<void> {
     await fs.rm(this.dir, { recursive: true, force: true });
+    await removeIfOnlyGitignore(this.root);
   }
 
-  /** Move the data to another workspace folder (which must not have any of its own). */
-  async moveTo(folder: string): Promise<void> {
-    if (!(await this.exists())) return;
-    const target = new WorkspaceData(folder);
+  /**
+   * Move the data to where the workspace named `name` keeps it in `folder` (another folder,
+   * a new name, or both). Nothing must be there yet: the caller checks.
+   */
+  async moveTo(folder: string, name: string): Promise<void> {
+    const target = new WorkspaceData(folder, name);
+    if (target.dir === this.dir || !(await this.exists())) return;
+    await fs.mkdir(target.root, { recursive: true });
+    await writeGitignore(target.root);
     try {
       await fs.rename(this.dir, target.dir);
     } catch (error) {
       if (errorCode(error) !== 'EXDEV') throw error;
       // Another disk: copy, then remove the original.
       await fs.cp(this.dir, target.dir, { recursive: true, errorOnExist: true, force: false });
-      await this.remove();
+      await fs.rm(this.dir, { recursive: true, force: true });
     }
+    await removeIfOnlyGitignore(this.root);
   }
 
   // ---------- Paths ----------
@@ -573,6 +600,31 @@ const toJson = (value: unknown): string => `${JSON.stringify(value, null, 2)}\n`
 
 const isRunStatus = (value: string): value is RunStatus =>
   (RUN_STATUSES as readonly string[]).includes(value);
+
+/** A "*" .gitignore in `dir` (left alone when there is one), so its files stay out of git. */
+async function writeGitignore(dir: string): Promise<void> {
+  const ignore = path.join(dir, '.gitignore');
+  if (!(await pathExists(ignore))) {
+    await writeFileAtomic(
+      ignore,
+      "# This app's chats, memory and settings. Keep them out of git.\n*\n",
+    );
+  }
+}
+
+/** Removes `dir` when all it holds is a .gitignore (or nothing); anything else keeps it. */
+async function removeIfOnlyGitignore(dir: string): Promise<void> {
+  let names: string[];
+  try {
+    names = await fs.readdir(dir);
+  } catch (error) {
+    if (errorCode(error) === 'ENOENT') return;
+    throw error;
+  }
+  if (names.some((name) => name !== '.gitignore')) return;
+  await fs.rm(path.join(dir, '.gitignore'), { force: true });
+  await fs.rmdir(dir).catch(() => {}); // something new appeared meanwhile: keep it
+}
 
 async function pathExists(target: string): Promise<boolean> {
   try {

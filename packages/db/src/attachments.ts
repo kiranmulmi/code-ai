@@ -1,10 +1,10 @@
 // Files users attach in a workspace's chats, kept privately next to its chats:
 //
-//   <folder>/.nimbrio-ai/uploads/<id>/meta.json   name, type, size, kind, createdAt
-//   <folder>/.nimbrio-ai/uploads/<id>/file        the bytes as uploaded
+//   <folder>/.hamro-ai/<workspace>/uploads/<id>/meta.json   name, type, size, kind, createdAt
+//   <folder>/.hamro-ai/<workspace>/uploads/<id>/file        the bytes as uploaded
 //
 // The agent reads them through the AttachmentStore interface (read_attachment, view_image,
-// save_attachment); its file tools can't reach .nimbrio-ai/.
+// save_attachment); its file tools can't reach .hamro-ai/.
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -15,9 +15,9 @@ import {
   fileExtension,
   type Attachment,
 } from '@app/shared';
-import { APP_DATA_FOLDER, errorCode, writeFileAtomic, type AttachmentStore } from '@app/agent';
+import { errorCode, writeFileAtomic, type AttachmentStore } from '@app/agent';
 import { InputError } from './errors.js';
-import { WorkspaceData, attachmentSchema, isUuid } from './workspace-data.js';
+import { WorkspaceData, attachmentSchema, isUuid, workspaceDataDir } from './workspace-data.js';
 
 /** Types for names browsers often leave untyped. */
 const KNOWN_TYPES: Record<string, string> = {
@@ -35,11 +35,15 @@ export function cleanFileName(name: string): string {
 }
 
 export class WorkspaceAttachments implements AttachmentStore {
-  /** <folder>/.nimbrio-ai/uploads */
+  /** <folder>/.hamro-ai/<workspace>/uploads */
   readonly dir: string;
 
-  constructor(readonly folder: string) {
-    this.dir = path.join(folder, APP_DATA_FOLDER, 'uploads');
+  /** `name`: the workspace's, which names its data subfolder in `folder` */
+  constructor(
+    readonly folder: string,
+    readonly name: string,
+  ) {
+    this.dir = path.join(workspaceDataDir(folder, name), 'uploads');
   }
 
   /** Keep a new upload. Throws InputError when it's empty or too large. */
@@ -50,7 +54,7 @@ export class WorkspaceAttachments implements AttachmentStore {
         `Files can be at most ${ATTACHMENT_LIMITS.maxBytes / (1024 * 1024)} MB.`,
       );
     }
-    await new WorkspaceData(this.folder).ensure(); // the data folder and its .gitignore
+    await new WorkspaceData(this.folder, this.name).ensure(); // the data folder and its .gitignore
     const cleanName = cleanFileName(name);
     const mime = type.trim() || KNOWN_TYPES[fileExtension(cleanName)] || 'application/octet-stream';
     const attachment: Attachment = {

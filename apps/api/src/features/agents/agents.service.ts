@@ -5,7 +5,7 @@ import { ConflictError, NotFoundError } from '../../lib/errors.js';
 import type { WorkspacesService } from '../workspaces/workspaces.service.js';
 
 /**
- * A workspace's own specialist sub-agents (its .nimbrio-ai/agents/), managed in the Agents tab.
+ * A workspace's own specialist sub-agents (its .hamro-ai/<workspace>/agents/), managed in the Agents tab.
  * The list also has the built-in specialists, which can't be changed here (a file with a
  * built-in's name replaces it), and the files that couldn't be used, with why.
  */

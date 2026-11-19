@@ -1,7 +1,8 @@
 // The list of workspaces (id, name, folder, sidebar folder) and the sidebar folders that
-// collect them ("groups"), in ~/.nimbrio-ai/workspaces.json. Everything else about a workspace
-// lives in its own folder (workspace-data.ts).
+// collect them ("groups"), in ~/.hamro-ai/workspaces.json. Everything else about a workspace
+// lives in its own folder (workspace-data.ts), which other workspaces may share.
 import { randomUUID } from 'node:crypto';
+import { workspaceSlug } from '@app/shared';
 import { serialized } from '@app/agent';
 import { z } from 'zod';
 import { InputError } from './errors.js';
@@ -107,10 +108,10 @@ export class WorkspaceList {
     return (await this.list()).find((w) => w.id === id) ?? null;
   }
 
-  /** `path` must be a folder no other workspace uses. */
+  /** No other workspace may use `path` under a name with the same slug (workspaceSlug). */
   async add(name: string, path: string): Promise<SavedWorkspace> {
     return this.#change((workspaces) => {
-      assertFolderFree(workspaces, path);
+      assertFolderFree(workspaces, path, name);
       const now = new Date().toISOString();
       const added = { id: randomUUID(), name, path, createdAt: now, updatedAt: now, groupId: null };
       return { workspaces: [...workspaces, added], result: added };
@@ -124,7 +125,7 @@ export class WorkspaceList {
     return this.#change((workspaces) => {
       const current = workspaces.find((w) => w.id === id);
       if (!current) return { workspaces, result: null };
-      assertFolderFree(workspaces, changes.path, id);
+      assertFolderFree(workspaces, changes.path, changes.name, id);
       const updated = { ...current, ...changes, updatedAt: new Date().toISOString() };
       return {
         workspaces: workspaces.map((w) => (w.id === id ? updated : w)),
@@ -141,9 +142,12 @@ export class WorkspaceList {
     });
   }
 
-  /** Throws when another workspace than `exceptId` already uses `path`. */
-  async assertFolderFree(path: string, exceptId?: string): Promise<void> {
-    assertFolderFree(await this.list(), path, exceptId);
+  /**
+   * Throws when another workspace than `exceptId` already uses `path` under a name with the
+   * same slug, as both would keep their data in the same subfolder.
+   */
+  async assertFolderFree(path: string, name: string, exceptId?: string): Promise<void> {
+    assertFolderFree(await this.list(), path, name, exceptId);
   }
 
   async #read(): Promise<WorkspacesFile> {
@@ -182,7 +186,19 @@ export class WorkspaceList {
   }
 }
 
-function assertFolderFree(workspaces: SavedWorkspace[], path: string, exceptId?: string): void {
-  const owner = workspaces.find((w) => w.path === path && w.id !== exceptId);
-  if (owner) throw new InputError(`The workspace "${owner.name}" already uses that folder.`);
+function assertFolderFree(
+  workspaces: SavedWorkspace[],
+  path: string,
+  name: string,
+  exceptId?: string,
+): void {
+  const slug = workspaceSlug(name);
+  const owner = workspaces.find(
+    (w) => w.path === path && w.id !== exceptId && workspaceSlug(w.name) === slug,
+  );
+  if (owner) {
+    throw new InputError(
+      `The workspace "${owner.name}" already uses that folder with a name that's too similar. Pick another name.`,
+    );
+  }
 }

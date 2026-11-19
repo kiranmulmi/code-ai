@@ -80,8 +80,8 @@ const root = readJson<Manifest>(path.join(ROOT, 'package.json'));
 const desktop = readJson<Manifest>(path.join(ROOT, 'apps/desktop/package.json'));
 
 const appManifest = {
-  name: 'nimbrio-ai-desktop',
-  productName: 'Nimbrio AI',
+  name: 'hamro-ai-desktop',
+  productName: 'Hamro AI',
   version: root.version,
   description: desktop.description,
   private: true,

@@ -25,8 +25,8 @@ export function foldersRouter(folders: FoldersService): Router {
   router.get(
     '/folders/check',
     asyncHandler(async (req, res) => {
-      const { path, workspaceId } = parse(folderCheckQuerySchema, req.query);
-      res.json({ data: await folders.check(path, workspaceId) });
+      const { path, workspaceId, name } = parse(folderCheckQuerySchema, req.query);
+      res.json({ data: await folders.check(path, workspaceId, name) });
     }),
   );
 

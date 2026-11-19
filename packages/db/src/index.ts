@@ -1,6 +1,6 @@
 // Public API of @app/db, the app's storage (files, no database): the workspace list and the
-// app's settings in ~/.nimbrio-ai/, and each workspace's chats, memory and settings in its
-// own folder (.nimbrio-ai/).
+// app's settings in ~/.hamro-ai/, and each workspace's chats, memory and settings in its
+// own folder (.hamro-ai/<workspace>/, so several workspaces can share a folder).
 export { InputError } from './errors.js';
 export { Store, type Chat } from './store.js';
 export { ModelStore, type ResolvedModel } from './models.js';
@@ -11,6 +11,7 @@ export { DEFAULT_APP_HOME, APP_HOME_FILES } from './app-home.js';
 export {
   WorkspaceData,
   isUuid,
+  workspaceDataDir,
   type ChatRecord,
   type RunRecord,
   type RunToSave,

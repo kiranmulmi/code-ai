@@ -15,8 +15,8 @@ import { ConflictError, NotFoundError } from '../../lib/errors.js';
 import type { WorkspacesService } from '../workspaces/workspaces.service.js';
 
 /**
- * MCP servers: set up once for the app (~/.nimbrio-ai/mcp-servers.json), turned on per workspace (its
- * .nimbrio-ai/mcp.json), started by the hub for the workspaces that use them.
+ * MCP servers: set up once for the app (~/.hamro-ai/mcp-servers.json), turned on per workspace (its
+ * .hamro-ai/<workspace>/mcp.json), started by the hub for the workspaces that use them.
  */
 export function createMcpService(
   { store, mcp: hub, runs }: AppContext,
@@ -48,13 +48,13 @@ export function createMcpService(
 
   /** Stops a server everywhere it runs (it changed or went away). */
   async function closeEverywhere(name: string): Promise<void> {
-    for (const workspace of await store.listWorkspaces()) await hub.restart(workspace.path, name);
+    for (const workspace of await store.listWorkspaces()) await hub.restart(workspace.id, name);
   }
 
   async function overviewOf(workspace: Workspace, state: McpState): Promise<McpOverview> {
     const servers = await store.mcpServers.list();
     const reports = new Map<string, McpServerReport>(
-      (await hub.connect(workspace.path, runnableMcpServers(servers, state))).map((r) => [
+      (await hub.connect(workspace, runnableMcpServers(servers, state))).map((r) => [
         r.name,
         r,
       ]),
@@ -135,7 +135,7 @@ export function createMcpService(
       try {
         state = await mcp.read();
       } catch (error) {
-        await hub.closeWorkspace(workspace.path);
+        await hub.closeWorkspace(workspace.id);
         return { file: mcp.file, isTrusted: false, fileError: errorMessage(error), servers: [] };
       }
       return overviewOf(workspace, state);
@@ -180,7 +180,7 @@ export function createMcpService(
       const before = new Set((await mcp.read()).enabled);
       const { allowed, enabled, isTrusted } = await mcp.setAllowedList(names);
       const on = new Set(enabled);
-      for (const name of before) if (!on.has(name)) await hub.restart(workspace.path, name);
+      for (const name of before) if (!on.has(name)) await hub.restart(workspace.id, name);
       return { allowed, enabled, isTrusted };
     },
 
@@ -193,7 +193,7 @@ export function createMcpService(
     async restart(workspaceId: string, name: string): Promise<McpOverview> {
       const workspace = await requireIdle(workspaceId);
       await requireServer(name);
-      await hub.restart(workspace.path, name);
+      await hub.restart(workspace.id, name);
       return overviewOf(workspace, await store.mcp(workspace).read());
     },
   };

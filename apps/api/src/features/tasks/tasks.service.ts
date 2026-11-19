@@ -14,7 +14,7 @@ import type { WorkspacesService } from '../workspaces/workspaces.service.js';
 export function createTasksService({ tasks }: AppContext, workspaces: WorkspacesService) {
   async function requireTask(workspaceId: string, taskId: string): Promise<BackgroundTaskDetail> {
     const workspace = await workspaces.require(workspaceId);
-    const task = tasks.get(workspace.path, taskId);
+    const task = tasks.get(workspace.id, taskId);
     if (!task) throw new NotFoundError('That background task is gone.');
     return task;
   }
@@ -23,7 +23,7 @@ export function createTasksService({ tasks }: AppContext, workspaces: Workspaces
     /** The tasks still running (stopped ones are only kept for the agent to read). */
     async listRunning(workspaceId: string): Promise<BackgroundTask[]> {
       const workspace = await workspaces.require(workspaceId);
-      return tasks.list(workspace.path).filter((task) => task.isRunning);
+      return tasks.list(workspace.id).filter((task) => task.isRunning);
     },
 
     get: requireTask,
@@ -49,7 +49,7 @@ export function createTasksService({ tasks }: AppContext, workspaces: Workspaces
       const root = await fs.realpath(workspace.path);
       const shown = path.relative(root, target).split(path.sep).join('/') || '.';
       try {
-        return tasks.forWorkspace(workspace.path).start(command, target, shown);
+        return tasks.forWorkspace(workspace.id).start(command, target, shown);
       } catch (error) {
         // Too many running already: the message says which to stop.
         throw new ValidationError(error instanceof Error ? error.message : String(error));
@@ -60,7 +60,7 @@ export function createTasksService({ tasks }: AppContext, workspaces: Workspaces
     async stop(workspaceId: string, taskId: string): Promise<void> {
       const workspace = await workspaces.require(workspaceId);
       await requireTask(workspaceId, taskId);
-      await tasks.stop(workspace.path, taskId);
+      await tasks.stop(workspace.id, taskId);
     },
   };
 }

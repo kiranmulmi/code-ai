@@ -1,4 +1,4 @@
-// Offline tests for the app's own data in ~/.nimbrio-ai (here a temp folder): the workspace
+// Offline tests for the app's own data in ~/.hamro-ai (here a temp folder): the workspace
 // list, models, agent settings and MCP servers.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -186,12 +186,12 @@ test('MCP servers: kept in order, names unique, renamed in place, saved privatel
   await assert.rejects(servers.list(), /isn't a valid MCP server name/);
 });
 
-test('workspaces: saved privately, one folder per workspace even when two adds race', async () => {
+test('workspaces: saved privately, one slug per folder even when two adds race', async () => {
   const dir = await home();
   const list = new WorkspaceList(appHomeFile(dir, 'workspaces'));
   assert.deepEqual(await list.list(), []);
 
-  const results = await Promise.allSettled([list.add('A', '/p/one'), list.add('B', '/p/one')]);
+  const results = await Promise.allSettled([list.add('A', '/p/one'), list.add('a!', '/p/one')]);
   assert.deepEqual(
     results.map((r) => r.status),
     ['fulfilled', 'rejected'],
@@ -201,7 +201,10 @@ test('workspaces: saved privately, one folder per workspace even when two adds r
   assert.equal((await fs.stat(list.file)).mode & 0o777, 0o600);
 
   const second = await list.add('B', '/p/two');
-  await assert.rejects(list.update(second.id, { name: 'B', path: '/p/one' }), /"A" already uses/);
+  await assert.rejects(list.update(second.id, { name: 'a', path: '/p/one' }), /"A" already uses/);
+  const sharing = await list.add('Other', '/p/one');
+  assert.equal(sharing.path, '/p/one', 'another name can share the folder');
+  assert.equal(await list.remove(sharing.id), true);
   assert.equal((await list.update(second.id, { name: 'Bee', path: '/p/three' }))?.name, 'Bee');
   assert.equal(await list.get('not-a-uuid'), null);
 
@@ -220,7 +223,7 @@ test('workspaces: saved privately, one folder per workspace even when two adds r
 
 test('the old .agentic-ai folders move to the new name, never over newer files', async () => {
   const root = await home();
-  const appHome = path.join(root, '.nimbrio-ai');
+  const appHome = path.join(root, '.hamro-ai');
   const oldHome = path.join(root, '.agentic-ai');
   await fs.mkdir(oldHome);
   await fs.writeFile(path.join(oldHome, 'models.json'), '{"old":true}');
@@ -229,8 +232,8 @@ test('the old .agentic-ai folders move to the new name, never over newer files',
   const merged = path.join(root, 'merged');
   await fs.mkdir(path.join(merged, '.agentic-ai', 'chats'), { recursive: true });
   await fs.writeFile(path.join(merged, '.agentic-ai', 'memory.json'), '"old"');
-  await fs.mkdir(path.join(merged, '.nimbrio-ai'));
-  await fs.writeFile(path.join(merged, '.nimbrio-ai', 'memory.json'), '"new"');
+  await fs.mkdir(path.join(merged, '.hamro-ai'));
+  await fs.writeFile(path.join(merged, '.hamro-ai', 'memory.json'), '"new"');
   const moved = path.join(root, 'moved');
   await fs.mkdir(path.join(moved, '.agentic-ai'), { recursive: true });
   // A link isn't followed or moved.
@@ -242,15 +245,32 @@ test('the old .agentic-ai folders move to the new name, never over newer files',
   assert.equal(notes.length, 3);
   assert.equal(await fs.readFile(path.join(appHome, 'models.json'), 'utf8'), '{"old":true}');
   await assert.rejects(fs.access(oldHome));
-  assert.equal(await fs.readFile(path.join(merged, '.nimbrio-ai', 'memory.json'), 'utf8'), '"new"');
-  assert.ok((await fs.stat(path.join(merged, '.nimbrio-ai', 'chats'))).isDirectory());
+  assert.equal(await fs.readFile(path.join(merged, '.hamro-ai', 'memory.json'), 'utf8'), '"new"');
+  assert.ok((await fs.stat(path.join(merged, '.hamro-ai', 'chats'))).isDirectory());
   assert.equal(await fs.readFile(path.join(merged, '.agentic-ai', 'memory.json'), 'utf8'), '"old"');
   assert.match(notes[1] ?? '', /except memory\.json/);
-  assert.ok((await fs.stat(path.join(moved, '.nimbrio-ai'))).isDirectory());
+  assert.ok((await fs.stat(path.join(moved, '.hamro-ai'))).isDirectory());
   assert.ok((await fs.lstat(path.join(linked, '.agentic-ai'))).isSymbolicLink());
 
   // Nothing left to move the second time.
   assert.deepEqual(await moveLegacyFolders(appHome, [moved]), []);
+});
+
+test('the old .nimbrio-ai folders move to .hamro-ai too', async () => {
+  const root = await home();
+  const appHome = path.join(root, '.hamro-ai');
+  const oldHome = path.join(root, '.nimbrio-ai');
+  await fs.mkdir(oldHome);
+  await fs.writeFile(path.join(oldHome, 'models.json'), '{"nimbrio":true}');
+  const workspace = path.join(root, 'workspace');
+  await fs.mkdir(path.join(workspace, '.nimbrio-ai', 'chats'), { recursive: true });
+
+  const notes = await moveLegacyFolders(appHome, [workspace]);
+  assert.equal(notes.length, 2);
+  assert.equal(await fs.readFile(path.join(appHome, 'models.json'), 'utf8'), '{"nimbrio":true}');
+  await assert.rejects(fs.access(oldHome));
+  assert.ok((await fs.stat(path.join(workspace, '.hamro-ai', 'chats'))).isDirectory());
+  await assert.rejects(fs.access(path.join(workspace, '.nimbrio-ai')));
 });
 
 test('models: a Cursor model keeps no server or key and runs with the Cursor sign-in token', async () => {

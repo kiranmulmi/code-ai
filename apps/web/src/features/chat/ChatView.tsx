@@ -143,6 +143,7 @@ export function ChatView({
                 onDecide={onDecide}
                 onShowUsage={() => setUsageView({ kind: 'reply', key: turn.key })}
                 revealUpTo={turn === lastTurn ? revealUpTo : null}
+                runStartedAt={turn === lastTurn ? state.runStartedAt : null}
               />
             ),
           )}

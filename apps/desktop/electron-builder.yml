@@ -1,6 +1,6 @@
 # Packs apps/desktop/.stage (laid out by scripts/stage.ts) into installers in release/.
-appId: ai.nimbrio.desktop
-productName: Nimbrio AI
+appId: ai.hamro.desktop
+productName: Hamro AI
 copyright: Copyright © 2026 Kiran Mulmi
 directories:
   app: .stage

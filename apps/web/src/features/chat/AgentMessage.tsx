@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { CopyButton } from '../../components/CopyButton';
-import { plural } from '../../lib/format';
+import { formatElapsed, plural } from '../../lib/format';
 import { tokensText, type AgentTurn } from './conversation';
 import { flowSections, type Block } from './flowSections';
 import { PlanCard } from './PlanCard';
@@ -40,6 +40,7 @@ export function AgentMessage({
   onDecide,
   onShowUsage,
   revealUpTo = null,
+  runStartedAt = null,
 }: {
   turn: AgentTurn;
   /** the plan each create_plan call made (planPlacement) */
@@ -52,6 +53,8 @@ export function AgentMessage({
    * blocks in order, as streamed), so it appears as it's read aloud; null shows it all.
    */
   revealUpTo?: number | null;
+  /** When the running request started (ms), for the live timer on its status line. */
+  runStartedAt?: number | null;
 }) {
   let unrevealed = revealUpTo ?? Infinity;
 
@@ -104,7 +107,7 @@ export function AgentMessage({
   return (
     <div className="flex flex-col gap-1.5">
       {blocks}
-      {turn.status && <StatusLine text={turn.status} />}
+      {turn.status && <StatusLine text={turn.status} startedAt={runStartedAt} />}
       {turn.liveMeta && !turn.meta && (
         <p
           className="pl-0.5 text-[12px] tabular-nums text-ink-3"
@@ -129,6 +132,12 @@ export function AgentMessage({
                   >
                     {tokensText(turn.usage.usage)}
                   </button>
+                  {turn.durationMs !== null && (
+                    <span title="Time taken, from sending the message to the final answer">
+                      {' · '}
+                      {formatElapsed(turn.durationMs / 1000)}
+                    </span>
+                  )}
                 </>
               ) : (
                 turn.meta

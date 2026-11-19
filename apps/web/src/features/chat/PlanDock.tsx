@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { ElapsedTime } from '../../components/ElapsedTime';
 import { Spinner } from '../../components/Spinner';
 import { CheckIcon, ChevronDownIcon, WarnIcon } from '../../lib/icons';
 import { readPref, writePref } from '../../lib/storage';
@@ -75,6 +76,9 @@ export function PlanDock({ state }: { state: PlanState }) {
                 ? (state.activity ?? 'Working…')
                 : plan.goal}
           </span>
+          {isWorking && (
+            <ElapsedTime startedAt={state.startedAt} className="shrink-0 text-[12px] text-ink-3" />
+          )}
           <span className="hidden w-32 shrink-0 sm:block">
             <SegmentBar steps={plan.steps} />
           </span>

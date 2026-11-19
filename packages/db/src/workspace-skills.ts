@@ -1,10 +1,11 @@
 // A workspace's skills, in one of two layouts:
 //
-//   <folder>/.nimbrio-ai/skills/<name>.md            written in the Skills tab
+//   <folder>/.hamro-ai/<workspace>/skills/
+//     <name>.md               written in the Skills tab
 //
-//   <folder>/.nimbrio-ai/skills/<name>/SKILL.md      uploaded as a folder, with files of its
-//   <folder>/.nimbrio-ai/skills/<name>/references/…  own beside it (references, templates,
-//   <folder>/.nimbrio-ai/skills/<name>/assets/…      assets: anything SKILL.md points to)
+//     <name>/SKILL.md         uploaded as a folder, with files of its
+//     <name>/references/…     own beside it (references, templates,
+//     <name>/assets/…         assets: anything SKILL.md points to)
 //
 //   ---
 //   name: jira-ticket-fix
@@ -16,7 +17,7 @@
 // The file (or folder) name is the skill's name (the `name:` line is written for readers and
 // other tools, and ignored when it disagrees; an upload takes its name from it). Written from
 // the Skills tab; the agent reads them through the SkillStore interface, and its file tools
-// can't reach .nimbrio-ai/. Links are never followed, so a skill folder can't lead outside.
+// can't reach .hamro-ai/. Links are never followed, so a skill folder can't lead outside.
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -28,15 +29,9 @@ import {
   type SkillFile,
   type SkillInput,
 } from '@app/shared';
-import {
-  APP_DATA_FOLDER,
-  errorCode,
-  serialized,
-  writeFileAtomic,
-  type SkillStore,
-} from '@app/agent';
+import { errorCode, serialized, writeFileAtomic, type SkillStore } from '@app/agent';
 import { InputError } from './errors.js';
-import { WorkspaceData } from './workspace-data.js';
+import { WorkspaceData, workspaceDataDir } from './workspace-data.js';
 
 /** A skill file is read only up to this size: anything longer can't be a valid skill. */
 const MAX_FILE_BYTES = SKILL_LIMITS.readBytes;
@@ -56,11 +51,15 @@ export interface SkillUploadFile {
 }
 
 export class WorkspaceSkills implements SkillStore {
-  /** <folder>/.nimbrio-ai/skills */
+  /** <folder>/.hamro-ai/<workspace>/skills */
   readonly dir: string;
 
-  constructor(readonly folder: string) {
-    this.dir = path.join(folder, APP_DATA_FOLDER, 'skills');
+  /** `name`: the workspace's, which names its data subfolder in `folder` */
+  constructor(
+    readonly folder: string,
+    readonly name: string,
+  ) {
+    this.dir = path.join(workspaceDataDir(folder, name), 'skills');
   }
 
   async list(): Promise<Skill[]> {
@@ -250,7 +249,7 @@ export class WorkspaceSkills implements SkillStore {
 
   /** The data folder (with its .gitignore) and the skills folder. */
   async #prepare(): Promise<void> {
-    await new WorkspaceData(this.folder).ensure();
+    await new WorkspaceData(this.folder, this.name).ensure();
     await fs.mkdir(this.dir, { recursive: true });
   }
 

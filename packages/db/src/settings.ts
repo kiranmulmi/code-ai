@@ -1,4 +1,4 @@
-// The agent's app-wide settings (Settings -> Agent), in ~/.nimbrio-ai/agent-settings.json.
+// The agent's app-wide settings (Settings -> Agent), in ~/.hamro-ai/agent-settings.json.
 import { serialized } from '@app/agent';
 import {
   agentSettingsSchema,

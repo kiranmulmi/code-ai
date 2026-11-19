@@ -16,6 +16,43 @@ export type ToolGroup = (typeof TOOL_GROUPS)[number];
  */
 export const DEFAULT_DISABLED_TOOLS: readonly ToolGroup[] = ['files'];
 
+const MAX_SLUG_LENGTH = 64;
+/** What a workspace's data subfolder holds: a workspace named like one would be mistaken for old data. */
+const RESERVED_SLUGS: ReadonlySet<string> = new Set(['chats', 'uploads', 'skills', 'agents']);
+
+/**
+ * The name of a workspace's data subfolder (`<folder>/.hamro-ai/<slug>/`), so several
+ * workspaces can share a folder: its name in lowercase letters and digits (accents dropped),
+ * any other run of characters a single '-', at most 64 long ("Client Site / v2" ->
+ * "client-site-v2"). A name with none of those (all symbols, or another script) gets
+ * "workspace-" and 8 hex characters from the name, so it stays the same; one that reads like
+ * a data folder (chats, skills, ...) gets "-workspace" added. Never empty, '.', '..' or
+ * anything with a path separator. Two workspaces on one folder need different slugs.
+ */
+export function workspaceSlug(name: string): string {
+  const slug = name
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+/, '')
+    .slice(0, MAX_SLUG_LENGTH)
+    .replace(/-+$/, '');
+  if (!slug) return `workspace-${fnv1a(name.trim().toLowerCase())}`;
+  return RESERVED_SLUGS.has(slug) ? `${slug}-workspace` : slug;
+}
+
+/** 32-bit FNV-1a of the text as 8 hex characters: stable, and runs in the browser too. */
+function fnv1a(text: string): string {
+  let hash = 0x811c9dc5;
+  for (const char of text) {
+    const code = char.codePointAt(0) ?? 0;
+    hash ^= code;
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return hash.toString(16).padStart(8, '0');
+}
+
 export const TOOL_GROUP_LABELS: Record<ToolGroup, { label: string; detail: string }> = {
   files: { label: 'Files', detail: 'Read, search, write, move and delete files in the folder' },
   commands: { label: 'Commands', detail: 'Run shell commands: tests, builds, installs, git' },

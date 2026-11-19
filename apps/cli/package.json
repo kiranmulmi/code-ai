@@ -5,7 +5,7 @@
   "type": "module",
   "main": "dist/index.js",
   "bin": {
-    "nimbrio-ai": "dist/index.js"
+    "hamro-ai": "dist/index.js"
   },
   "scripts": {
     "start": "tsx src/index.ts",

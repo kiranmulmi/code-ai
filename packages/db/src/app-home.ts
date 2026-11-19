@@ -1,7 +1,7 @@
 // The app's own data, global to this machine and kept in the user's home folder (there is
 // no database):
 //
-//   ~/.nimbrio-ai/
+//   ~/.hamro-ai/
 //     workspaces.json        the workspaces (id, name, folder) and sidebar folders (WorkspaceList)
 //     models.json            the models the agent can run on, with their API keys (ModelStore)
 //     agent-settings.json    how the agent behaves: Settings -> Agent (SettingsStore)

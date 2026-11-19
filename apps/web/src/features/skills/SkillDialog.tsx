@@ -71,7 +71,7 @@ const BODY_HEIGHT = 'h-[max(140px,calc(88vh-690px))] sm:h-[max(160px,calc(88vh-5
 
 /**
  * Write or edit one of the workspace's skills in a popup (`name` null: a new one). Saved as
- * `.nimbrio-ai/skills/<name>.md`. Closing with unsaved changes asks first.
+ * `.hamro-ai/<workspace>/skills/<name>.md`. Closing with unsaved changes asks first.
  */
 export function SkillDialog({
   workspaceId,
@@ -335,7 +335,7 @@ export function SkillDialog({
                 <p className={HINT}>
                   Lower-case words joined by hyphens. Saved as{' '}
                   <span className="break-all font-mono text-[12px]">
-                    .nimbrio-ai/skills/{savedAs}
+                    .hamro-ai/{'<workspace>'}/skills/{savedAs}
                   </span>
                 </p>
               </div>

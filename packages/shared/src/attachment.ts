@@ -3,7 +3,7 @@ import { ATTACHMENT_LIMITS } from './constants.js';
 
 /**
  * A file the user attached in a chat. It is kept privately in the workspace's
- * `.nimbrio-ai/uploads/` (never in the project folder itself); the agent reads it with
+ * `.hamro-ai/<workspace>/uploads/` (never in the project folder itself); the agent reads it with
  * its attachment tools (read_attachment, view_image, save_attachment).
  */
 export interface Attachment {

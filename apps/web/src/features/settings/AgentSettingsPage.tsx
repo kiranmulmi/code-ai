@@ -90,7 +90,7 @@ const fmt = (value: number) => value.toLocaleString('en');
 
 /**
  * `/settings/agent`: how the agent behaves in every workspace (approvals, planning,
- * limits, web search, logging). Saved in ~/.nimbrio-ai; applies from the next message.
+ * limits, web search, logging). Saved in ~/.hamro-ai; applies from the next message.
  */
 export function AgentSettingsPage() {
   const navigate = useNavigate();
@@ -349,10 +349,10 @@ export function AgentSettingsPage() {
                   Lets the agent hand self-contained parts of a task to specialist sub-agents (
                   <span className="font-mono">delegate_task</span>): a researcher, coder, reviewer,
                   writer, or your own from the workspace&apos;s{' '}
-                  <span className="font-mono">.nimbrio-ai/agents/</span> folder. Each works in a
-                  fresh context with its specialist&apos;s tools, shares findings on the team notes,
-                  and reports back. Several can work at once. They share the message&apos;s token
-                  budget and ask for approval like the agent does.
+                  <span className="font-mono">.hamro-ai/{'<workspace>'}/agents/</span> folder. Each
+                  works in a fresh context with its specialist&apos;s tools, shares findings on the
+                  team notes, and reports back. Several can work at once. They share the
+                  message&apos;s token budget and ask for approval like the agent does.
                 </p>
               </div>
               <Switch
@@ -487,8 +487,8 @@ export function AgentSettingsPage() {
               </div>
               <p className={HINT}>
                 {LOG_TEXT[draft.logLevel]} in the server&apos;s terminal. Each run is also written
-                to a JSONL log in <span className="font-mono">~/.nimbrio-ai/logs</span> (move it
-                with <span className="font-mono">AGENT_LOG_DIR</span> in .env).
+                to a JSONL log in <span className="font-mono">~/.hamro-ai/logs</span> (move it with{' '}
+                <span className="font-mono">AGENT_LOG_DIR</span> in .env).
               </p>
             </div>
           </div>

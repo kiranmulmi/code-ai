@@ -1,5 +1,5 @@
 // Files the user attached in a chat. The app keeps them (in @app/db, privately in the
-// workspace's .nimbrio-ai/uploads/); the agent only reads them through this interface,
+// workspace's .hamro-ai/<workspace>/uploads/); the agent only reads them through this interface,
 // with the attachment tools in tools/attachments.ts.
 import { IMAGE_TYPES, fileExtension, type Attachment } from '@app/shared';
 

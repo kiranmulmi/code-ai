@@ -27,6 +27,21 @@ export function useStickToBottom<T extends HTMLElement>(content: unknown, resetK
     lastTop.current = node.scrollTop;
   }, [content, resetKey]);
 
+  // Content can grow without new props here (streamed text plays out frame by frame inside
+  // its block), so follow any change in the log's size too.
+  useLayoutEffect(() => {
+    const node = ref.current;
+    if (!node || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(() => {
+      if (!isPinned.current) return;
+      node.scrollTop = node.scrollHeight;
+      lastTop.current = node.scrollTop;
+    });
+    observer.observe(node);
+    for (const child of Array.from(node.children)) observer.observe(child);
+    return () => observer.disconnect();
+  }, [resetKey]);
+
   // The wheel says "up" before the log has moved, even when it's already at the very end.
   useLayoutEffect(() => {
     const node = ref.current;

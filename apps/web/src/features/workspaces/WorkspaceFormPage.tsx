@@ -12,6 +12,7 @@ import {
   DEFAULT_DISABLED_TOOLS,
   LIMITS,
   workspaceInputSchema,
+  workspaceSlug,
   workspaceUpdateSchema,
   type McpServerEntry,
   type ToolGroup,
@@ -236,17 +237,20 @@ export function WorkspaceFormPage() {
     };
   }, [workspaceId]);
 
-  // Checked as the folder is typed or picked (e.g. another workspace already uses it), so it
-  // shows under the field before Save. A failed check stays quiet: saving checks again.
+  // Checked as the folder or name is typed or picked (e.g. another workspace there has a too
+  // similar name; several can share a folder), so it shows under the field before Save. A
+  // failed check stays quiet: saving checks again.
   const [folderProblem, setFolderProblem] = useState<string | null>(null);
   const savedPath = loaded?.path;
+  const savedName = loaded?.name;
   useEffect(() => {
     const wanted = folderPath.trim();
+    const wantedName = name.trim();
     setFolderProblem(null);
-    if (!wanted || wanted === savedPath) return;
+    if (!wanted || !wantedName || (wanted === savedPath && wantedName === savedName)) return;
     let isCurrent = true;
     const timer = setTimeout(() => {
-      checkWorkspaceFolder(wanted, workspaceId)
+      checkWorkspaceFolder(wanted, workspaceId, wantedName)
         .then((problem) => {
           if (isCurrent) setFolderProblem(problem);
         })
@@ -256,7 +260,7 @@ export function WorkspaceFormPage() {
       isCurrent = false;
       clearTimeout(timer);
     };
-  }, [folderPath, savedPath, workspaceId]);
+  }, [folderPath, name, savedPath, savedName, workspaceId]);
   const pathError = errors.path ?? folderProblem;
 
   const isMcpChanged =
@@ -515,9 +519,13 @@ export function WorkspaceFormPage() {
                     'Chats, memories and instructions move to the new folder with it, and the agent works there from now on.'
                   ) : (
                     <>
-                      An existing project, or a new folder created for you. The agent can read and
-                      change anything inside it, asking before each change. Its chats and memories
-                      are kept in <span className="font-mono text-[12px]">.nimbrio-ai/</span> there.
+                      An existing project, or a new folder created for you; other workspaces can use
+                      it too. The agent can read and change anything inside it, asking before each
+                      change. Its chats and memories are kept in{' '}
+                      <span className="font-mono text-[12px]">
+                        .hamro-ai/{workspaceSlug(name.trim() || 'workspace')}/
+                      </span>{' '}
+                      there, named after the workspace.
                     </>
                   )}
                 </p>
@@ -719,8 +727,11 @@ export function WorkspaceFormPage() {
             <>
               All chats, memories and instructions of{' '}
               <strong className="text-ink">{loaded?.name}</strong> are deleted (its{' '}
-              <code className="font-mono text-[12px]">.nimbrio-ai</code> folder). Its other files
-              stay in <code className="font-mono text-[12px]">{loaded?.path}</code>.
+              <code className="font-mono text-[12px]">
+                .hamro-ai/{workspaceSlug(loaded?.name ?? '')}
+              </code>{' '}
+              folder). Its other files, and other workspaces using the folder, stay in{' '}
+              <code className="font-mono text-[12px]">{loaded?.path}</code>.
             </>
           }
           busy={isDeleting}

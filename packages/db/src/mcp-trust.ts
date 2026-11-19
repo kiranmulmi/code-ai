@@ -1,7 +1,9 @@
-// Which mcp.json each workspace folder has approved. A stdio MCP server is a command this
-// app runs, and mcp.json can arrive with a cloned project or be edited by hand, so servers
-// only start from a file whose fingerprint the user approved in the app. The fingerprints
-// live outside every workspace (~/.nimbrio-ai/mcp-trust.json), so a file can't approve itself.
+// Which mcp.json each workspace has approved, keyed by the workspace's data folder
+// (<folder>/.hamro-ai/<workspace>, as several workspaces can share a folder; before, by the
+// folder itself). A stdio MCP server is a command this app runs, and mcp.json can arrive with
+// a cloned project or be edited by hand, so servers only start from a file whose fingerprint
+// the user approved in the app. The fingerprints live outside every workspace
+// (~/.hamro-ai/mcp-trust.json), so a file can't approve itself.
 import { createHash } from 'node:crypto';
 import path from 'node:path';
 import fs from 'node:fs/promises';
@@ -32,29 +34,48 @@ export function mcpFingerprint(config: McpFileContent): string {
 export class McpTrust {
   constructor(readonly file: string = DEFAULT_MCP_TRUST_FILE) {}
 
-  /** A file that turns nothing on runs nothing, so it never needs approving. */
-  async isTrusted(folder: string, config: McpFileContent): Promise<boolean> {
+  /**
+   * `dataDir`: the workspace's data folder (WorkspaceData.dir). A file that turns nothing on
+   * runs nothing, so it never needs approving.
+   */
+  async isTrusted(dataDir: string, config: McpFileContent): Promise<boolean> {
     if (isEmpty(config)) return true;
-    return (await this.#read())[folder] === mcpFingerprint(config);
+    return (await this.#read())[dataDir] === mcpFingerprint(config);
   }
 
-  trust(folder: string, config: McpFileContent): Promise<void> {
-    return this.#change((all) => ({ ...all, [folder]: mcpFingerprint(config) }));
+  trust(dataDir: string, config: McpFileContent): Promise<void> {
+    return this.#change((all) => ({ ...all, [dataDir]: mcpFingerprint(config) }));
   }
 
-  forget(folder: string): Promise<void> {
+  forget(dataDir: string): Promise<void> {
     return this.#change((all) => {
-      const { [folder]: _removed, ...rest } = all;
+      const { [dataDir]: _removed, ...rest } = all;
       return rest;
     });
   }
 
-  /** The workspace moved to another folder, and its mcp.json with it. */
+  /** The workspace's data moved (another folder or a new name), and its mcp.json with it. */
   move(from: string, to: string): Promise<void> {
     return this.#change((all) => {
       const { [from]: fingerprint, ...rest } = all;
       return fingerprint ? { ...rest, [to]: fingerprint } : rest;
     });
+  }
+
+  /**
+   * Like `move`, but `to` keeps an approval of its own; for old approvals (keyed by folder)
+   * whose mcp.json moved into a workspace's data folder.
+   * @returns whether one was carried over
+   */
+  async carryOver(from: string, to: string): Promise<boolean> {
+    let isCarried = false;
+    await this.#change((all) => {
+      const { [from]: fingerprint, ...rest } = all;
+      if (!fingerprint || all[to] !== undefined) return all;
+      isCarried = true;
+      return { ...rest, [to]: fingerprint };
+    });
+    return isCarried;
   }
 
   async #read(): Promise<Record<string, string>> {

@@ -31,6 +31,9 @@ async function tempFolder(): Promise<string> {
   return fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), 'agent-mcp-test-')));
 }
 
+/** A workspace in `folder`; the hub keeps servers per workspace id. */
+const inFolder = (path: string, id = 'ws-1') => ({ id, path });
+
 function toolNamed(tools: readonly AnyTool[], name: string): AnyTool {
   const tool = tools.find((t) => t.name === name);
   assert.ok(tool, `no tool named ${name}`);
@@ -56,7 +59,7 @@ test('a stdio MCP server starts in the workspace and its tools work as agent too
   const previousKey = process.env.AGENT_API_KEY;
   process.env.AGENT_API_KEY = 'app-secret';
   try {
-    const { tools, reports } = await hub.tools(folder, {
+    const { tools, reports } = await hub.tools(inFolder(folder), {
       echo: echoServer({ env: { EXTRA: 'configured' }, autoApprove: ['echo'] }),
     });
 
@@ -103,7 +106,7 @@ test('a server is reused, restarted when its config changes, and stopped when re
   const folder = await tempFolder();
   const hub = new McpHub();
   const pidOf = async (servers: Record<string, McpServerConfig>) => {
-    const { tools } = await hub.tools(folder, servers);
+    const { tools } = await hub.tools(inFolder(folder), servers);
     const out = await toolNamed(tools, 'mcp__echo__whereami').runValidated({}, unusedContext());
     return (JSON.parse(String(out)) as { pid: number }).pid;
   };
@@ -113,8 +116,53 @@ test('a server is reused, restarted when its config changes, and stopped when re
     const changed = await pidOf({ echo: echoServer({ env: { EXTRA: 'new' } }) });
     assert.notEqual(changed, first, 'a new env means a new process');
 
-    assert.deepEqual(await hub.connect(folder, {}), []);
+    assert.deepEqual(await hub.connect(inFolder(folder), {}), []);
     assert.throws(() => process.kill(changed, 0), 'removed from the config: stopped');
+  } finally {
+    await hub.close();
+  }
+});
+
+test('workspaces sharing a folder each keep their own servers', async () => {
+  const folder = await tempFolder();
+  const hub = new McpHub();
+  const first = inFolder(folder, 'ws-1');
+  const second = inFolder(folder, 'ws-2');
+  const pidOf = async (workspace: { id: string; path: string }, name: string) => {
+    const { tools } = await hub.tools(workspace, { [name]: echoServer() });
+    const out = await toolNamed(tools, `mcp__${name}__whereami`).runValidated({}, unusedContext());
+    return JSON.parse(String(out)) as { pid: number; cwd: string };
+  };
+  const isAlive = (pid: number) => {
+    try {
+      process.kill(pid, 0);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+  try {
+    const a = await pidOf(first, 'alpha');
+    const b = await pidOf(second, 'beta');
+    assert.equal(a.cwd, folder, 'runs in the shared folder');
+    assert.equal(b.cwd, folder);
+    assert.ok(isAlive(a.pid), "the second workspace's list didn't close the first one's server");
+    assert.equal((await pidOf(first, 'alpha')).pid, a.pid, 'still the same process');
+
+    // The same server name in both: one process each.
+    const sameName = await pidOf(second, 'alpha');
+    assert.notEqual(sameName.pid, a.pid);
+
+    await hub.closeWorkspace(second.id);
+    assert.ok(!isAlive(sameName.pid), "the closed workspace's server stopped");
+    assert.ok(isAlive(a.pid), "the sibling's server kept running");
+
+    // Moved to another folder: the same id, so its server starts again there.
+    const elsewhere = await tempFolder();
+    const moved = await pidOf(inFolder(elsewhere, 'ws-1'), 'alpha');
+    assert.equal(moved.cwd, elsewhere);
+    assert.notEqual(moved.pid, a.pid);
+    assert.ok(!isAlive(a.pid), 'the old folder\'s server stopped, none left behind');
   } finally {
     await hub.close();
   }
@@ -123,7 +171,7 @@ test('a server is reused, restarted when its config changes, and stopped when re
 test('a server that fails to start is reported, not thrown', async () => {
   const hub = new McpHub({ logger: silentLogger, retryMs: 0 });
   try {
-    const [report] = await hub.connect(await tempFolder(), {
+    const [report] = await hub.connect(inFolder(await tempFolder()), {
       broken: { command: 'definitely-not-a-real-mcp-command' },
     });
     assert.equal(report?.state, 'error');
@@ -146,7 +194,7 @@ test('the agent calls an MCP tool, asking first unless it is auto-approved', asy
     message,
   });
   const runOnce = async (autoApprove: string[]) => {
-    const { tools } = await hub.tools(folder, { echo: echoServer({ autoApprove }) });
+    const { tools } = await hub.tools(inFolder(folder), { echo: echoServer({ autoApprove }) });
     const seen: ModelMessage[][] = [];
     const asked: string[] = [];
     let call = 0;

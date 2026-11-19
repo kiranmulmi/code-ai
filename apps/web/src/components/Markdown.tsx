@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import ReactMarkdown, { type Components, type Options } from 'react-markdown';
 import remarkGfm, { type Options as GfmOptions } from 'remark-gfm';
 import { CodeHighlight } from './CodeHighlight';
@@ -48,9 +49,10 @@ const COMPONENTS: Components = {
 
 /**
  * Renders agent text as Markdown (CommonMark and GitHub's extensions) through react-markdown,
- * which builds React elements and shows any HTML in the text as plain text.
+ * which builds React elements and shows any HTML in the text as plain text. Memoised, so while
+ * a reply streams only the block that's growing is parsed again each frame.
  */
-export function Markdown({
+export const Markdown = memo(function Markdown({
   text,
   isStreaming = false,
   className = '',
@@ -66,4 +68,4 @@ export function Markdown({
       </ReactMarkdown>
     </div>
   );
-}
+});

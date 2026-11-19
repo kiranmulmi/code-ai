@@ -1,5 +1,5 @@
 // Accounts with model providers that sign in through their website (today: Cursor), app-wide,
-// in ~/.nimbrio-ai/providers.json (written 0600). The tokens only leave through `cursor()` and
+// in ~/.hamro-ai/providers.json (written 0600). The tokens only leave through `cursor()` and
 // `cursorAccessToken()`, for the API and runs on this machine; the UI sees `ProviderAccount`.
 // An access token that ran out is renewed with the refresh token when it's next needed.
 import {

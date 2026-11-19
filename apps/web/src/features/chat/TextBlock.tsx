@@ -1,9 +1,14 @@
 import { Markdown } from '../../components/Markdown';
 import { BulbIcon } from '../../lib/icons';
 import type { TextItem } from './conversation';
+import { useSmoothText } from './useSmoothText';
 
 /** Agent text: the answer, an interim note on the way to a tool call, or an error. */
 export function TextBlock({ item }: { item: TextItem }) {
+  // Streamed text plays out at a steady pace rather than in the bursts it arrives in.
+  const smooth = useSmoothText(item.text, item.isOpen && !item.isError);
+  const text = smooth.text;
+  const isStreaming = item.isOpen || smooth.isCatchingUp;
   if (!item.text) return null;
 
   if (item.isError) {
@@ -22,7 +27,7 @@ export function TextBlock({ item }: { item: TextItem }) {
       <div className="flex gap-2 px-0.5 py-0.5 text-[13px] text-ink-3 [overflow-wrap:anywhere]">
         <BulbIcon size={14} className="mt-[3px] shrink-0 text-ink-4" />
         <div className="min-w-0 flex-1">
-          <Markdown text={item.text} isStreaming={item.isOpen} />
+          <Markdown text={text} isStreaming={isStreaming} />
         </div>
       </div>
     );
@@ -30,7 +35,7 @@ export function TextBlock({ item }: { item: TextItem }) {
 
   return (
     <div className="px-0.5 py-1 leading-relaxed text-ink [overflow-wrap:anywhere]">
-      <Markdown text={item.text} isStreaming={item.isOpen} />
+      <Markdown text={text} isStreaming={isStreaming} />
     </div>
   );
 }

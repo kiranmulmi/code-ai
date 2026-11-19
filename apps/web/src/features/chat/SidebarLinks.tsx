@@ -149,10 +149,10 @@ export function SidebarLinks({
           type="button"
           onClick={() => {
             void install().then((isInstalled) => {
-              if (isInstalled) toast('Installed. Open Nimbrio AI from your apps.');
+              if (isInstalled) toast('Installed. Open Hamro AI from your apps.');
             });
           }}
-          title="Open Nimbrio AI in its own window, from your dock or start menu"
+          title="Open Hamro AI in its own window, from your dock or start menu"
           className={`${ROW} w-full text-left transition-colors hover:bg-subtle hover:text-ink`}
         >
           <span className="grid h-6 w-6 shrink-0 place-items-center rounded-lg bg-accent text-on-accent">

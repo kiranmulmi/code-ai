@@ -1,5 +1,5 @@
 // Observability: every step of a run goes to the console (readable) and to a
-// JSONL file in ~/.nimbrio-ai/logs/ (one event per line, AGENT_LOG_DIR to move it), so you can see why the agent did
+// JSONL file in ~/.hamro-ai/logs/ (one event per line, AGENT_LOG_DIR to move it), so you can see why the agent did
 // what it did after the fact. The console level is set in the app (Settings -> Agent).
 import fs from 'node:fs';
 import path from 'node:path';

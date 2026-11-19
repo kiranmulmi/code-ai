@@ -83,7 +83,7 @@ async function startServer(): Promise<number> {
   const shellPath = await loginShellPath();
   const log = fs.createWriteStream(serverLogPath(), { flags: 'w' });
   const child = utilityProcess.fork(SERVER_ENTRY, [], {
-    serviceName: 'Nimbrio AI server',
+    serviceName: 'Hamro AI server',
     stdio: 'pipe',
     env: {
       ...process.env,
@@ -102,7 +102,7 @@ async function startServer(): Promise<number> {
     log.end();
     if (isQuitting) return;
     dialog.showErrorBox(
-      'Nimbrio AI stopped',
+      'Hamro AI stopped',
       `The app's server stopped unexpectedly (exit code ${code}).\n\nDetails are in ${serverLogPath()}`,
     );
     app.quit();
@@ -122,7 +122,7 @@ function createWindow(): void {
     height: 900,
     minWidth: 380,
     minHeight: 560,
-    title: 'Nimbrio AI',
+    title: 'Hamro AI',
     show: false,
     // The page's own --bg, so opening doesn't flash white in dark mode.
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#08131f' : '#f2f7f6',
@@ -231,7 +231,7 @@ if (!app.requestSingleInstanceLock()) {
       isQuitting = true;
       server?.kill();
       dialog.showErrorBox(
-        "Nimbrio AI couldn't start",
+        "Hamro AI couldn't start",
         `${error instanceof Error ? error.message : String(error)}\n\nDetails are in ${serverLogPath()}`,
       );
       app.quit();

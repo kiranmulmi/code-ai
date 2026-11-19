@@ -61,6 +61,7 @@ test("a reloaded chat shows its planner call's duration at the start of the run"
     cacheWriteTokens: 0,
     calls,
     finishedAt: null,
+    durationMs: null,
   });
   const detail = {
     chat: {},

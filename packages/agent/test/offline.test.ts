@@ -258,26 +258,27 @@ async function sampleProject(): Promise<ToolContext> {
   await write('node_modules/lib/index.js', 'export function add() {}');
   await write('.git/HEAD', 'ref: refs/heads/main');
   // The app's own data: never listed, searched, read or changed by file tools.
-  await write('.nimbrio-ai/chats/c1/messages.jsonl', '{"content":"export function add"}\n');
-  await write('.nimbrio-ai/memory.json', '[]');
+  await write('.hamro-ai/chats/c1/messages.jsonl', '{"content":"export function add"}\n');
+  await write('.hamro-ai/memory.json', '[]');
   return toolContext({ workspace: filesDir });
 }
 
-test("file tools can't see or touch the app's own .nimbrio-ai data", async () => {
+test("file tools can't see or touch the app's own .hamro-ai data", async () => {
   const ctx = await sampleProject();
   const refused = /holds this app's own chats/;
+  await assert.rejects(readFile.run({ path: '.hamro-ai/memory.json' }, ctx), refused);
+  await assert.rejects(readFile.run({ path: '.Hamro-AI/memory.json' }, ctx), refused);
+  await assert.rejects(listFiles.run({ path: '.hamro-ai' }, ctx), refused);
+  // The folder's names before the app was renamed, in case an old copy is left.
   await assert.rejects(readFile.run({ path: '.nimbrio-ai/memory.json' }, ctx), refused);
-  await assert.rejects(readFile.run({ path: '.Nimbrio-AI/memory.json' }, ctx), refused);
-  await assert.rejects(listFiles.run({ path: '.nimbrio-ai' }, ctx), refused);
-  // The folder's name before the app was renamed, in case an old copy is left.
   await assert.rejects(readFile.run({ path: '.agentic-ai/memory.json' }, ctx), refused);
   await assert.rejects(
-    writeFile.run({ path: '.nimbrio-ai/memory.json', content: '[]' }, ctx),
+    writeFile.run({ path: '.hamro-ai/memory.json', content: '[]' }, ctx),
     refused,
   );
-  await assert.rejects(deletePath.run({ path: '.nimbrio-ai' }, ctx), refused);
+  await assert.rejects(deletePath.run({ path: '.hamro-ai' }, ctx), refused);
   await assert.rejects(
-    movePath.run({ from: 'package.json', to: 'sub/.nimbrio-ai/x.json' }, ctx),
+    movePath.run({ from: 'package.json', to: 'sub/.hamro-ai/x.json' }, ctx),
     refused,
   );
   assert.match(String(await findFiles.run({ pattern: '*.json*' }, ctx)), /^package\.json$/);
@@ -508,6 +509,36 @@ test(
         runCommand.run({ command: 'sleep 1', background: true }, base),
         /aren't available/,
       );
+    } finally {
+      await registry.close();
+    }
+  },
+);
+
+test(
+  "stopping one workspace's tasks leaves a sibling's on the same folder running",
+  { skip: !hasBash },
+  async () => {
+    const base = await sampleProject();
+    const registry = new BackgroundTasks();
+    const first = registry.forWorkspace('ws-1');
+    const second = registry.forWorkspace('ws-2');
+    try {
+      const a = first.start('sleep 30', base.workspace, '.');
+      const b = second.start('sleep 30', base.workspace, '.');
+      assert.deepEqual(
+        registry.list('ws-1').map((task) => task.id),
+        [a.id],
+        'each sees only its own',
+      );
+      assert.equal(first.get(b.id), null, "can't read the sibling's task");
+      assert.equal(await first.stop(b.id), false, "can't stop the sibling's task");
+
+      await registry.closeWorkspace('ws-1');
+      assert.deepEqual(registry.list('ws-1'), [], 'stopped and forgotten');
+      assert.equal(second.get(b.id)?.isRunning, true, "the sibling's task keeps running");
+      assert.ok(b.pid);
+      assert.doesNotThrow(() => process.kill(b.pid ?? 0, 0));
     } finally {
       await registry.close();
     }
@@ -1478,7 +1509,7 @@ test('config reads only the bootstrap values from env; saved settings fall back 
   assert.equal(config.maxSteps, DEFAULT_AGENT_SETTINGS.maxSteps);
   assert.equal(config.approval, 'ask');
   assert.equal(config.logDir, path.join(os.homedir(), 'agent-logs'));
-  assert.equal(loadAgentConfig({}).logDir, path.join(os.homedir(), '.nimbrio-ai', 'logs'));
+  assert.equal(loadAgentConfig({}).logDir, path.join(os.homedir(), '.hamro-ai', 'logs'));
 
   const saved = readAgentSettings({
     maxSteps: 'lots',
@@ -1575,7 +1606,7 @@ test('save_attachment copies a file into the workspace and never overwrites', as
     saveAttachment.run({ attachment_id: id, path: 'public/logo.png' }, ctx),
     /already exists/,
   );
-  await assert.rejects(saveAttachment.run({ attachment_id: id, path: '.nimbrio-ai/x.png' }, ctx));
+  await assert.rejects(saveAttachment.run({ attachment_id: id, path: '.hamro-ai/x.png' }, ctx));
 });
 
 test('attached files are listed for the model and view_image shows the image next', async () => {
@@ -1727,14 +1758,14 @@ test('the Files panel search finds names and lines, skipping generated and app f
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'agent-search-'));
   await fs.mkdir(path.join(dir, 'src'));
   await fs.mkdir(path.join(dir, 'node_modules', 'dep'), { recursive: true });
-  await fs.mkdir(path.join(dir, '.nimbrio-ai'));
+  await fs.mkdir(path.join(dir, '.hamro-ai'));
   await fs.writeFile(
     path.join(dir, 'src', 'Greeting.ts'),
     'export const hello = 1;\nconst x = HELLO;\n',
   );
   await fs.writeFile(path.join(dir, 'greeting-notes.md'), 'nothing here\n');
   await fs.writeFile(path.join(dir, 'node_modules', 'dep', 'greeting.js'), 'hello');
-  await fs.writeFile(path.join(dir, '.nimbrio-ai', 'greeting.json'), '"hello"');
+  await fs.writeFile(path.join(dir, '.hamro-ai', 'greeting.json'), '"hello"');
   await fs.writeFile(path.join(dir, 'image.bin'), Buffer.from([0, 1, 2, 104, 101, 108, 108, 111]));
 
   const names = await findFilesByName(dir, 'GREET', 10);
@@ -1955,7 +1986,7 @@ test('copy_skill_file asks first, copies the bytes into the workspace and never 
   );
   await assert.rejects(
     copySkillFile.run(
-      { skill: 'corporate-navy-teal', path: 'assets/design-system.css', to: '.nimbrio-ai/x.css' },
+      { skill: 'corporate-navy-teal', path: 'assets/design-system.css', to: '.hamro-ai/x.css' },
       ctx,
     ),
     /can't reach it/,

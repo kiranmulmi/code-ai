@@ -156,8 +156,9 @@ export function McpServerFormPage() {
         <div className="border-b border-line bg-subtle px-5 py-3 sm:px-6">
           <h2 className="text-[15px] font-bold text-ink">Server</h2>
           <p className="text-[13px] text-ink-3">
-            Saved in this workspace&apos;s <span className="font-mono">.nimbrio-ai/mcp.json</span>,
-            in the format other MCP apps use.
+            Saved in this workspace&apos;s{' '}
+            <span className="font-mono">.hamro-ai/{'<workspace>'}/mcp.json</span>, in the format
+            other MCP apps use.
           </p>
         </div>
 
@@ -289,7 +290,7 @@ export function McpServerFormPage() {
               A local server runs its command in the folder of each workspace that turns it on, with
               only the variables in <span className="font-mono">env</span> plus basics like PATH and
               HOME, never this app&apos;s own keys. Keys and tokens in it are saved in
-              ~/.nimbrio-ai/mcp-servers.json, readable only by you, not in your project folders.
+              ~/.hamro-ai/mcp-servers.json, readable only by you, not in your project folders.
             </p>
           </div>
         </div>

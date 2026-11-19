@@ -52,6 +52,8 @@ export type HistoryItem =
       calls: ModelCallUsage[];
       /** when the reply finished (ISO) */
       finishedAt: string | null;
+      /** how long the reply took, from send to finish (null when unknown) */
+      durationMs: number | null;
     };
 
 export interface ChatDetail {

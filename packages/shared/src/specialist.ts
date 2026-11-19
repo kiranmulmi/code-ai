@@ -5,7 +5,7 @@ import { TOOL_GROUPS, type ToolGroup } from './workspace.js';
 /**
  * A specialist sub-agent the main agent can hand work to with delegate_task. The app has
  * built-in ones (researcher, coder, reviewer, writer, general); a workspace adds its own in the
- * Agents tab, kept as `.nimbrio-ai/agents/<name>.md` (front matter, then the role). One named
+ * Agents tab, kept as `.hamro-ai/<workspace>/agents/<name>.md` (front matter, then the role). One named
  * like a built-in replaces it.
  */
 export interface SpecialistInfo {

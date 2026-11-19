@@ -51,7 +51,7 @@ test('create, read, rename and delete a specialist; taken names are a 409', asyn
 
 test('broken files show with their reason and can be deleted by file name', async () => {
   const { service, id, folder } = await setup();
-  const dir = path.join(folder, '.nimbrio-ai', 'agents');
+  const dir = path.join(folder, '.hamro-ai', 'project', 'agents');
   await fs.mkdir(dir, { recursive: true });
   await fs.writeFile(path.join(dir, 'helper.md'), '---\ntools: files, wifi\n---\n');
   const { problems } = await service.list(id);

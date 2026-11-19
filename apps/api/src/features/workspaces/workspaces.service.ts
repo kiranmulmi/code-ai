@@ -35,10 +35,11 @@ export function createWorkspacesService({ store, runs, mcp, tasks }: AppContext)
       const updated = await store.updateWorkspace(id, changes);
       if (!updated) throw new NotFoundError("That workspace doesn't exist.");
       // Its MCP servers ran in the old folder; they start again in the new one when needed.
-      // Its background tasks are stopped too: they ran in the old folder.
+      // Its background tasks are stopped too: they ran in the old folder. Both are kept by
+      // id, so a rename needs nothing and other workspaces on the same folder keep theirs.
       if (updated.path !== current.path) {
-        await mcp.closeWorkspace(current.path);
-        await tasks.closeWorkspace(current.path);
+        await mcp.closeWorkspace(id);
+        await tasks.closeWorkspace(id);
       }
       return updated;
     },
@@ -66,8 +67,8 @@ export function createWorkspacesService({ store, runs, mcp, tasks }: AppContext)
       const workspace = await require(id);
       if (runs.hasRunningIn(id))
         throw new ConflictError('A chat in this workspace is still running.');
-      await mcp.closeWorkspace(workspace.path);
-      await tasks.closeWorkspace(workspace.path);
+      await mcp.closeWorkspace(workspace.id);
+      await tasks.closeWorkspace(workspace.id);
       await store.deleteWorkspace(id);
       return { filesKeptAt: workspace.path };
     },

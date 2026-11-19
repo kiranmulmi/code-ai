@@ -13,9 +13,12 @@ import { ForbiddenError, NotFoundError, ValidationError } from '../../lib/errors
  */
 export function createFoldersService({ store }: AppContext) {
   return {
-    /** Whether a workspace could use the folder (another one may already); nothing is created. */
-    async check(requested: string, workspaceId?: string): Promise<FolderCheck> {
-      return { problem: await store.folderProblem(requested, workspaceId) };
+    /**
+     * Whether a workspace named `name` could use the folder (another one there may have a too
+     * similar name); nothing is created.
+     */
+    async check(requested: string, workspaceId?: string, name?: string): Promise<FolderCheck> {
+      return { problem: await store.folderProblem(requested, workspaceId, name) };
     },
 
     async browse(requested?: string): Promise<FolderListing> {

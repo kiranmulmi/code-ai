@@ -1,4 +1,4 @@
-// Offline tests for a workspace's skills: .nimbrio-ai/skills/<name>.md, and skill folders
+// Offline tests for a workspace's skills: .hamro-ai/<workspace>/skills/<name>.md, and skill folders
 // uploaded as <name>/SKILL.md with files of their own.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -16,7 +16,10 @@ import {
 } from '../src/workspace-skills.js';
 
 async function tempSkills(): Promise<WorkspaceSkills> {
-  return new WorkspaceSkills(await fs.mkdtemp(path.join(os.tmpdir(), 'agent-skills-test-')));
+  return new WorkspaceSkills(
+    await fs.mkdtemp(path.join(os.tmpdir(), 'agent-skills-test-')),
+    'Skills Test',
+  );
 }
 
 const FIX = {
@@ -37,7 +40,7 @@ test('a skill is saved as Markdown with front matter and read back', async () =>
     text,
     '---\nname: jira-ticket-fix\ndescription: When the user gives a Jira ticket to check or fix.\n---\n\nPhase 1: verify.\n\nPhase 2: propose, then stop.\n',
   );
-  const ignore = path.join(skills.folder, '.nimbrio-ai', '.gitignore');
+  const ignore = path.join(skills.folder, '.hamro-ai', '.gitignore');
   assert.ok(await fs.stat(ignore), 'the data folder keeps its .gitignore');
   assert.deepEqual(
     (await skills.list()).map((s) => s.name),

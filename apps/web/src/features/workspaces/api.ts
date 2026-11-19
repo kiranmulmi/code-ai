@@ -40,13 +40,17 @@ export function fetchFolders(folderPath?: string): Promise<FolderListing> {
   return request<FolderListing>(`/folders${buildQuery({ path: folderPath })}`);
 }
 
-/** Why the folder can't be this workspace's (or a new one's), e.g. another uses it; or null. */
+/**
+ * Why the folder can't be this workspace's (or a new one's) under `name`, e.g. another there
+ * has a too similar name; or null.
+ */
 export async function checkWorkspaceFolder(
   folderPath: string,
   workspaceId?: string,
+  name?: string,
 ): Promise<string | null> {
   const { problem } = await request<FolderCheck>(
-    `/folders/check${buildQuery({ path: folderPath, workspaceId })}`,
+    `/folders/check${buildQuery({ path: folderPath, workspaceId, name })}`,
   );
   return problem;
 }

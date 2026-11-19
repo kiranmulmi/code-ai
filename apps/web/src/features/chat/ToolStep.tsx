@@ -116,8 +116,8 @@ function SubagentSteps({ activity }: { activity: SubagentActivity }) {
       {activity.tools.map((tool) => (
         <div key={tool.id} className="flex h-6 items-center gap-2">
           <StepIcon name={tool.name} state={tool.state} />
-          <span className="shrink-0 font-mono font-semibold text-ink-3">{tool.name}</span>
-          <span className="min-w-0 flex-1 truncate font-mono text-ink-3 opacity-75">
+          <span className="shrink-0 font-mono font-semibold italic text-ink-4">{tool.name}</span>
+          <span className="min-w-0 flex-1 truncate font-mono text-ink-4">
             {stepSummary(tool.args).text}
           </span>
         </div>
@@ -145,7 +145,7 @@ function ToolCall({ item }: { item: ToolItem }) {
     <details className="group text-[12.5px]">
       <summary className="flex h-8 cursor-pointer list-none items-center gap-2.5 rounded-lg px-2.5 text-[11px] transition-colors hover:bg-surface group-open:bg-surface [&::-webkit-details-marker]:hidden">
         <StepIcon name={item.name} state={item.state} />
-        <span className="shrink-0 font-mono font-semibold text-ink-3">{item.name}</span>
+        <span className="shrink-0 font-mono font-semibold italic text-ink-4">{item.name}</span>
         {delegated && (
           <Badge tone="blue" className="shrink-0">
             {specialistTitle(delegated.specialist)}
@@ -154,7 +154,7 @@ function ToolCall({ item }: { item: ToolItem }) {
         <span
           title={summary.isReason ? inlineArgs(item.args) : undefined}
           className={`min-w-0 flex-1 truncate ${
-            summary.isReason ? 'text-[12px] text-ink-2' : 'font-mono text-ink-3 opacity-75'
+            summary.isReason ? 'text-[12px] text-ink-3' : 'font-mono text-ink-4'
           }`}
         >
           {summary.text}

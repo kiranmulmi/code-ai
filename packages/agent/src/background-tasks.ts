@@ -1,7 +1,8 @@
 // Commands the agent leaves running on purpose (run_command with background: true): dev
 // servers, watchers, anything that should outlive the agent's turn. The app holds one
 // BackgroundTasks for its whole life; each run gets a view of one workspace's tasks
-// (`forWorkspace`), so a chat can only see and stop the tasks of its own workspace.
+// (`forWorkspace`), so a chat can only see and stop the tasks of its own workspace. Tasks are
+// kept per workspace id, not folder: several workspaces can share a folder, each with its own.
 import { spawn, type ChildProcess } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import type { BackgroundTask, BackgroundTaskDetail } from '@app/shared';
@@ -18,6 +19,7 @@ const STOP_GRACE_MS = TOOL_LIMITS.backgroundTasks.stopGraceMs;
 
 interface Entry {
   task: BackgroundTask;
+  /** the workspace's id */
   workspace: string;
   output: BoundedOutput;
   child: ChildProcess;
@@ -41,7 +43,7 @@ export interface WorkspaceTasks {
 export class BackgroundTasks {
   private readonly entries = new Map<string, Entry>();
 
-  /** The tasks of one workspace folder; tasks it starts are tagged with `chatId`. */
+  /** The tasks of one workspace (by its id); tasks it starts are tagged with `chatId`. */
   forWorkspace(workspace: string, chatId: string | null = null): WorkspaceTasks {
     return {
       start: (command, cwd, shownCwd) => this.start(workspace, chatId, command, cwd, shownCwd),
@@ -102,7 +104,7 @@ export class BackgroundTasks {
     );
   }
 
-  /** Stops one workspace's tasks and forgets them (the workspace is deleted or moved). */
+  /** Stops one workspace's tasks (by its id) and forgets them (it's deleted or moved). */
   async closeWorkspace(workspace: string): Promise<void> {
     const entries = [...this.entries.values()].filter((e) => e.workspace === workspace);
     await Promise.all(entries.filter((e) => e.task.isRunning).map((e) => this.end(e)));

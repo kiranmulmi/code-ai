@@ -40,7 +40,7 @@ export {
 } from './memory/long-term.js';
 export {
   APP_DATA_FOLDER,
-  LEGACY_APP_DATA_FOLDER,
+  LEGACY_APP_DATA_FOLDERS,
   checkInput,
   isInAppData,
   resolveInWorkspace,
@@ -74,6 +74,7 @@ export {
   type McpHubOptions,
   type McpServerReport,
   type McpToolSummary,
+  type McpWorkspace,
 } from './mcp/hub.js';
 export { listWorkspaceFiles } from './tools/files/walk.js';
 export { findFilesByName, searchFileContents } from './workspace-search.js';

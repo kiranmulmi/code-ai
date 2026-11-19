@@ -1,4 +1,4 @@
-// Offline tests for which MCP servers a workspace turns on (.nimbrio-ai/mcp.json) and the
+// Offline tests for which MCP servers a workspace turns on (.hamro-ai/<workspace>/mcp.json) and the
 // approvals kept outside it.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -15,11 +15,11 @@ async function setup() {
   const folder = path.join(tmp, 'project');
   await fs.mkdir(folder);
   const trust = new McpTrust(path.join(tmp, 'home', 'mcp-trust.json'));
-  const data = new WorkspaceData(folder);
+  const data = new WorkspaceData(folder, 'Project');
   return { folder, trust, data, mcp: new WorkspaceMcp(data, trust) };
 }
 
-/** The app's servers (they live in ~/.nimbrio-ai/mcp-servers.json; here just a list). */
+/** The app's servers (they live in ~/.hamro-ai/mcp-servers.json; here just a list). */
 const servers: McpServerEntry[] = [
   { name: 'github', server: { url: 'https://example.com/mcp' } },
   { name: 'docs', server: { command: 'node', args: ['docs.js'] } },
@@ -28,7 +28,7 @@ const servers: McpServerEntry[] = [
 test('a workspace starts with every server off, and turning one on saves just its name', async () => {
   const { folder, mcp } = await setup();
   assert.deepEqual(await mcp.read(), {
-    file: path.join(folder, '.nimbrio-ai', 'mcp.json'),
+    file: path.join(folder, '.hamro-ai', 'project', 'mcp.json'),
     allowed: [],
     enabled: [],
     isTrusted: true,
@@ -38,7 +38,7 @@ test('a workspace starts with every server off, and turning one on saves just it
   const state = await mcp.setEnabled('github', true);
   assert.equal(state.isTrusted, true);
   assert.deepEqual(
-    JSON.parse(await fs.readFile(path.join(folder, '.nimbrio-ai', 'mcp.json'), 'utf8')),
+    JSON.parse(await fs.readFile(path.join(folder, '.hamro-ai', 'project', 'mcp.json'), 'utf8')),
     { allowed: ['github'], enabled: ['github'] },
     'no settings or tokens in the workspace folder',
   );
@@ -141,18 +141,34 @@ test('an old mcp.json with full settings is read as legacy and turns nothing on'
   );
 });
 
-test('approvals follow the folder, ignore formatting and stop with forget', async () => {
-  const { folder, trust } = await setup();
+test('approvals follow the data folder, ignore formatting and stop with forget', async () => {
+  const { trust, data, mcp } = await setup();
   const config = { enabled: ['a', 'b'] };
-  await trust.trust(folder, config);
-  assert.equal(await trust.isTrusted(folder, { enabled: ['a', 'b'] }), true);
+  await trust.trust(data.dir, config);
+  assert.equal(await trust.isTrusted(data.dir, { enabled: ['a', 'b'] }), true);
+  assert.equal(await trust.isTrusted(data.folder, config), false, 'not by the folder any more');
   assert.notEqual(mcpFingerprint(config), mcpFingerprint({ enabled: ['a'] }));
 
-  await trust.move(folder, '/elsewhere');
-  assert.equal(await trust.isTrusted(folder, config), false);
+  await trust.move(data.dir, '/elsewhere');
+  assert.equal(await trust.isTrusted(data.dir, config), false);
   assert.equal(await trust.isTrusted('/elsewhere', config), true);
   await trust.forget('/elsewhere');
   assert.equal(await trust.isTrusted('/elsewhere', config), false);
+
+  // Another workspace on the same folder has an approval of its own.
+  await mcp.setEnabled('github', true);
+  const sibling = new WorkspaceMcp(new WorkspaceData(data.folder, 'Other'), trust);
+  await fs.mkdir(path.dirname(sibling.file), { recursive: true });
+  await fs.writeFile(sibling.file, JSON.stringify({ enabled: ['github'] }));
+  assert.equal((await mcp.read()).isTrusted, true);
+  assert.equal((await sibling.read()).isTrusted, false, "one workspace's approval isn't another's");
+
+  // An old approval (keyed by folder) is carried over once, never over a newer one.
+  await trust.trust(data.folder, config);
+  assert.equal(await trust.carryOver(data.folder, data.dir), false, 'the data folder has its own');
+  assert.equal(await trust.carryOver(data.folder, '/new-dir'), true);
+  assert.equal(await trust.isTrusted('/new-dir', config), true);
+  assert.equal(await trust.carryOver(data.folder, '/new-dir'), false, 'only once');
 });
 
 test('a damaged mcp.json is reported with its path', async () => {

@@ -1,4 +1,4 @@
-// Skills the user wrote for a workspace (kept by @app/db in its .nimbrio-ai/skills/). The
+// Skills the user wrote for a workspace (kept by @app/db in its .hamro-ai/<workspace>/skills/). The
 // agent lists them in its system prompt and loads one with use_skill when a task matches;
 // skills the user picked for a message come with that message (pickedSkillsContext). A skill
 // uploaded as a folder has files of its own (references, templates, assets): use_skill lists

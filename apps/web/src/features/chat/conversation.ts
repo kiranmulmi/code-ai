@@ -8,7 +8,7 @@ import type {
   StreamEvent,
   Usage,
 } from '@app/shared';
-import { compactNumber, parseArgs, plural } from '../../lib/format';
+import { compactNumber, formatElapsed, parseArgs, plural } from '../../lib/format';
 import { initialPlanState, withPhase, withPlan, type PlanState } from '../panel/plan/planState';
 import { PLAN_TOOL_NAMES, addedStepCount, describeActivity } from './tools';
 
@@ -130,6 +130,8 @@ export type AgentTurn = {
   liveMeta: string | null;
   /** When the reply finished (ISO), shown next to `meta`. */
   finishedAt: string | null;
+  /** How long the reply took, from send to finish (null when unknown). */
+  durationMs: number | null;
 };
 
 /** What one reply cost: its totals and each model call (none for replies saved before). */
@@ -165,6 +167,8 @@ export type ConversationState = {
   context: { usedTokens: number; windowTokens: number; summarizeAtTokens?: number } | null;
   /** The question the agent is waiting on, if any (tools run one at a time). */
   question: OpenQuestion | null;
+  /** When the running request was sent (ms), to show how long it has run; null when idle. */
+  runStartedAt: number | null;
   /** Counter for React keys, so the reducer stays pure. */
   seq: number;
 };
@@ -194,6 +198,7 @@ export const initialConversation: ConversationState = {
   runUsage: null,
   context: null,
   question: null,
+  runStartedAt: null,
   seq: 0,
 };
 
@@ -230,9 +235,18 @@ export function tokensText(usage: Usage): string {
   return cached ? `${total} · ${compactNumber(cached)} cached` : total;
 }
 
-/** "2 steps · 4.4K tokens · 3.9K cached"; "~4.4K" while a model call's tokens are estimated. */
-function metaText(steps: number, usage: Usage, isEstimated = false): string {
-  return `${plural(steps, 'step')} · ${isEstimated ? '~' : ''}${tokensText(usage)}`;
+/**
+ * "2 steps · 4.4K tokens · 3.9K cached · 1m 05s"; "~4.4K" while a model call's tokens are
+ * estimated. The time taken is left out while it runs or when unknown.
+ */
+function metaText(
+  steps: number,
+  usage: Usage,
+  isEstimated = false,
+  durationMs: number | null = null,
+): string {
+  const time = durationMs === null ? '' : ` · ${formatElapsed(durationMs / 1000)}`;
+  return `${plural(steps, 'step')} · ${isEstimated ? '~' : ''}${tokensText(usage)}${time}`;
 }
 
 /**
@@ -246,6 +260,7 @@ class Draft {
   runUsage: Usage | null;
   context: ConversationState['context'];
   question: OpenQuestion | null;
+  runStartedAt: number | null;
   agent: AgentTurn | null = null;
 
   constructor(state: ConversationState) {
@@ -255,6 +270,7 @@ class Draft {
     this.runUsage = state.runUsage;
     this.context = state.context;
     this.question = state.question;
+    this.runStartedAt = state.runStartedAt;
     const last = this.turns.at(-1);
     if (last?.role === 'agent') {
       this.agent = { ...last, flow: [...last.flow] };
@@ -278,6 +294,7 @@ class Draft {
         usage: null,
         liveMeta: null,
         finishedAt: null,
+        durationMs: null,
       };
       this.turns.push(this.agent);
     }
@@ -605,8 +622,10 @@ class Draft {
     }
     this.setRunUsage(result.usage);
     this.runUsage = null;
+    agent.durationMs = this.runStartedAt === null ? null : Math.max(0, at - this.runStartedAt);
+    this.runStartedAt = null;
     agent.liveMeta = null;
-    agent.meta = metaText(result.steps, result.usage);
+    agent.meta = metaText(result.steps, result.usage, false, agent.durationMs);
     agent.usage = { steps: result.steps, usage: result.usage, calls: result.calls };
     agent.finishedAt = new Date(at).toISOString();
   }
@@ -642,6 +661,7 @@ class Draft {
       runUsage: this.runUsage,
       context: this.context,
       question: this.question,
+      runStartedAt: this.runStartedAt,
       plan,
     };
   }
@@ -683,7 +703,8 @@ function fromHistory(detail: ChatDetail): ConversationState {
         }
         draft.addUsage(item);
         const turn = draft.ensureAgent();
-        turn.meta = metaText(item.steps, item);
+        turn.durationMs = item.durationMs ?? null;
+        turn.meta = metaText(item.steps, item, false, turn.durationMs);
         turn.usage = {
           steps: item.steps,
           usage: {
@@ -905,6 +926,7 @@ export function conversationReducer(
         new Date(action.at).toISOString(),
       );
       draft.ensureAgent('Working…');
+      draft.runStartedAt ??= action.at;
       return draft.result(state);
     }
     case 'event':
@@ -927,6 +949,7 @@ export function conversationReducer(
       // A run that ended without `done` (an error): its tokens so far stay in the chat's total.
       draft.runUsage = null;
       draft.question = null;
+      draft.runStartedAt = null;
       if (draft.agent) {
         draft.agent.status = null;
         draft.agent.liveMeta = null;

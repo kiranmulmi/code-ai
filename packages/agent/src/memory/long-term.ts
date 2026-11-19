@@ -1,5 +1,5 @@
 // Long-term memory: facts that survive between sessions.
-// The app keeps them in a JSON file per workspace, <folder>/.nimbrio-ai/memory.json
+// The app keeps them in a JSON file per workspace, <folder>/.hamro-ai/<workspace>/memory.json
 // (LongTermMemory below, opened by @app/db). Recall is simple keyword overlap -
 // good enough to start. Swap in embeddings later without touching the rest of the agent.
 import fs from 'node:fs/promises';
