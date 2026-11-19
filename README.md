@@ -69,6 +69,7 @@ Everything else is saved in the workspace's own folder, under `.nimbrio-ai/` (it
 | `mcp.json`                  | which of the app's MCP servers are on here              |
 | `uploads/<id>/`             | an attached file (`file`) and its details (`meta.json`) |
 | `skills/<name>.md`          | a skill: name and description up top, then the steps    |
+| `agents/<name>.md`          | a specialist sub-agent, from the Agents tab             |
 
 Adding a folder that already has a `.nimbrio-ai/` folder (say, after deleting the workspace from the list, or on a new machine) brings its chats, memory and settings back.
 
@@ -109,6 +110,39 @@ This is a hybrid of the two common agent patterns: **plan-and-execute** for big 
 - **Per-workspace planning and tools:** in a workspace's settings, Planning follows Settings → Agent or is on or off just there, and Tools turns off groups it doesn't need (files, commands, web, memory, plans). Off groups' tools and prompt rules aren't sent, so a chat-only workspace (a language tutor, say) uses far fewer tokens per message. Attachment and skill tools are only sent when a chat has files or the workspace has skills.
 - **MCP tools on demand:** the MCP servers you turn on in a workspace are listed to the agent by tool name only; it loads the full definitions of the tools a task needs (`load_mcp_tools`) and only those are sent from then on. A plain message doesn't pay for a server's tools (Atlassian's are ~25K tokens).
 - **Skills:** instructions you write for a kind of task (a ticket workflow, a review checklist) in the Skills tab under the side panel. The agent sees each skill's name and description and loads the one a task needs with `use_skill`; to choose yourself, pick skills for a message with the Skills button in the message box, and they're sent with it in full. A skill guides how the agent works; it never turns approvals off. To give a skill files of its own (references, templates, stylesheets), click **Upload** in the Skills tab and pick a skill folder with a `SKILL.md` at its top (front matter `name` and `description`, then the instructions), such as one from `~/.claude/skills/`. It is kept as `.nimbrio-ai/skills/<name>/`; the agent reads its files with `read_skill_file` and copies them into the project with `copy_skill_file` (which asks first).
+- **Sub-agents (a team of specialists):** turn on Sub-agents in Settings → Agent and the agent can hand self-contained parts of a task to specialists with `delegate_task`, each working in a fresh context and reporting back:
+
+  | Specialist   | Tools              | Notes                                               |
+  | ------------ | ------------------ | --------------------------------------------------- |
+  | `researcher` | web, files, memory | read-only; cites sources                            |
+  | `coder`      | files, commands    | makes changes and checks they work                  |
+  | `reviewer`   | files, web         | read-only; runs on the reviewer model if one is set |
+  | `writer`     | files              | read-only; drafts from notes and files              |
+  | `general`    | everything         | the default                                         |
+
+  A read-only specialist isn't given any tool that writes, runs commands or changes memory, and none gets a group the workspace turned off. Sub-agents can't delegate further.
+
+  - **Team notes:** while a request runs, the agent and its sub-agents share notes (`post_note`, `read_notes`): a researcher posts what it found, and the writer reads it, without everything passing through the main agent's context. They start empty with each message and aren't saved.
+  - **At the same time:** several `delegate_task` calls in one step run in parallel, up to **Parallel sub-agents** in Settings → Agent (1–8, default 3); the rest wait their turn. They split the message's remaining token budget, so parallel work can't overspend it. Their approval prompts and questions take turns, so you answer one at a time.
+  - **In the chat:** each `delegate_task` step shows its specialist and label with the sub-agent's own tool calls under it, and a sub-agent's approval card names it ("Coder “Fix tests” wants to run…"). In the CLI its lines read `[coder · Fix tests] run_command`.
+  - **Your own specialists:** open the **Agents** tab (next to Skills, under the side panel) and click **New specialist**: a name, when to use it, which tool groups it gets, read-only, which model, and its role. Click a built-in to start from a copy of it. It is used from the next message. A file in the agents folder that can't be used shows at the top of the tab with why (no description, an unknown tool group, a bad file name, a link…), with **Fix**, which rewrites it from the form, and delete. Each one is kept as `.nimbrio-ai/agents/<name>.md`, so you can also write the file yourself:
+
+    ```markdown
+    ---
+    description: Checking code for security problems: injection, secrets, unsafe input.
+    tools: files, web
+    read_only: true
+    model: review
+    ---
+
+    You are the team's security auditor. Read the code you're pointed at, list each problem
+    with file, line and a fix, and post the serious ones as team notes.
+    ```
+
+    `description` is required (it's how the agent picks). `tools` lists tool groups (files, commands, web, memory, plans; left out: all). `read_only` defaults to false. `model` is `subagent` (the default, Settings → Agent → Sub-agent model) or `review`. The text below the front matter is the specialist's role. A file named like a built-in (`coder.md`) replaces it. Files that break these rules, and links, are skipped.
+
+  Sub-agents cost tokens: each one rereads what it needs. Turn them on for wide research and larger changes, and leave them off for chat.
+
 - **Memory:** saved memories are added to the first message of every chat (and to the planning step), so the agent follows your preferences from its first reply. If you change them in the Memory panel mid-chat, the new list is sent with your next message. The agent updates an existing memory rather than saving a near-copy.
 
 The API only listens on 127.0.0.1, so other devices on your network can't reach it, and it rejects requests addressed to any other host name and non-JSON writes. Keep it that way: the agent can write files.
@@ -181,7 +215,7 @@ For web search, set **Settings → Agent → SearXNG URL** (default `http://loca
 
 ## Agent settings
 
-Everything about how the agent behaves is set in the app under **Settings → Agent**, saved in `~/.nimbrio-ai/agent-settings.json` and applied from the next message (no restart): tool approvals (ask / run without asking / refuse), planning on or off, max model calls, the token budget and longest message per prompt, the SearXNG URL and the console log level. The CLI reads the same settings. `.env` is optional and keeps only server options: `PORT`, `CORS_ORIGIN`, `LOG_LEVEL` (HTTP logs) and `AGENT_LOG_DIR`, plus the `EVAL_*` values for evals.
+Everything about how the agent behaves is set in the app under **Settings → Agent**, saved in `~/.nimbrio-ai/agent-settings.json` and applied from the next message (no restart): tool approvals (ask / run without asking / refuse), planning on or off, max model calls, the token budget and longest message per prompt, sub-agents (on/off, their model, how many work at once), answer review, the SearXNG URL and the console log level. The CLI reads the same settings. `.env` is optional and keeps only server options: `PORT`, `CORS_ORIGIN`, `LOG_LEVEL` (HTTP logs) and `AGENT_LOG_DIR`, plus the `EVAL_*` values for evals.
 
 Evals (`npm run eval`) don't read the app's saved models, so they take their model from `EVAL_MODEL`, `EVAL_BASE_URL` and `EVAL_API_KEY` in `.env`.
 

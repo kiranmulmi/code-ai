@@ -451,7 +451,7 @@ export function skillFileName(text: string): string {
   return frontMatterValue(splitFrontMatter(text).head, 'name');
 }
 
-function splitFrontMatter(text: string): { head: string; body: string } {
+export function splitFrontMatter(text: string): { head: string; body: string } {
   const normalized = text.replace(/\r\n/g, '\n').replace(/^\uFEFF/, '');
   const match = /^---\n([\s\S]*?)\n---\n?([\s\S]*)$/.exec(normalized);
   if (!match) return { head: '', body: normalized.trim() };
@@ -462,7 +462,7 @@ function splitFrontMatter(text: string): { head: string; body: string } {
  * One top-level value from YAML front matter: `key: text`, quoted, or a block (`key: >` or
  * `key: |`, its indented lines joined into one line).
  */
-function frontMatterValue(head: string, key: string): string {
+export function frontMatterValue(head: string, key: string): string {
   const lines = head.split('\n');
   const index = lines.findIndex((line) => line.startsWith(`${key}:`));
   if (index === -1) return '';

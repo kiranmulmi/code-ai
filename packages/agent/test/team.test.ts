@@ -8,6 +8,7 @@ import path from 'node:path';
 import { createAgent } from '../src/agent.js';
 import { LongTermMemory } from '../src/memory/long-term.js';
 import { Board } from '../src/team/board.js';
+import { oneAtATime } from '../src/one-at-a-time.js';
 import { buildToolset } from '../src/tools/index.js';
 import type { AgentLogger } from '../src/logger.js';
 import type { CallModel, ModelReply, ModelRequest } from '../src/llm.js';
@@ -261,4 +262,147 @@ test('a reviewer runs on the review model when one is set', async () => {
   assert.equal(subagentModel.requests.length, 0);
   assert.equal(reviewModel.requests.length, 1);
   assert.match(String(parent.requests[1]?.messages.at(-1)?.content), /Looks fine/);
+});
+
+// ---------- Prompts from sub-agents working at the same time ----------
+
+test('oneAtATime runs calls in order, one after another, even when one fails', async () => {
+  const queue = oneAtATime();
+  const log: string[] = [];
+  const step = (name: string, ms: number, fail = false) =>
+    queue(async () => {
+      log.push(`start ${name}`);
+      await new Promise((resolve) => setTimeout(resolve, ms));
+      log.push(`end ${name}`);
+      if (fail) throw new Error(name);
+      return name;
+    });
+  const results = await Promise.allSettled([step('a', 20, true), step('b', 5), step('c', 1)]);
+  assert.deepEqual(log, ['start a', 'end a', 'start b', 'end b', 'start c', 'end c']);
+  assert.deepEqual(
+    results.map((r) => r.status),
+    ['rejected', 'fulfilled', 'fulfilled'],
+  );
+});
+
+test('sub-agents working at once take turns with approval prompts and questions', async () => {
+  const setup = await tempSetup();
+  const parent = scriptedModel([
+    calls(
+      ['d1', 'delegate_task', { task: 'TASK-A write a', agent: 'coder', label: 'A' }],
+      ['d2', 'delegate_task', { task: 'TASK-B write b', agent: 'coder', label: 'B' }],
+    ),
+    say('Both done.'),
+  ]);
+  const child = routedModel(
+    {
+      'TASK-A': [
+        calls([
+          'a1',
+          'ask_user',
+          { question: 'Name for a?', options: [{ label: 'x' }, { label: 'y' }] },
+        ]),
+        calls(['a2', 'write_file', { path: 'a.txt', content: 'a' }]),
+        say('Wrote a.'),
+      ],
+      'TASK-B': [
+        calls([
+          'b1',
+          'ask_user',
+          { question: 'Name for b?', options: [{ label: 'x' }, { label: 'y' }] },
+        ]),
+        calls(['b2', 'write_file', { path: 'b.txt', content: 'b' }]),
+        say('Wrote b.'),
+      ],
+    },
+    5,
+  );
+  // Counts prompts open at once, per kind and in all.
+  const open = { approval: 0, question: 0, all: 0 };
+  const maxOpen = { approval: 0, question: 0, all: 0 };
+  const prompted: string[] = [];
+  const prompt = async (kind: 'approval' | 'question', text: string, answer: string) => {
+    open[kind] += 1;
+    open.all += 1;
+    maxOpen[kind] = Math.max(maxOpen[kind], open[kind]);
+    maxOpen.all = Math.max(maxOpen.all, open.all);
+    prompted.push(text);
+    await new Promise((resolve) => setTimeout(resolve, 15));
+    open[kind] -= 1;
+    open.all -= 1;
+    return answer;
+  };
+  const run = (terminal: <T>(task: () => Promise<T>) => Promise<T>) =>
+    createAgent({
+      ...setup,
+      callModel: parent.callModel,
+      subagentCallModel: child.callModel,
+      logger: silentLogger,
+      ask: (text) => terminal(() => prompt('approval', text, 'y')),
+      askUser: async ({ question }) => ({
+        type: 'answered',
+        text: await terminal(() => prompt('question', question, 'x')),
+      }),
+      config: { planning: 'off', subagents: true, approval: 'ask', maxParallelSubagents: 2 },
+    }).run('Write a and b');
+
+  // The agent itself: never two approval prompts, or two questions, open at once.
+  const result = await run((task) => task());
+  assert.equal(result.status, 'done');
+  assert.equal(maxOpen.approval, 1);
+  assert.equal(maxOpen.question, 1);
+  assert.equal(prompted.filter((p) => p.startsWith('Name for')).length, 2);
+  const approvals = prompted.filter((p) => p.includes('wants to run write_file'));
+  assert.equal(approvals.length, 2);
+  assert.ok(approvals.some((p) => p.includes('"A" (coder)')));
+  assert.equal(await fs.readFile(path.join(setup.filesDir, 'b.txt'), 'utf8'), 'b');
+});
+
+test('with one shared terminal queue (the CLI), approvals and questions never overlap', async () => {
+  const setup = await tempSetup();
+  const parent = scriptedModel([
+    calls(
+      ['d1', 'delegate_task', { task: 'TASK-A', agent: 'coder', label: 'A' }],
+      ['d2', 'delegate_task', { task: 'TASK-B', agent: 'coder', label: 'B' }],
+    ),
+    say('Both done.'),
+  ]);
+  const ask = (q: string) =>
+    calls(['q', 'ask_user', { question: q, options: [{ label: 'x' }, { label: 'y' }] }]);
+  const child = routedModel(
+    {
+      'TASK-A': [
+        ask('Name for a?'),
+        calls(['w', 'write_file', { path: 'a.txt', content: 'a' }]),
+        say('a'),
+      ],
+      'TASK-B': [
+        calls(['w', 'write_file', { path: 'b.txt', content: 'b' }]),
+        ask('Name for b?'),
+        say('b'),
+      ],
+    },
+    5,
+  );
+  let open = 0;
+  let maxOpen = 0;
+  const prompt = async (answer: string) => {
+    open += 1;
+    maxOpen = Math.max(maxOpen, open);
+    await new Promise((resolve) => setTimeout(resolve, 15));
+    open -= 1;
+    return answer;
+  };
+  const terminal = oneAtATime();
+  const result = await createAgent({
+    ...setup,
+    callModel: parent.callModel,
+    subagentCallModel: child.callModel,
+    logger: silentLogger,
+    ask: () => terminal(() => prompt('y')),
+    askUser: async () => ({ type: 'answered', text: await terminal(() => prompt('x')) }),
+    config: { planning: 'off', subagents: true, approval: 'ask', maxParallelSubagents: 2 },
+  }).run('Write a and b');
+  assert.equal(result.status, 'done');
+  assert.equal(maxOpen, 1);
 });

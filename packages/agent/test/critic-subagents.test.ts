@@ -240,6 +240,8 @@ test("a sub-agent's approvals are labelled with its name", async () => {
     config: { planning: 'off', subagents: true, approval: 'ask' },
   }).run('Save hi to a.txt using a sub-agent');
 
-  assert.deepEqual(asked, [{ tool: 'write_file', from: { subagent: 'Writer' } }]);
+  assert.deepEqual(asked, [
+    { tool: 'write_file', from: { subagent: 'Writer', specialist: 'general' } },
+  ]);
   assert.equal(await fs.readFile(path.join(setup.filesDir, 'a.txt'), 'utf8'), 'hi');
 });

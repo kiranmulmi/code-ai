@@ -7,6 +7,7 @@ import {
   type ConversationAction,
   type FlowItem,
 } from '../src/features/chat/conversation';
+import { delegateInfo, describeActivity, specialistTitle } from '../src/features/chat/tools';
 
 const at = Date.parse('2026-11-07T10:00:00.000Z');
 const play = (actions: ConversationAction[]) =>
@@ -72,6 +73,45 @@ test("a sub-agent's approval card names it", () => {
   const card = flowOf(state).find((item) => item.kind === 'approval');
   assert.ok(card?.kind === 'approval');
   assert.equal(card.subagent, 'Writer');
+  assert.equal(card.specialist, null);
+});
+
+test("a sub-agent's approval card names its specialist too", () => {
+  const state = play([
+    { type: 'send', text: 'Go', attachments: [], skills: [], at },
+    {
+      type: 'event',
+      event: {
+        type: 'approval',
+        id: 'a1',
+        tool: 'run_command',
+        input: {},
+        subagent: 'Fix tests',
+        specialist: 'coder',
+      },
+      at,
+    },
+  ]);
+  const card = flowOf(state).find((item) => item.kind === 'approval');
+  assert.ok(card?.kind === 'approval');
+  assert.equal(card.specialist, 'coder');
+});
+
+test('delegate_task steps read their specialist and label from the args', () => {
+  assert.deepEqual(
+    delegateInfo(JSON.stringify({ task: 'Find prices', agent: 'researcher', label: 'Prices' })),
+    { specialist: 'researcher', label: 'Prices' },
+  );
+  // Older chats: no agent (a general sub-agent), no label (the task, shortened).
+  assert.deepEqual(delegateInfo(JSON.stringify({ task: 'Do it' })), {
+    specialist: 'general',
+    label: 'Do it',
+  });
+  assert.equal(specialistTitle('security-auditor'), 'Security auditor');
+  assert.equal(
+    describeActivity('delegate_task', JSON.stringify({ agent: 'writer', label: 'Draft' })),
+    'Writer: Draft',
+  );
 });
 
 test('a review that asks for changes shows its issues as a note', () => {

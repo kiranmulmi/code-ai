@@ -1493,6 +1493,10 @@ test('config reads only the bootstrap values from env; saved settings fall back 
   assert.equal(saved.maxInputChars, 500);
   assert.equal(saved.searxngUrl, 'http://search.local');
   assert.deepEqual(readAgentSettings(null), DEFAULT_AGENT_SETTINGS);
+  // Parallel sub-agents: kept within 1-8, else the default.
+  assert.equal(readAgentSettings({ maxParallelSubagents: 5 }).maxParallelSubagents, 5);
+  assert.equal(readAgentSettings({ maxParallelSubagents: 50 }).maxParallelSubagents, 3);
+  assert.equal(readAgentSettings({ maxParallelSubagents: 0 }).maxParallelSubagents, 3);
 });
 
 // ---------- Attachments ----------

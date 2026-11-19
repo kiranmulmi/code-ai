@@ -28,6 +28,12 @@ export {
   type SkillUploadFile,
 } from './workspace-skills.js';
 export {
+  WorkspaceAgents,
+  AgentExistsError,
+  formatAgentFile,
+  parseAgentFile,
+} from './workspace-agents.js';
+export {
   runInChat,
   titleFrom,
   historyForUi,

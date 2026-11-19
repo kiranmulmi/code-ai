@@ -28,7 +28,8 @@ const ACTIVITY: Record<string, (args: Record<string, unknown>) => string> = {
   remember: () => 'Saving to memory',
   recall: () => 'Searching memory',
   forget: () => 'Deleting from memory',
-  delegate_task: (a) => `Sub-agent: ${shorten(text(a.label) || text(a.task), 60)}`,
+  delegate_task: (a) =>
+    `${specialistTitle(text(a.agent) || 'general')}: ${shorten(text(a.label) || text(a.task), 60)}`,
 };
 
 /** A short line for the plan panel about what a tool call is doing. */
@@ -50,4 +51,19 @@ export function stepSummary(args: string): { text: string; isReason: boolean } {
 export function addedStepCount(args: string): number {
   const steps = parseArgs(args).steps;
   return Array.isArray(steps) ? steps.length : 0;
+}
+
+/** A specialist's name as a title: "security-auditor" -> "Security auditor". */
+export function specialistTitle(name: string): string {
+  const words = name.replace(/-/g, ' ').trim();
+  return words ? words.charAt(0).toUpperCase() + words.slice(1) : 'Sub-agent';
+}
+
+/** delegate_task: which specialist it went to and its label (the args as the model sent them). */
+export function delegateInfo(args: string): { specialist: string; label: string } {
+  const a = parseArgs(args);
+  return {
+    specialist: text(a.agent).trim() || 'general',
+    label: text(a.label).trim() || shorten(text(a.task), 60) || 'Sub-agent',
+  };
 }

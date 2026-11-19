@@ -130,6 +130,7 @@ export class RunRegistry {
           tool: toolName,
           input,
           ...(from ? { subagent: from.subagent } : {}),
+          ...(from?.specialist ? { specialist: from.specialist } : {}),
         });
       });
     };

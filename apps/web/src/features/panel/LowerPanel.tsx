@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { Memory, Skill } from '@app/shared';
 import { IconButton } from '../../components/IconButton';
-import { BrainIcon, ChevronDownIcon, ServerIcon, SkillIcon } from '../../lib/icons';
+import { BrainIcon, ChevronDownIcon, ServerIcon, SkillIcon, WrenchIcon } from '../../lib/icons';
 import type { AsyncResource } from '../../lib/useAsync';
 import { useStoredState } from '../../lib/useStoredState';
+import { AgentsPanel } from '../agents/AgentsPanel';
+import { useAgents } from '../agents/useAgents';
 import { McpPanel } from '../mcp/McpPanel';
 import { SkillsPanel } from '../skills/SkillsPanel';
 import { MemoryPanel } from './memory/MemoryPanel';
@@ -19,6 +21,7 @@ const ICON: Record<LowerPanelTab, ReactNode> = {
   memory: <BrainIcon size={13} />,
   mcp: <ServerIcon size={13} />,
   skills: <SkillIcon size={13} />,
+  agents: <WrenchIcon size={13} />,
 };
 
 const HEIGHT_DEFAULT = 300;
@@ -31,7 +34,7 @@ const parseHeight = (stored: string | null) => Number(stored) || HEIGHT_DEFAULT;
 const parseFlag = (stored: string | null) => stored === 'true';
 
 /**
- * The bottom of the side panel: Memory, MCP servers and Skills in their own tabs, under the files or
+ * The bottom of the side panel: Skills, Agents (specialist sub-agents), Memory and MCP servers in their own tabs, under the files or
  * the terminal. Drag its top edge to resize it (double-click resets), or fold it to its tabs.
  */
 export function LowerPanel({
@@ -49,6 +52,8 @@ export function LowerPanel({
   const [height, setHeight] = useStoredState('agent.lowerPanelHeight', parseHeight);
   const [isFolded, setIsFolded] = useStoredState('agent.lowerPanelFolded', parseFlag);
   const [isDragging, setIsDragging] = useState(false);
+  // Loaded here so switching tabs keeps the list; reloaded when the tab is picked.
+  const agents = useAgents(workspaceId);
   const section = useRef<HTMLElement>(null);
 
   useEffect(() => {
@@ -69,12 +74,13 @@ export function LowerPanel({
     if (isFolded) setIsFolded(false);
     if (next === 'memory') memories.reload();
     if (next === 'skills') skills.reload();
+    if (next === 'agents') agents.reload();
   };
 
   return (
     <section
       ref={section}
-      aria-label="Skills, Memory and MCP servers"
+      aria-label="Skills, Agents, Memory and MCP servers"
       style={isFolded ? undefined : { height }}
       className="relative flex min-h-0 shrink-0 flex-col border-t border-line lg:min-w-[var(--panel-w)]"
     >
@@ -82,7 +88,7 @@ export function LowerPanel({
         <div
           role="separator"
           aria-orientation="horizontal"
-          aria-label="Resize the Skills, Memory and MCP section"
+          aria-label="Resize the Skills, Agents, Memory and MCP section"
           aria-valuenow={height}
           tabIndex={0}
           title="Drag to resize · double-click to reset"
@@ -117,7 +123,7 @@ export function LowerPanel({
       <div className="flex h-10 shrink-0 items-stretch gap-1 border-b border-line-2 bg-subtle pl-2 pr-1.5">
         <div
           role="tablist"
-          aria-label="Skills, Memory and MCP"
+          aria-label="Skills, Agents, Memory and MCP"
           className="panel-tabs flex min-w-0 flex-1 items-stretch"
         >
           {LOWER_PANEL_TABS.map((id) => (
@@ -138,8 +144,12 @@ export function LowerPanel({
           onClick={() => setIsFolded(!isFolded)}
           aria-expanded={!isFolded}
           aria-controls="lower-panel-body"
-          title={isFolded ? 'Show Skills, Memory and MCP' : 'Fold Skills, Memory and MCP'}
-          aria-label={isFolded ? 'Show Skills, Memory and MCP' : 'Fold Skills, Memory and MCP'}
+          title={
+            isFolded ? 'Show Skills, Agents, Memory and MCP' : 'Fold Skills, Agents, Memory and MCP'
+          }
+          aria-label={
+            isFolded ? 'Show Skills, Agents, Memory and MCP' : 'Fold Skills, Agents, Memory and MCP'
+          }
           className="h-7 w-7 self-center"
         >
           <ChevronDownIcon
@@ -159,6 +169,7 @@ export function LowerPanel({
           {tab === 'memory' && <MemoryPanel workspaceId={workspaceId} memories={memories} />}
           {tab === 'mcp' && <McpPanel workspaceId={workspaceId} isBusy={isBusy} />}
           {tab === 'skills' && <SkillsPanel workspaceId={workspaceId} skills={skills} />}
+          {tab === 'agents' && <AgentsPanel workspaceId={workspaceId} agents={agents} />}
         </div>
       )}
     </section>

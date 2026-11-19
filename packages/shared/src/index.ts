@@ -225,6 +225,18 @@ export {
   type SkillUpload,
 } from './skill.js';
 export {
+  AGENT_NAME_PATTERN,
+  SPECIALIST_MODELS,
+  specialistInputSchema,
+  toAgentName,
+  type AgentFileProblem,
+  type SpecialistData,
+  type SpecialistInfo,
+  type SpecialistInput,
+  type SpecialistList,
+  type SpecialistModel,
+} from './specialist.js';
+export {
   taskStartSchema,
   type BackgroundTask,
   type BackgroundTaskDetail,

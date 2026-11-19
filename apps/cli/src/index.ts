@@ -13,6 +13,7 @@ import {
   BackgroundTasks,
   loadAgentConfig,
   McpHub,
+  oneAtATime,
   Planner,
   type AgentRunOptions,
 } from '@app/agent';
@@ -54,6 +55,8 @@ function createPrinter() {
   let lastBlock = ''; // text since the last tool call
   let hasStreamed = false;
   let isAtLineStart = true;
+  /** delegate_task calls by id: who each sub-agent is, for its lines */
+  const subagents = new Map<string, string>();
   return {
     onEvent(event: AgentEvent) {
       if (event.type === 'text_delta') {
@@ -62,6 +65,7 @@ function createPrinter() {
         hasStreamed = true;
         isAtLineStart = event.text.endsWith('\n');
       } else if (event.type === 'tool_call') {
+        if (event.name === 'delegate_task') subagents.set(event.id, subagentTag(event.args));
         if (!isAtLineStart) process.stdout.write('\n');
         isAtLineStart = true;
         lastBlock = '';
@@ -85,7 +89,8 @@ function createPrinter() {
         const inner = event.event;
         if (inner.type === 'tool_call' && !inner.name.endsWith('_plan')) {
           if (!isAtLineStart) process.stdout.write('\n');
-          console.log(`\x1b[2m  [sub-agent] ${inner.name}\x1b[0m`);
+          const who = subagents.get(event.callId) ?? 'sub-agent';
+          console.log(`\x1b[2m  [${who}] ${inner.name}\x1b[0m`);
           isAtLineStart = true;
         }
       } else if (event.type === 'compaction') {
@@ -112,6 +117,19 @@ function createPrinter() {
       isAtLineStart = true;
     },
   };
+}
+
+/** "researcher · Prices": a delegate_task call's specialist and label, from its arguments. */
+function subagentTag(args: string): string {
+  try {
+    const parsed = JSON.parse(args) as { agent?: unknown; label?: unknown };
+    const agent =
+      typeof parsed.agent === 'string' && parsed.agent.trim() ? parsed.agent : 'general';
+    const label = typeof parsed.label === 'string' ? parsed.label.trim() : '';
+    return label ? `${agent} · ${label}` : agent;
+  } catch {
+    return 'sub-agent';
+  }
 }
 
 /** Removes `--name value` from args and returns the value, or null when absent. */
@@ -141,23 +159,27 @@ async function main(): Promise<void> {
   const mcp = new McpHub();
   // Commands the agent starts in the background run until it stops them or the CLI exits.
   const tasks = new BackgroundTasks();
+  // One terminal line: approval prompts and ask_user questions (from sub-agents working at the
+  // same time, too) take turns, so two never print over each other or take each other's answer.
+  const prompts = oneAtATime();
   const baseOptions: AgentRunOptions = {
     config,
-    ask: (question) => rl.question(question),
+    ask: (question) => prompts(() => rl.question(question)),
     // ask_user: the options numbered; a number picks one, other text is the answer, Enter skips.
-    askUser: async ({ question, options }) => {
-      console.log(`\n${question}`);
-      options.forEach((option, i) => {
-        const about = option.description ? ` \x1b[2m- ${option.description}\x1b[0m` : '';
-        console.log(`  ${i + 1}. ${option.label}${about}`);
-      });
-      const reply = (
-        await rl.question(`Pick 1-${options.length}, type an answer, or press Enter to skip: `)
-      ).trim();
-      if (!reply) return { type: 'skipped' };
-      const picked = /^\d+$/.test(reply) ? options[Number(reply) - 1] : undefined;
-      return { type: 'answered', text: picked?.label ?? reply };
-    },
+    askUser: ({ question, options }) =>
+      prompts(async () => {
+        console.log(`\n${question}`);
+        options.forEach((option, i) => {
+          const about = option.description ? ` \x1b[2m- ${option.description}\x1b[0m` : '';
+          console.log(`  ${i + 1}. ${option.label}${about}`);
+        });
+        const reply = (
+          await rl.question(`Pick 1-${options.length}, type an answer, or press Enter to skip: `)
+        ).trim();
+        if (!reply) return { type: 'skipped' as const };
+        const picked = /^\d+$/.test(reply) ? options[Number(reply) - 1] : undefined;
+        return { type: 'answered' as const, text: picked?.label ?? reply };
+      }),
     onEvent: printer.onEvent,
   };
 

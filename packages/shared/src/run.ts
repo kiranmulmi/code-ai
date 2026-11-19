@@ -184,6 +184,8 @@ export type StreamEvent =
       input: unknown;
       /** the sub-agent (delegate_task label) asking, when it isn't the agent itself */
       subagent?: string;
+      /** that sub-agent's specialist, e.g. "researcher" */
+      specialist?: string;
     }
   | { type: 'approval_closed'; id: string; allowed: boolean }
   /** The agent asks the user (ask_user) and waits; answered with `POST /v1/questions/:id`. */

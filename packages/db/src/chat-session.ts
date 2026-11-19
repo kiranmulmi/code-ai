@@ -12,6 +12,7 @@ import {
   type BackgroundTasks,
   type ChatMessage,
   type McpHub,
+  type Specialist,
 } from '@app/agent';
 import {
   toolResultPreview,
@@ -84,6 +85,8 @@ export async function runInChat({
     voiceReplies: workspace.voiceMode,
     attachments: store.attachments(workspace),
     skills: store.skills(workspace),
+    // The workspace's own specialists, only read when sub-agents are on.
+    specialists: agentOptions.config?.subagents ? await workspaceSpecialists(store, workspace) : [],
     extraTools: mcp ? await mcpTools(store, workspace, mcp, agentOptions) : [],
     tasks: tasks?.forWorkspace(workspace.path, chat.id),
   });
@@ -297,4 +300,13 @@ export function historyForUi(
   }
   if (turnStart !== null) endTurn(turnStart);
   return items;
+}
+
+/** The workspace's specialist files; a problem reading the folder only leaves them out. */
+async function workspaceSpecialists(store: Store, workspace: Workspace): Promise<Specialist[]> {
+  try {
+    return await store.agents(workspace).list();
+  } catch {
+    return [];
+  }
 }

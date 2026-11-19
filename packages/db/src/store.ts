@@ -28,6 +28,7 @@ import { InputError } from './errors.js';
 import { moveLegacyFolders } from './legacy-folders.js';
 import { WorkspaceAttachments } from './attachments.js';
 import { WorkspaceSkills } from './workspace-skills.js';
+import { WorkspaceAgents } from './workspace-agents.js';
 import { McpServerStore } from './mcp-servers.js';
 import { McpTrust } from './mcp-trust.js';
 import { ModelStore } from './models.js';
@@ -362,6 +363,11 @@ export class Store {
   /** One workspace's skills: .nimbrio-ai/skills/<name>.md, or <name>/SKILL.md with its files. */
   skills(workspace: Pick<Workspace, 'path'>): WorkspaceSkills {
     return new WorkspaceSkills(workspace.path);
+  }
+
+  /** One workspace's own specialist sub-agents: .nimbrio-ai/agents/<name>.md. */
+  agents(workspace: Pick<Workspace, 'path'>): WorkspaceAgents {
+    return new WorkspaceAgents(workspace.path);
   }
 
   /** Which MCP servers one workspace turned on: .nimbrio-ai/mcp.json, and whether it's approved. */

@@ -29,11 +29,8 @@ import { SettingsTabs } from './SettingsTabs';
 import { APP_NAME } from '../../lib/brand';
 
 /** The form keeps numbers as typed text, so a half-typed value isn't snapped to a number. */
-type Draft = Omit<AgentSettings, 'maxSteps' | 'maxTotalTokens' | 'maxInputChars'> & {
-  maxSteps: string;
-  maxTotalTokens: string;
-  maxInputChars: string;
-};
+type NumberKey = 'maxSteps' | 'maxTotalTokens' | 'maxInputChars' | 'maxParallelSubagents';
+type Draft = Omit<AgentSettings, NumberKey> & Record<NumberKey, string>;
 type Field = keyof AgentSettings;
 type FieldErrors = Partial<Record<Field, string>>;
 
@@ -46,6 +43,7 @@ const toDraft = (settings: AgentSettings): Draft => ({
   maxSteps: String(settings.maxSteps),
   maxTotalTokens: String(settings.maxTotalTokens),
   maxInputChars: String(settings.maxInputChars),
+  maxParallelSubagents: String(settings.maxParallelSubagents),
 });
 
 const toNumber = (text: string) => (text.trim() === '' ? Number.NaN : Number(text));
@@ -55,6 +53,7 @@ const fromDraft = (draft: Draft) => ({
   maxSteps: toNumber(draft.maxSteps),
   maxTotalTokens: toNumber(draft.maxTotalTokens),
   maxInputChars: toNumber(draft.maxInputChars),
+  maxParallelSubagents: toNumber(draft.maxParallelSubagents),
 });
 
 const APPROVALS: Record<ApprovalMode, { title: string; detail: string }> = {
@@ -181,7 +180,7 @@ export function AgentSettingsPage() {
   };
 
   const numberField = (
-    key: 'maxSteps' | 'maxTotalTokens' | 'maxInputChars',
+    key: NumberKey,
     label: string,
     unit: string,
     hint: ReactNode,
@@ -347,9 +346,12 @@ export function AgentSettingsPage() {
               <div>
                 <p className={LABEL}>Sub-agents</p>
                 <p className={HINT}>
-                  Lets the agent hand a self-contained part of a task to a sub-agent (
-                  <span className="font-mono">delegate_task</span>), which works in a fresh context
-                  with the same tools and reports back. Sub-agents share the message&apos;s token
+                  Lets the agent hand self-contained parts of a task to specialist sub-agents (
+                  <span className="font-mono">delegate_task</span>): a researcher, coder, reviewer,
+                  writer, or your own from the workspace&apos;s{' '}
+                  <span className="font-mono">.nimbrio-ai/agents/</span> folder. Each works in a
+                  fresh context with its specialist&apos;s tools, shares findings on the team notes,
+                  and reports back. Several can work at once. They share the message&apos;s token
                   budget and ask for approval like the agent does.
                 </p>
               </div>
@@ -369,6 +371,16 @@ export function AgentSettingsPage() {
                 error={errors.subagentModelId}
                 onChange={(id) => set('subagentModelId', id)}
               />
+            )}
+            {draft.subagents && (
+              <div className={SECTION}>
+                {numberField(
+                  'maxParallelSubagents',
+                  'Parallel sub-agents',
+                  'at once',
+                  'Sub-agents that may work at the same time; more started in one step wait their turn. Higher is faster but uses tokens quicker.',
+                )}
+              </div>
             )}
             <div className={SECTION}>
               <p className={LABEL}>Review answers</p>

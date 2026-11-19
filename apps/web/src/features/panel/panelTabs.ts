@@ -19,8 +19,11 @@ export function visiblePanelTabs(optional: OptionalPanelTabs): readonly PanelTab
   );
 }
 
-/** The tabs of the section below them: what the agent remembers, the MCP servers, the skills. */
-export const LOWER_PANEL_TABS = ['skills', 'memory', 'mcp'] as const;
+/**
+ * The tabs of the section below them: the skills, the specialist sub-agents, what the agent
+ * remembers, the MCP servers.
+ */
+export const LOWER_PANEL_TABS = ['skills', 'agents', 'memory', 'mcp'] as const;
 
 export type LowerPanelTab = (typeof LOWER_PANEL_TABS)[number];
 
@@ -32,6 +35,7 @@ export const PANEL_TAB_LABEL: Record<PanelTab | LowerPanelTab, string> = {
   memory: 'Memory',
   mcp: 'MCP',
   skills: 'Skills',
+  agents: 'Agents',
 };
 
 export function parsePanelTab(stored: string | null): PanelTab {

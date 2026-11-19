@@ -18,7 +18,7 @@ apps/cli            @app/cli       terminal chat (same chats and workspaces as t
 apps/web            @app/web       React + Vite + Tailwind chat UI
 apps/desktop        @app/desktop   Electron app: runs the built API in a utility process, shows the web app in a window
 packages/agent      @app/agent     the agent: loop, planner, prompts, guardrails, LLM client, tools, memory
-packages/db         @app/db        storage (files, no database): ~/.nimbrio-ai/ (workspace list, models with API keys, provider sign-ins, agent settings, MCP servers, mcp.json approvals) + each workspace's .nimbrio-ai/ files (chats, memory, settings, which MCP servers are on, attached files, skills), Store, runInChat
+packages/db         @app/db        storage (files, no database): ~/.nimbrio-ai/ (workspace list, models with API keys, provider sign-ins, agent settings, MCP servers, mcp.json approvals) + each workspace's .nimbrio-ai/ files (chats, memory, settings, which MCP servers are on, attached files, skills, agents), Store, runInChat
 packages/shared     @app/shared    contracts shared by api, web and agent (types, Zod schemas, envelopes)
 packages/tsconfig   @app/tsconfig  base / node / react tsconfigs
 packages/eslint-config  @app/eslint-config  flat ESLint config (base + react)

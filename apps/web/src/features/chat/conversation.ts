@@ -66,6 +66,8 @@ export type ApprovalItem = {
   input: unknown;
   /** the sub-agent asking, when it isn't the agent itself */
   subagent: string | null;
+  /** that sub-agent's specialist, e.g. "researcher" */
+  specialist: string | null;
   state: ApprovalState;
   error: string | null;
 };
@@ -538,7 +540,13 @@ class Draft {
     if (next !== item.subagent) flow[index] = { ...item, subagent: next };
   }
 
-  addApproval(approvalId: string, tool: string, input: unknown, subagent: string | null): void {
+  addApproval(
+    approvalId: string,
+    tool: string,
+    input: unknown,
+    subagent: string | null,
+    specialist: string | null = null,
+  ): void {
     this.closeSegment();
     const agent = this.ensureAgent();
     agent.flow.push({
@@ -548,6 +556,7 @@ class Draft {
       tool,
       input,
       subagent,
+      specialist,
       state: 'pending',
       error: null,
     });
@@ -810,7 +819,13 @@ function applyEvent(state: ConversationState, event: RunEvent, at: number): Conv
       plan = withPlan(withPhase(plan, 'working', at), event.plan);
       break;
     case 'approval':
-      draft.addApproval(event.id, event.tool, event.input, event.subagent ?? null);
+      draft.addApproval(
+        event.id,
+        event.tool,
+        event.input,
+        event.subagent ?? null,
+        event.specialist ?? null,
+      );
       break;
     case 'subagent':
       draft.addSubagentEvent(event.callId, event.event);

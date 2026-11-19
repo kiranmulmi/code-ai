@@ -44,6 +44,8 @@ export interface AgentSettings {
   subagents: boolean;
   /** The model sub-agents run on (a saved model's id); null: the chat's model. */
   subagentModelId: string | null;
+  /** Sub-agents that may work at the same time; more started in one step wait their turn. */
+  maxParallelSubagents: number;
   /** When a reviewer checks the agent's final answer. */
   review: ReviewMode;
   /** The model the reviewer runs on (a saved model's id); null: the chat's model. */
@@ -93,6 +95,7 @@ export const agentSettingsSchema = z.object({
   logLevel: z.enum(LOG_LEVELS),
   subagents: z.boolean(),
   subagentModelId: optionalModelId,
+  maxParallelSubagents: wholeNumber('Parallel sub-agents', SETTINGS_LIMITS.maxParallelSubagents),
   review: z.enum(REVIEW_MODES),
   reviewModelId: optionalModelId,
 });
@@ -120,6 +123,7 @@ export function readAgentSettings(raw: unknown): AgentSettings {
     logLevel: field('logLevel'),
     subagents: field('subagents'),
     subagentModelId: field('subagentModelId'),
+    maxParallelSubagents: field('maxParallelSubagents'),
     review: field('review'),
     reviewModelId: field('reviewModelId'),
   };

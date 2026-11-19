@@ -90,6 +90,7 @@ import {
 } from './guardrails.js';
 import { createLogger, type AgentLogger } from './logger.js';
 import { errorMessage, isRecord } from './errors.js';
+import { oneAtATime } from './one-at-a-time.js';
 
 export type { ApprovalSource, ApproveFn, AskFn };
 
@@ -311,6 +312,14 @@ export function createAgent(options: AgentOptions): Agent {
   const meter = new ContextMeter();
   const logger = options.logger ?? createLogger({ level: config.logLevel, logDir: config.logDir });
   const approve = options.approve ?? createApprover(config.approval, options.ask);
+  // ask_user: sub-agents working at the same time take turns asking, since the user answers one
+  // question at a time. A sub-agent is given its parent's queue, so it doesn't add its own.
+  const askUser = ((ask: AskUserFn | undefined): AskUserFn | null => {
+    if (!ask) return null;
+    if (isSubagent) return ask;
+    const queue = oneAtATime();
+    return (question) => queue(() => ask(question));
+  })(options.askUser);
 
   // A sub-agent never gets delegate_task: no sub-agents of sub-agents.
   const canDelegate = config.subagents && !isSubagent;
@@ -385,7 +394,7 @@ export function createAgent(options: AgentOptions): Agent {
     attachments: attachmentStore,
     skills: skillStore,
     tasks: options.tasks ?? null,
-    askUser: options.askUser ?? null,
+    askUser,
     loadTools: toolset.deferred.size ? loadTools : null,
     signal,
     showImage: (id) => {
@@ -1031,7 +1040,7 @@ export function createAgent(options: AgentOptions): Agent {
       const tokensLeft = Math.floor((budget.maxTotalTokens - budget.budgetTokens()) / share);
       if (tokensLeft <= 0)
         throw new Error('The token budget is used up. Finish without a sub-agent.');
-      const from: ApprovalSource = { subagent: label };
+      const from: ApprovalSource = { subagent: label, specialist: chosen.name };
       const ownModel =
         chosen.model === 'review' && (options.reviewCallModel || options.reviewModel)
           ? options.reviewCallModel
@@ -1056,6 +1065,7 @@ export function createAgent(options: AgentOptions): Agent {
         },
         team: board ? { board, author: label, specialist: chosen } : undefined,
         approve: (name, input) => approve(name, input, from),
+        askUser: askUser ?? undefined,
         onEvent: (event) => emit({ type: 'subagent', callId, event }),
         conversation: new Conversation(),
         planner: new Planner(),

@@ -4,7 +4,7 @@ import { CodeHighlight } from '../../components/CodeHighlight';
 import { CodeText } from '../../components/CodeText';
 import { Spinner } from '../../components/Spinner';
 import { inlineArgs, prettyJson } from '../../lib/format';
-import { stepSummary } from './tools';
+import { delegateInfo, specialistTitle, stepSummary } from './tools';
 import { ChevronRightIcon, CrossIcon } from '../../lib/icons';
 import { languageForPath } from '../../lib/languages';
 import type { SubagentActivity, ToolItem } from './conversation';
@@ -139,12 +139,18 @@ export function ToolStep({ item }: { item: ToolItem }) {
 }
 
 function ToolCall({ item }: { item: ToolItem }) {
-  const summary = stepSummary(item.args);
+  const delegated = item.name === 'delegate_task' ? delegateInfo(item.args) : null;
+  const summary = delegated ? { text: delegated.label, isReason: true } : stepSummary(item.args);
   return (
     <details className="group text-[12.5px]">
       <summary className="flex h-8 cursor-pointer list-none items-center gap-2.5 rounded-lg px-2.5 text-[11px] transition-colors hover:bg-surface group-open:bg-surface [&::-webkit-details-marker]:hidden">
         <StepIcon name={item.name} state={item.state} />
         <span className="shrink-0 font-mono font-semibold text-ink-3">{item.name}</span>
+        {delegated && (
+          <Badge tone="blue" className="shrink-0">
+            {specialistTitle(delegated.specialist)}
+          </Badge>
+        )}
         <span
           title={summary.isReason ? inlineArgs(item.args) : undefined}
           className={`min-w-0 flex-1 truncate ${

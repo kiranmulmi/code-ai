@@ -3,6 +3,7 @@ import { Button } from '../../components/Button';
 import { Spinner } from '../../components/Spinner';
 import { CheckIcon, CrossIcon, ShieldIcon } from '../../lib/icons';
 import type { ApprovalItem } from './conversation';
+import { specialistTitle } from './tools';
 import { ToolInput } from './ToolInput';
 
 /** The agent asks before it runs a tool that changes something, e.g. writing a file or running a command. */
@@ -30,7 +31,8 @@ export function ApprovalCard({
           <span className="font-medium text-ink">
             {item.subagent ? (
               <>
-                Sub-agent <span className="text-ink-2">“{item.subagent}”</span> wants to run{' '}
+                {item.specialist ? specialistTitle(item.specialist) : 'Sub-agent'}{' '}
+                <span className="text-ink-2">“{item.subagent}”</span> wants to run{' '}
               </>
             ) : (
               'The agent wants to run '

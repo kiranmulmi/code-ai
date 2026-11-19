@@ -34,6 +34,8 @@ import { createTerminalSocket } from './features/terminal/terminal.socket.js';
 import { createMcpService } from './features/mcp/mcp.service.js';
 import { memoriesRouter } from './features/memories/memories.routes.js';
 import { skillsRouter } from './features/skills/skills.routes.js';
+import { agentsRouter } from './features/agents/agents.routes.js';
+import { createAgentsService } from './features/agents/agents.service.js';
 import { SKILL_UPLOAD_BODY_LIMIT, createSkillsService } from './features/skills/skills.service.js';
 import { modelsRouter } from './features/models/models.routes.js';
 import { createModelsService } from './features/models/models.service.js';
@@ -116,6 +118,7 @@ export function createApp(context: AppContext) {
   v1.use(chatsRouter(chats));
   v1.use(memoriesRouter(context, workspaces));
   v1.use(skillsRouter(skills));
+  v1.use(agentsRouter(createAgentsService(context, workspaces)));
   v1.use(mcpRouter(createMcpService(context, workspaces)));
   v1.use(filesRouter(files));
   v1.use(gitRouter(git));

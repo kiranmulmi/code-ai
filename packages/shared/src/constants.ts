@@ -21,6 +21,8 @@ export const AGENT_SETTING_DEFAULTS = {
   maxTotalTokens: 400_000,
   /** longer prompts are rejected */
   maxInputChars: 20_000,
+  /** sub-agents that may work at the same time when the agent starts several in one step */
+  maxParallelSubagents: 3,
 };
 
 /** The range Settings -> Agent accepts. */
@@ -28,6 +30,7 @@ export const SETTINGS_LIMITS = {
   maxSteps: { min: 1, max: 200 },
   maxTotalTokens: { min: 1_000, max: 50_000_000 },
   maxInputChars: { min: 100, max: 1_000_000 },
+  maxParallelSubagents: { min: 1, max: 8 },
   searxngUrl: 500,
 } as const;
 
@@ -238,6 +241,18 @@ export const SKILL_LIMITS = {
   pathLength: 240,
   /** a skill's SKILL.md is read only up to this size */
   readBytes: 256 * 1024,
+} as const;
+
+/** A workspace's own specialist sub-agents (.nimbrio-ai/agents/<name>.md). */
+export const AGENT_LIMITS = {
+  /** specialists read from one workspace (all of them are listed to the agent) */
+  count: 20,
+  /** a file is read only up to this size */
+  fileBytes: 32 * 1024,
+  nameLength: 40,
+  descriptionLength: 300,
+  /** the role text under the front matter */
+  instructionsChars: 20_000,
 } as const;
 
 /** Longest text each AI writer takes. */
