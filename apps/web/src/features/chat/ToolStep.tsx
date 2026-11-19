@@ -12,7 +12,17 @@ import { toolIcon } from './toolIcon';
 import { ToolInput } from './ToolInput';
 
 /** A call's status: a spinner while it runs, a cross if it failed, else the tool's own icon. */
-function StepIcon({ name, state }: { name: string; state: ToolItem['state'] }) {
+function StepIcon({
+  name,
+  state,
+  pop = false,
+}: {
+  name: string;
+  state: ToolItem['state'];
+  /** Pop the icon in: the call just finished while we watched. */
+  pop?: boolean;
+}) {
+  const popClass = pop ? 'animate-pop motion-reduce:animate-none' : '';
   if (state === 'running') {
     return (
       <span className="grid h-5 w-5 place-items-center">
@@ -22,25 +32,29 @@ function StepIcon({ name, state }: { name: string; state: ToolItem['state'] }) {
   }
   if (state === 'error') {
     return (
-      <span className="grid h-5 w-5 place-items-center text-danger">
+      <span className={`grid h-5 w-5 place-items-center text-danger ${popClass}`}>
         <CrossIcon size={12} />
       </span>
     );
   }
   const Icon = toolIcon(name);
   return (
-    <span className="grid h-5 w-5 place-items-center text-ink-3">
+    <span className={`grid h-5 w-5 place-items-center text-ink-3 ${popClass}`}>
       <Icon size={13} />
     </span>
   );
 }
+
+/** A running call's text: a light sweeping across it, like the "thinking" line. */
+const RUNNING_TEXT =
+  'bg-[linear-gradient(90deg,var(--ink-4)_0%,var(--ink)_50%,var(--ink-4)_100%)] bg-[length:200%_100%] bg-clip-text text-transparent animate-shimmer motion-reduce:animate-none';
 
 /** How close to the end (px) still counts as "at the newest call". */
 const NEAR_END = 24;
 
 /**
  * A run of consecutive tool calls: a "Tool calls" header with their count, then plain rows on
- * the chat background, no card around them. Two rows show at once; the rest scroll inside a
+ * the chat background, no card around them. Four rows show at once; the rest scroll inside a
  * capped box that stays on the newest call (unless the reader has scrolled up), with the older
  * calls fading out at the top edge.
  */
@@ -48,6 +62,8 @@ export function ToolSteps({ items }: { items: readonly ToolItem[] }) {
   const ref = useRef<HTMLDivElement>(null);
   const isPinned = useRef(true);
   const [isFaded, setIsFaded] = useState(false);
+  // Calls already there when the list first shows (e.g. an old chat) don't animate in.
+  const [initialKeys] = useState(() => new Set(items.map((item) => item.key)));
 
   const update = useCallback(() => {
     const node = ref.current;
@@ -67,21 +83,27 @@ export function ToolSteps({ items }: { items: readonly ToolItem[] }) {
     <section className="flex flex-col gap-1">
       <div className="flex items-center gap-1.5 px-2.5 text-[11px] font-medium text-ink-3">
         <span>Tool calls</span>
-        <span className="rounded-md bg-surface-2 px-1.5 text-[10.5px] tabular-nums text-ink-2">
+        <span
+          // A new key each time the count changes, so the badge pops again.
+          key={items.length}
+          className={`rounded-md bg-surface-2 px-1.5 text-[10.5px] tabular-nums text-ink-2 ${
+            items.length > initialKeys.size ? 'animate-pop motion-reduce:animate-none' : ''
+          }`}
+        >
           {items.length}
         </span>
       </div>
       <div
         ref={ref}
         onScroll={update}
-        // Two rows (h-8 each, gap-px) show at once; the rest scroll. While a call is open the
+        // Four rows (h-8 each, gap-px) show at once; the rest scroll. While a call is open the
         // cap (and the fade) lift, so its input and result show in full.
-        className={`flex max-h-[calc(4rem+1px)] flex-col gap-px overflow-y-auto [&:has(details[open])]:max-h-none [&:has(details[open])]:[mask-image:none] [&>*]:shrink-0 ${
+        className={`flex max-h-[calc(8rem+3px)] flex-col gap-px overflow-y-auto [&:has(details[open])]:max-h-none [&:has(details[open])]:[mask-image:none] [&>*]:shrink-0 ${
           isFaded ? '[mask-image:linear-gradient(to_bottom,transparent,black_1rem)]' : ''
         }`}
       >
         {items.map((item) => (
-          <ToolStep key={item.key} item={item} />
+          <ToolStep key={item.key} item={item} isNew={!initialKeys.has(item.key)} />
         ))}
       </div>
     </section>
@@ -139,23 +161,28 @@ function SubagentSteps({ activity }: { activity: SubagentActivity }) {
 }
 
 /** One tool call. Click it to see the input and result, which open in a card below it. */
-export function ToolStep({ item }: { item: ToolItem }) {
-  if (!item.subagent) return <ToolCall item={item} />;
+export function ToolStep({ item, isNew = false }: { item: ToolItem; isNew?: boolean }) {
+  // A call that arrives while we watch slides in from above.
+  const enter = isNew ? 'animate-enter motion-reduce:animate-none' : '';
+  if (!item.subagent) return <ToolCall item={item} className={enter} />;
   return (
-    <div className="flex flex-col">
+    <div className={`flex flex-col ${enter}`}>
       <ToolCall item={item} />
       <SubagentSteps activity={item.subagent} />
     </div>
   );
 }
 
-function ToolCall({ item }: { item: ToolItem }) {
+function ToolCall({ item, className = '' }: { item: ToolItem; className?: string }) {
+  // Seen running: when it finishes, its icon pops in.
+  const [wasRunning] = useState(item.state === 'running');
+  const isRunning = item.state === 'running';
   const delegated = item.name === 'delegate_task' ? delegateInfo(item.args) : null;
   const summary = delegated ? { text: delegated.label, isReason: true } : stepSummary(item.args);
   return (
-    <details className="group text-[12.5px]">
+    <details className={`group text-[12.5px] ${className}`}>
       <summary className="flex h-8 cursor-pointer list-none items-center gap-2.5 rounded-lg px-2.5 text-[11px] transition-colors hover:bg-surface group-open:bg-surface [&::-webkit-details-marker]:hidden">
-        <StepIcon name={item.name} state={item.state} />
+        <StepIcon name={item.name} state={item.state} pop={wasRunning && !isRunning} />
         <span className="shrink-0 font-mono font-semibold italic text-ink-4">{item.name}</span>
         {delegated && (
           <Badge tone="blue" className="shrink-0">
@@ -166,7 +193,7 @@ function ToolCall({ item }: { item: ToolItem }) {
           title={summary.isReason ? inlineArgs(item.args) : undefined}
           className={`min-w-0 flex-1 truncate ${
             summary.isReason ? 'text-[12px] text-ink-3' : 'font-mono text-ink-4'
-          }`}
+          } ${isRunning ? RUNNING_TEXT : ''}`}
         >
           {summary.text}
         </span>
@@ -176,7 +203,7 @@ function ToolCall({ item }: { item: ToolItem }) {
           className="shrink-0 text-ink-4 transition-transform group-open:rotate-90"
         />
       </summary>
-      <div className="chat-card mb-2 ml-[30px] mt-1 grid gap-px overflow-hidden bg-line-2">
+      <div className="chat-card mb-2 ml-[30px] mt-1 grid gap-px overflow-hidden bg-line-2 group-open:animate-enter motion-reduce:!animate-none">
         <div className="bg-surface px-3 py-2.5">
           <div className="eyebrow mb-1.5">Input</div>
           <ToolInput tool={item.name} input={item.args} />
