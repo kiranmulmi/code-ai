@@ -33,7 +33,8 @@ export function WorkspaceAvatar({
 }: {
   id: string;
   name: string;
-  size?: 'md' | 'sm';
+  /** xs: matches 13px row text (sidebar list); sm: switcher; md: collapsed rail. */
+  size?: 'md' | 'sm' | 'xs';
 }) {
   const [from, to] = swatchOf(id);
   const style = { '--ws-from': from, '--ws-to': to } as CSSProperties;
@@ -43,7 +44,11 @@ export function WorkspaceAvatar({
       style={style}
       // A gradient tile with white initials and a soft bevel, like the brand tile.
       className={`grid shrink-0 place-items-center bg-[linear-gradient(145deg,var(--ws-from),var(--ws-to))] font-extrabold tracking-[0.02em] text-white shadow-[inset_0_1px_0_rgb(255_255_255/0.3),inset_0_-1px_0_rgb(0_0_0/0.15),0_2px_6px_-2px_rgb(16_38_63/0.35)] [text-shadow:0_1px_1px_rgb(0_0_0/0.18)] ${
-        size === 'sm' ? 'h-6 w-6 rounded-md text-[9.5px]' : 'h-8 w-8 rounded-lg text-[11px]'
+        size === 'xs'
+          ? 'h-4 w-4 rounded-[4px] text-[7px] leading-none'
+          : size === 'sm'
+            ? 'h-6 w-6 rounded-md text-[9.5px]'
+            : 'h-8 w-8 rounded-lg text-[11px]'
       }`}
     >
       {initials(name)}

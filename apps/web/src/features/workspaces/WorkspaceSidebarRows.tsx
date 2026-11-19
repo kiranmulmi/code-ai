@@ -18,8 +18,6 @@ export const WORKSPACE_DRAG_TYPE = 'application/x-hamro-workspace';
 export const isWorkspaceDrag = (event: DragEvent) =>
   event.dataTransfer.types.includes(WORKSPACE_DRAG_TYPE);
 
-const chatsLabel = (count: number) => `${count} chat${count === 1 ? '' : 's'}`;
-
 const MENU_BUTTON =
   'absolute right-1.5 top-1/2 hidden h-6 w-6 -translate-y-1/2 place-items-center rounded-md text-ink-3 transition-colors hover:bg-[color-mix(in_srgb,var(--ink)_8%,transparent)] hover:text-ink group-focus-within:grid group-hover:grid aria-expanded:grid [@media(hover:none)]:grid';
 
@@ -154,7 +152,7 @@ export function FolderRow({
   );
 }
 
-/** One workspace: a link, its chat count, and a ⋯ menu to file it in a folder. */
+/** One workspace: a link and a ⋯ menu to file it in a folder. */
 export function WorkspaceRow({
   workspace,
   isCurrent,
@@ -175,7 +173,6 @@ export function WorkspaceRow({
   onDragStart: (event: DragEvent) => void;
   onDragEnd: () => void;
 }) {
-  const count = workspace.chatCount ?? 0;
   const isLocked = isBusy && !isCurrent;
   const title = isLocked ? 'Wait for the agent to finish' : workspace.path;
   const blockWhileBusy = (event: MouseEvent) => {
@@ -208,22 +205,10 @@ export function WorkspaceRow({
               } ${isLocked ? 'cursor-not-allowed opacity-60' : ''}`
         }
       >
-        <WorkspaceAvatar id={workspace.id} name={workspace.name} size={isCollapsed ? 'md' : 'sm'} />
+        <WorkspaceAvatar id={workspace.id} name={workspace.name} size={isCollapsed ? 'md' : 'xs'} />
         {!isCollapsed && (
           <>
             <span className="min-w-0 flex-1 truncate">{workspace.name}</span>
-            {count > 0 && (
-              <span
-                title={chatsLabel(count)}
-                className={`shrink-0 rounded-full bg-surface-2 px-1.5 text-[11px] font-medium leading-5 tabular-nums text-ink-3 ${
-                  moveItems.length
-                    ? 'group-focus-within:invisible group-hover:invisible [@media(hover:none)]:invisible'
-                    : ''
-                }`}
-              >
-                {count}
-              </span>
-            )}
           </>
         )}
       </Link>

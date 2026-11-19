@@ -39,9 +39,10 @@ function StepIcon({ name, state }: { name: string; state: ToolItem['state'] }) {
 const NEAR_END = 24;
 
 /**
- * A run of consecutive tool calls: plain rows on the chat background, no card around them.
- * A long run scrolls inside a capped box that stays on the newest call (unless the reader has
- * scrolled up), with the older calls fading out at the top edge.
+ * A run of consecutive tool calls: a "Tool calls" header with their count, then plain rows on
+ * the chat background, no card around them. Two rows show at once; the rest scroll inside a
+ * capped box that stays on the newest call (unless the reader has scrolled up), with the older
+ * calls fading out at the top edge.
  */
 export function ToolSteps({ items }: { items: readonly ToolItem[] }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -63,17 +64,27 @@ export function ToolSteps({ items }: { items: readonly ToolItem[] }) {
   }, [items.length, update]);
 
   return (
-    <div
-      ref={ref}
-      onScroll={update}
-      className={`flex max-h-[22rem] flex-col gap-px overflow-y-auto [&>*]:shrink-0 ${
-        isFaded ? '[mask-image:linear-gradient(to_bottom,transparent,black_3rem)]' : ''
-      }`}
-    >
-      {items.map((item) => (
-        <ToolStep key={item.key} item={item} />
-      ))}
-    </div>
+    <section className="flex flex-col gap-1">
+      <div className="flex items-center gap-1.5 px-2.5 text-[11px] font-medium text-ink-3">
+        <span>Tool calls</span>
+        <span className="rounded-md bg-surface-2 px-1.5 text-[10.5px] tabular-nums text-ink-2">
+          {items.length}
+        </span>
+      </div>
+      <div
+        ref={ref}
+        onScroll={update}
+        // Two rows (h-8 each, gap-px) show at once; the rest scroll. While a call is open the
+        // cap (and the fade) lift, so its input and result show in full.
+        className={`flex max-h-[calc(4rem+1px)] flex-col gap-px overflow-y-auto [&:has(details[open])]:max-h-none [&:has(details[open])]:[mask-image:none] [&>*]:shrink-0 ${
+          isFaded ? '[mask-image:linear-gradient(to_bottom,transparent,black_1rem)]' : ''
+        }`}
+      >
+        {items.map((item) => (
+          <ToolStep key={item.key} item={item} />
+        ))}
+      </div>
+    </section>
   );
 }
 

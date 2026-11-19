@@ -35,16 +35,15 @@ export function PlanStepSection({
       <div className="grid grid-cols-[20px_minmax(0,1fr)] gap-2.5 px-0.5">
         <span
           aria-label={STATUS_LABEL[status]}
-          className={`mt-px grid h-5 w-5 place-items-center rounded-full border-[1.5px] text-[10px] font-semibold tabular-nums ${MARKER[status]}`}
+          className={`mt-px grid h-5 w-5 place-items-center rounded-full border-[1.5px] text-[10px] font-semibold tabular-nums ${MARKER[status]}${isActive ? ' text-accent' : ''}`}
         >
-          <Marker status={status} number={number} />
+          {/* The active step shows its number: the "Working..." line below already shows activity. */}
+          {isActive ? number : <Marker status={status} number={number} />}
         </span>
         <div className="flex min-w-0 flex-col gap-0.5">
-          {status !== 'done' && (
+          {status !== 'done' && !isActive && (
             <span
-              className={`text-[10px] font-medium uppercase tracking-[0.12em] ${
-                isActive ? 'text-accent' : 'text-ink-3'
-              }`}
+              className="text-[10px] font-medium uppercase tracking-[0.12em] text-ink-3"
             >
               {STATUS_LABEL[status]}
             </span>
