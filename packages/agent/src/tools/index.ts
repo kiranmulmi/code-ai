@@ -22,7 +22,9 @@ import { webSearch } from './web-search.js';
 import { copySkillFile, readSkillFile, useSkill } from './skills.js';
 import { loadMcpTools } from './load-mcp-tools.js';
 import { fetchPage } from './fetch-page.js';
-import { delegateTask } from './delegate.js';
+import { DELEGATE_TOOL_NAME, makeDelegateTask } from './delegate.js';
+import { postNote, readNotes } from './notes.js';
+import { BUILT_IN_SPECIALISTS, type Specialist } from '../team/specialists.js';
 
 const TOOLS: readonly AnyTool[] = [
   createPlan,
@@ -119,20 +121,47 @@ function firstSentence(tool: AnyTool, max = 160): string {
 }
 
 /** Sent only when sub-agents are on (and never to a sub-agent). */
-export const DELEGATE_TOOL = delegateTask.name;
+export const DELEGATE_TOOL = DELEGATE_TOOL_NAME;
+
+/** The team notes tools: sent to the main agent and its sub-agents when sub-agents are on. */
+export const NOTE_TOOLS: readonly string[] = [postNote.name, readNotes.name];
+
+/** Tools that change saved state without asking first: left out for read-only specialists. */
+const QUIET_WRITES = new Set(['remember', 'forget']);
 
 /**
  * The built-in tools, then `extra` ones (from MCP servers). The extra ones are deferred: the
  * model sees their names (`deferredSummary`) and loads the ones it needs with load_mcp_tools.
  * Tools in `disabledGroups` are left out (unless a chat already called one: see `disabled`).
- * With `subagents`, delegate_task comes last among the built-in tools.
+ * With `subagents`, delegate_task comes last among the built-in tools, after the notes tools.
  */
 export function buildToolset(
   extra: readonly AnyTool[] = [],
   disabledGroups: readonly ToolGroup[] = [],
-  { subagents = false }: { subagents?: boolean } = {},
+  {
+    subagents = false,
+    notes = subagents,
+    readOnly = false,
+    specialists = BUILT_IN_SPECIALISTS,
+  }: {
+    /** offer delegate_task (the main agent, with sub-agents on) */
+    subagents?: boolean;
+    /** offer post_note / read_notes (the main agent and its sub-agents, with sub-agents on) */
+    notes?: boolean;
+    /** a read-only specialist: no tool that writes, runs commands or changes memory */
+    readOnly?: boolean;
+    /** the specialists delegate_task offers */
+    specialists?: readonly Specialist[];
+  } = {},
 ): Toolset {
-  const own = subagents ? [...TOOLS, delegateTask] : [...TOOLS];
+  const base = readOnly
+    ? TOOLS.filter((t) => !t.needsApproval && !QUIET_WRITES.has(t.name))
+    : [...TOOLS];
+  const own = [
+    ...base,
+    ...(notes ? [postNote, readNotes] : []),
+    ...(subagents ? [makeDelegateTask(specialists)] : []),
+  ];
   const mcp = extra.filter((tool) => !own.some((t) => t.name === tool.name));
   const builtIn = mcp.length ? [...own, loadMcpTools] : own;
   const tools = [...builtIn, ...mcp];

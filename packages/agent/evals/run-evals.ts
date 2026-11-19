@@ -74,6 +74,12 @@ const caseSchema = z.object({
   checkFile: z.object({ path: z.string(), includes: z.array(z.string()).optional() }).optional(),
   /** a background task (run_command background: true) should still be running at the end */
   expectRunningTask: z.boolean().optional(),
+  /** turn sub-agents on (delegate_task and the team notes) */
+  subagents: z.boolean().optional(),
+  /** specialists delegate_task should have been called with (its `agent` argument) */
+  expectSpecialists: z.array(z.string()).optional(),
+  /** at least this many delegate_task calls in one step (they run at the same time) */
+  expectParallelDelegates: z.number().int().optional(),
 });
 type EvalCase = z.infer<typeof caseSchema>;
 
@@ -137,9 +143,20 @@ async function runCase(
       ]
     : [];
   const tasks = new BackgroundTasks();
+  /** the `agent` of each delegate_task call by the main agent */
+  const delegated: string[] = [];
   const makeAgent = () =>
     createAgent({
-      config: { ...config, approval: 'auto' },
+      config: { ...config, approval: 'auto', subagents: testCase.subagents ?? false },
+      onEvent: (event) => {
+        if (event.type !== 'tool_call' || event.name !== 'delegate_task') return;
+        try {
+          const args = JSON.parse(event.args) as { agent?: string };
+          delegated.push(args.agent ?? 'general');
+        } catch {
+          delegated.push('?');
+        }
+      },
       model,
       logger,
       filesDir,
@@ -190,6 +207,20 @@ async function runCase(
         }
       } catch {
         failures.push(`${testCase.checkFile.path} was not created`);
+      }
+    }
+    for (const name of testCase.expectSpecialists ?? []) {
+      if (!delegated.includes(name)) failures.push(`expected a delegate_task to the ${name}`);
+    }
+    if (testCase.expectParallelDelegates) {
+      const most = Math.max(
+        0,
+        ...result.calls.map((c) => c.toolCalls.filter((t) => t === 'delegate_task').length),
+      );
+      if (most < testCase.expectParallelDelegates) {
+        failures.push(
+          `expected ${testCase.expectParallelDelegates} delegate_task calls in one step, got ${most}`,
+        );
       }
     }
     if (testCase.expectRunningTask && !tasks.list(filesDir).some((task) => task.isRunning)) {

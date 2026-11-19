@@ -18,6 +18,8 @@ export interface AgentConfig extends AgentSettings {
   maxPlanChecks: number;
   /** times the reviewer can send an answer back for another pass (when review is on) */
   maxReviews: number;
+  /** sub-agents that may run at the same time when one step starts several */
+  maxParallelSubagents: number;
 }
 
 // Lenient on purpose: a missing, empty or invalid value falls back to its default.
@@ -43,5 +45,6 @@ export function loadAgentConfig(env: NodeJS.ProcessEnv = process.env): AgentConf
     logDir: e.AGENT_LOG_DIR ?? path.join(os.homedir(), '.nimbrio-ai', 'logs'),
     maxPlanChecks: 1,
     maxReviews: 1,
+    maxParallelSubagents: 3,
   };
 }

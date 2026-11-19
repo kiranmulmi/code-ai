@@ -4,6 +4,7 @@ import type { Planner } from '../planner.js';
 import type { AttachmentStore } from '../attachments.js';
 import type { MemoryStore } from '../memory/long-term.js';
 import type { WorkspaceTasks } from '../background-tasks.js';
+import type { Board } from '../team/board.js';
 
 /** Asks the user a question mid-run and resolves with their answer (or that they skipped it). */
 export type AskUserFn = (question: UserQuestion) => Promise<QuestionAnswer>;
@@ -20,6 +21,8 @@ export interface DelegatedTask {
   task: string;
   /** a short name, shown to the user and in the sub-agent's approval requests */
   label: string;
+  /** which specialist does it (team/specialists.ts) */
+  agent: string;
 }
 
 /** Runs a sub-agent on the task and resolves with what to tell the model. */
@@ -51,6 +54,8 @@ export interface ToolContext {
   signal?: AbortSignal;
   /** delegate_task: runs a sub-agent; null when sub-agents are off (and inside a sub-agent) */
   delegate?: DelegateFn | null;
+  /** post_note / read_notes: the request's team notes, and who posts as; null when sub-agents are off */
+  notes?: { board: Board; author: string } | null;
 }
 
 /**

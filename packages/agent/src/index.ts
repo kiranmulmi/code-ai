@@ -62,6 +62,8 @@ export { parseReview, type Review } from './critic.js';
 export { imageDataUrl, type AttachmentStore } from './attachments.js';
 export { BackgroundTasks, type WorkspaceTasks } from './background-tasks.js';
 export type { SkillStore } from './skills.js';
+export { BUILT_IN_SPECIALISTS, GENERAL_SPECIALIST, type Specialist } from './team/specialists.js';
+export { Board, type BoardNote } from './team/board.js';
 export { suggestChatTitle, cleanTitle } from './title.js';
 export { improvePrompt, cleanImprovedPrompt } from './improve.js';
 export { improveSkill, parseImprovedSkill, type SkillDraft } from './improve-skill.js';

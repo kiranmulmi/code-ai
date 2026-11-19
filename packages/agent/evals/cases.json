@@ -49,7 +49,10 @@
     "prompt": "In notes.txt, change the launch date to 21 March.",
     "expectTools": ["edit_file"],
     "forbidTools": ["write_file"],
-    "checkFile": { "path": "notes.txt", "includes": ["21 March", "BLUE HERON"] }
+    "checkFile": {
+      "path": "notes.txt",
+      "includes": ["21 March", "BLUE HERON"]
+    }
   },
   {
     "name": "runs-a-command",
@@ -132,5 +135,33 @@
     "prompt": "hello",
     "fakeMcp": true,
     "forbidTools": ["load_mcp_tools"]
+  },
+  {
+    "name": "delegates-parallel-research-to-researchers",
+    "why": "With sub-agents on, independent research topics go to researcher specialists in one step, so they run at the same time.",
+    "prompt": "Using sub-agents, research these three separately and in parallel, then give me one short paragraph on each with a source: the latest stable release of Node.js, of Python, and of Rust.",
+    "subagents": true,
+    "expectTools": ["delegate_task"],
+    "expectSpecialists": ["researcher"],
+    "expectParallelDelegates": 2
+  },
+  {
+    "name": "delegates-code-change-to-coder-then-reviewer",
+    "why": "A code change goes to the coder, and an independent check to the reviewer, not to a general sub-agent.",
+    "prompt": "Use a sub-agent to rename the greet function in src/greet.ts to sayHello, then have a separate sub-agent review the change.",
+    "subagents": true,
+    "expectSpecialists": ["coder", "reviewer"],
+    "checkFile": {
+      "path": "src/greet.ts",
+      "includes": ["sayHello"]
+    }
+  },
+  {
+    "name": "does-not-delegate-small-lookups",
+    "why": "Sub-agents cost tokens: a one-step lookup is done directly even when sub-agents are on.",
+    "prompt": "What is the version in package.json?",
+    "subagents": true,
+    "forbidTools": ["delegate_task"],
+    "outputIncludes": ["3.4.5"]
   }
 ]

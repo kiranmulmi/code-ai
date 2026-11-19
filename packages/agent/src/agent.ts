@@ -65,6 +65,14 @@ import {
 } from './context.js';
 import { withoutReason, type ToolDefinition } from './tools/define.js';
 import { ATTACHMENT_TOOLS, DELEGATE_TOOL, SKILL_TOOLS, buildToolset } from './tools/index.js';
+import { Board } from './team/board.js';
+import {
+  BUILT_IN_SPECIALISTS,
+  GENERAL_SPECIALIST,
+  specialistMap,
+  specialistOffGroups,
+  type Specialist,
+} from './team/specialists.js';
 import type { AnyTool, AskUserFn, DelegatedTask, ToolContext } from './tools/define.js';
 import { REVIEW_PROMPT, parseReview, reviewMessage, reviseMessage, type Review } from './critic.js';
 import type { WorkspaceTasks } from './background-tasks.js';
@@ -169,6 +177,13 @@ export interface AgentOptions extends AgentRunOptions {
   tasks?: WorkspaceTasks;
   /** set for a sub-agent (delegate_task): its prompt says it reports to another agent */
   role?: 'agent' | 'subagent';
+  /**
+   * the specialists delegate_task offers (team/specialists.ts); later ones replace built-ins
+   * with the same name. Without it, the built-in ones.
+   */
+  specialists?: readonly Specialist[];
+  /** a sub-agent's team: the request's shared notes, who it posts as, and its specialist */
+  team?: { board: Board; author: string; specialist: Specialist };
 }
 
 /** What comes with one user prompt besides its text. */
@@ -297,10 +312,25 @@ export function createAgent(options: AgentOptions): Agent {
   const logger = options.logger ?? createLogger({ level: config.logLevel, logDir: config.logDir });
   const approve = options.approve ?? createApprover(config.approval, options.ask);
 
-  const disabledTools = options.disabledTools ?? [];
   // A sub-agent never gets delegate_task: no sub-agents of sub-agents.
   const canDelegate = config.subagents && !isSubagent;
-  const toolset = buildToolset(options.extraTools, disabledTools, { subagents: canDelegate });
+  const specialists = [
+    ...specialistMap([...BUILT_IN_SPECIALISTS, ...(options.specialists ?? [])]).values(),
+  ];
+  const specialistsByName = specialistMap(specialists);
+  const team = options.team ?? null;
+  const specialist = team?.specialist ?? null;
+  // A specialist only gets its own tool groups (and never one the workspace turned off).
+  const disabledTools = specialist
+    ? specialistOffGroups(specialist, options.disabledTools ?? [])
+    : (options.disabledTools ?? []);
+  const toolset = buildToolset(options.extraTools, disabledTools, {
+    subagents: canDelegate,
+    notes: canDelegate || team !== null,
+    readOnly: specialist?.readOnly ?? false,
+    specialists,
+  });
+  const teamSection = canDelegate ? ('lead' as const) : specialist;
   const plannerPrompt = buildPlannerPrompt(toolset.summary);
   const instructions = options.instructions ?? '';
   const { filesDir, longTermMemory } = options;
@@ -338,7 +368,7 @@ export function createAgent(options: AgentOptions): Agent {
     '',
     toolset.deferredSummary,
     disabledTools,
-    { voiceReplies, hasPlanningStep, isSubagent },
+    { voiceReplies, hasPlanningStep, isSubagent, team: teamSection },
   );
   let systemPrompt = systemSections.map((section) => section.text).join('');
   let skillList = '';
@@ -364,6 +394,13 @@ export function createAgent(options: AgentOptions): Agent {
   };
   /** The budget of the run in progress, for delegate_task. */
   let currentBudget: Budget | null = null;
+  /** The team notes of the request in progress (a sub-agent uses its parent's). */
+  let board: Board | null = team?.board ?? null;
+  /** Sub-agents running now, and those waiting for a slot (maxParallelSubagents). */
+  let subagentsRunning = 0;
+  const subagentQueue: (() => void)[] = [];
+  /** Sub-agents in the current batch of delegate_task calls: they split the tokens left. */
+  let delegateBatchSize = 1;
   // Data URLs of the images in the conversation, loaded once per request.
   const imageUrls = new Map<string, string>();
   const missingImages = new Set<string>();
@@ -458,10 +495,11 @@ export function createAgent(options: AgentOptions): Agent {
     }
 
     try {
-      const context =
+      const notes = board ? { board, author: team?.author ?? 'main agent' } : null;
+      const context: ToolContext =
         name === DELEGATE_TOOL && canDelegate
-          ? { ...toolContext, delegate: (task: DelegatedTask) => delegate(callId, task) }
-          : toolContext;
+          ? { ...toolContext, notes, delegate: (task: DelegatedTask) => delegate(callId, task) }
+          : { ...toolContext, notes };
       const output = await tool.runValidated(input, context);
       const text = typeof output === 'string' ? output : JSON.stringify(output, null, 2);
       logger.event('tool_result', { tool: name, ok: true, chars: text.length });
@@ -478,19 +516,41 @@ export function createAgent(options: AgentOptions): Agent {
     return Boolean(tool?.isReadOnly && !tool.needsApproval && !toolset.disabled.has(name));
   }
 
-  /** The model's calls in order, with each run of read-only calls grouped to run together. */
+  /**
+   * The model's calls in order, with each run of read-only calls grouped to run together, and
+   * each run of delegate_task calls too (sub-agents ask for their own approvals, and at most
+   * maxParallelSubagents of them work at once).
+   */
   function batchCalls(calls: readonly ToolCall[]): ToolCall[][] {
+    const kindOf = (name: string) =>
+      canDelegate && name === DELEGATE_TOOL ? 'delegate' : canRunAlongside(name) ? 'read' : null;
     const batches: ToolCall[][] = [];
     for (const call of calls) {
       const last = batches.at(-1);
-      const isReadOnly = canRunAlongside(call.function.name);
-      if (last && isReadOnly && last.every((c) => canRunAlongside(c.function.name))) {
+      const kind = kindOf(call.function.name);
+      if (last && kind && last.every((c) => kindOf(c.function.name) === kind)) {
         last.push(call);
       } else {
         batches.push([call]);
       }
     }
     return batches;
+  }
+
+  /** Waits for a free sub-agent slot; call the returned function when done. */
+  async function subagentSlot(): Promise<() => void> {
+    const max = Math.max(1, config.maxParallelSubagents);
+    if (subagentsRunning >= max) {
+      await new Promise<void>((resolve) => subagentQueue.push(resolve));
+    } else {
+      subagentsRunning += 1;
+    }
+    return () => {
+      const next = subagentQueue.shift();
+      if (next)
+        next(); // hands its slot straight to the next one waiting
+      else subagentsRunning -= 1;
+    };
   }
 
   /** The workspace's skills, one line each; a problem reading them only leaves them out. */
@@ -510,6 +570,8 @@ export function createAgent(options: AgentOptions): Agent {
   ): Promise<RunResult> {
     const budget = new Budget(config);
     currentBudget = budget;
+    // Fresh team notes for each request (a sub-agent keeps the one it was given).
+    if (canDelegate) board = new Board();
     const toolsUsed: string[] = [];
     const finish = (status: RunStatus, text: string): RunResult => {
       const result: RunResult = {
@@ -543,7 +605,7 @@ export function createAgent(options: AgentOptions): Agent {
       skillList,
       toolset.deferredSummary,
       disabledTools,
-      { voiceReplies, hasPlanningStep, hasAttachments, isSubagent },
+      { voiceReplies, hasPlanningStep, hasAttachments, isSubagent, team: teamSection },
     );
     systemPrompt = systemSections.map((section) => section.text).join('');
     // Tools this chat already called stay sent: its earlier calls refer to them.
@@ -714,6 +776,7 @@ export function createAgent(options: AgentOptions): Agent {
             }
             continue;
           }
+          delegateBatchSize = batch.filter((c) => c.function.name === DELEGATE_TOOL).length || 1;
           const results = await Promise.all(
             batch.map(async (call) => {
               const { name, arguments: args } = call.function;
@@ -955,51 +1018,67 @@ export function createAgent(options: AgentOptions): Agent {
    * same workspace, tools (but delegate_task), stop signal and approvals (labelled with it).
    * It may use what is left of this run's token budget; its calls count toward this run.
    */
-  async function delegate(callId: string, { task, label }: DelegatedTask): Promise<string> {
+  async function delegate(callId: string, { task, label, agent }: DelegatedTask): Promise<string> {
     const budget = currentBudget;
     if (!budget) throw new Error('No run in progress.');
-    const tokensLeft = Math.floor(budget.maxTotalTokens - budget.budgetTokens());
-    if (tokensLeft <= 0)
-      throw new Error('The token budget is used up. Finish without a sub-agent.');
-    const from: ApprovalSource = { subagent: label };
-    const ownModel = options.subagentCallModel
-      ? { callModel: options.subagentCallModel }
-      : options.subagentModel
-        ? { callModel: undefined, model: options.subagentModel }
-        : {};
-    logger.step(`sub-agent "${label}" started`);
-    const child = createAgent({
-      ...options,
-      ...ownModel,
-      role: 'subagent',
-      config: {
-        ...config,
-        planning: 'off',
-        review: 'off',
-        subagents: false,
-        maxTotalTokens: tokensLeft,
-      },
-      approve: (name, input) => approve(name, input, from),
-      onEvent: (event) => emit({ type: 'subagent', callId, event }),
-      conversation: new Conversation(),
-      planner: new Planner(),
-      memoryShown: null,
-      steering: undefined,
-      voiceReplies: false,
-      chatId: undefined,
-    });
-    const result = await child.run(task);
-    for (const call of result.calls) {
-      budget.recordCall(call, { ...call, kind: 'subagent' });
+    const chosen = specialistsByName.get(agent) ?? specialistsByName.get(GENERAL_SPECIALIST);
+    if (!chosen) throw new Error(`There is no specialist "${agent}".`);
+    // Sub-agents started in the same step share what is left; each waits for a free slot.
+    const share = delegateBatchSize;
+    const release = await subagentSlot();
+    try {
+      if (isStopped()) throw new StoppedError();
+      const tokensLeft = Math.floor((budget.maxTotalTokens - budget.budgetTokens()) / share);
+      if (tokensLeft <= 0)
+        throw new Error('The token budget is used up. Finish without a sub-agent.');
+      const from: ApprovalSource = { subagent: label };
+      const ownModel =
+        chosen.model === 'review' && (options.reviewCallModel || options.reviewModel)
+          ? options.reviewCallModel
+            ? { callModel: options.reviewCallModel }
+            : { callModel: undefined, model: options.reviewModel }
+          : options.subagentCallModel
+            ? { callModel: options.subagentCallModel }
+            : options.subagentModel
+              ? { callModel: undefined, model: options.subagentModel }
+              : {};
+      logger.step(`sub-agent "${label}" (${chosen.name}) started`);
+      const child = createAgent({
+        ...options,
+        ...ownModel,
+        role: 'subagent',
+        config: {
+          ...config,
+          planning: 'off',
+          review: 'off',
+          subagents: false,
+          maxTotalTokens: tokensLeft,
+        },
+        team: board ? { board, author: label, specialist: chosen } : undefined,
+        approve: (name, input) => approve(name, input, from),
+        onEvent: (event) => emit({ type: 'subagent', callId, event }),
+        conversation: new Conversation(),
+        planner: new Planner(),
+        memoryShown: null,
+        steering: undefined,
+        voiceReplies: false,
+        chatId: undefined,
+      });
+      const result = await child.run(task);
+      for (const call of result.calls) {
+        budget.recordCall(call, { ...call, kind: 'subagent' });
+      }
+      emit({ type: 'usage', steps: budget.steps, usage: budget.usage() });
+      logger.step(`sub-agent "${label}" ended: ${result.status}`);
+      if (result.status === 'stopped') throw new StoppedError();
+      const note =
+        result.status === 'done'
+          ? ''
+          : `[The sub-agent ended early (${result.status}); its report may be incomplete.]\n\n`;
+      return `${note}${result.text}`;
+    } finally {
+      release();
     }
-    emit({ type: 'usage', steps: budget.steps, usage: budget.usage() });
-    logger.step(`sub-agent "${label}" ended: ${result.status}`);
-    if (result.status === 'stopped') throw new StoppedError();
-    const note =
-      result.status === 'done'
-        ? ''
-        : `[The sub-agent ended early (${result.status}); its report may be incomplete.]\n\n`;
-    return `${note}${result.text}`;
   }
 
   async function summarizeAtLimit(
