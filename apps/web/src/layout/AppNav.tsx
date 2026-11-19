@@ -2,7 +2,7 @@ import type { AppInfo, Workspace } from '@app/shared';
 import { IconButton } from '../components/IconButton';
 import { WorkspaceSwitcher } from '../features/workspaces/WorkspaceSwitcher';
 import { MenuIcon } from '../lib/icons';
-import { BrandLink } from './BrandLink';
+import { Brand } from './Brand';
 import { ConnectionMenu } from './ConnectionMenu';
 import { ThemeToggle } from './ThemeToggle';
 import { WorkspaceSettingsLink } from './WorkspaceSettingsLink';
@@ -54,7 +54,7 @@ export function AppNav({
         </IconButton>
       )}
 
-      <BrandLink isNameHiddenOnPhone />
+      <Brand />
 
       <span aria-hidden className={`shrink-0 select-none text-[20px] font-light text-line-strong`}>
         /

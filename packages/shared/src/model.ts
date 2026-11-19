@@ -12,11 +12,8 @@ export const REASONING_EFFORTS = ['low', 'medium', 'high'] as const;
 
 export type ReasoningEffort = (typeof REASONING_EFFORTS)[number];
 
-/**
- * Who serves a model: `openai` is any server that speaks the OpenAI API (with a base URL and
- * key); `cursor` is Cursor, through the account signed in under Settings → Model providers.
- */
-export const MODEL_PROVIDERS = ['openai', 'cursor'] as const;
+/** Who serves a model: `openai` is any server that speaks the OpenAI API (base URL and key). */
+export const MODEL_PROVIDERS = ['openai'] as const;
 
 export type ModelProvider = (typeof MODEL_PROVIDERS)[number];
 
@@ -31,7 +28,7 @@ export interface ModelProfile {
   /** The model name exactly as the server lists it, e.g. "gpt-4.1". */
   model: string;
   provider: ModelProvider;
-  /** Any OpenAI-compatible server. Null means api.openai.com (and always for Cursor). */
+  /** Any OpenAI-compatible server. Null means api.openai.com. */
   baseUrl: string | null;
   hasApiKey: boolean;
   /** Null lets the server decide. */

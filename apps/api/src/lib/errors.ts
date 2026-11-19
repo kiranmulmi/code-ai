@@ -44,7 +44,7 @@ export class PayloadTooLargeError extends HttpError {
   }
 }
 
-/** A service this app calls (a model provider's sign-in, say) failed or answered badly. */
+/** A service this app calls (Supabase's sign-in check, say) failed or answered badly. */
 export class UpstreamError extends HttpError {
   constructor(message = 'An outside service failed.') {
     super(502, 'UPSTREAM_ERROR', message);

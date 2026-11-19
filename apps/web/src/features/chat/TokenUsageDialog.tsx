@@ -108,7 +108,7 @@ export function TokenUsageDialog({
           far lower. Totals are what the model server reported; it doesn&apos;t say what each part
           cost, so the parts are counted from the text sent and scaled to those totals.
           {hasEstimates &&
-            ' For requests marked estimated the server reported no tokens (Cursor doesn’t for a step that ends in a tool call), so their totals are counted from the text sent too.'}
+            ' For requests marked estimated the server reported no tokens, so their totals are counted from the text sent too.'}
         </p>
       </div>
     </Modal>

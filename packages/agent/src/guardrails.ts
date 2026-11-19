@@ -370,8 +370,8 @@ export function assertNotSecretFile(shownPath: string): void {
 
 /**
  * For the agent's run_command only (the user's own terminal tab isn't limited): commands that
- * name this app's data folders are refused. ~/.hamro-ai/ holds every model API key, provider
- * sign-in and MCP token in plain JSON. A backstop like refuseCommand, not a sandbox: a command
+ * name this app's data folders are refused. ~/.hamro-ai/ holds every model API key and MCP
+ * token in plain JSON. A backstop like refuseCommand, not a sandbox: a command
  * that builds the path at run time gets through, and redactSecrets catches what it prints.
  * @returns why the command is refused, or null when it may run
  */
@@ -396,7 +396,6 @@ const TOKEN_PATTERNS: readonly RegExp[] = [
   /\b(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{30,}\b/g, // GitHub tokens
   /\bgithub_pat_[A-Za-z0-9_]{30,}\b/g,
   /\bglpat-[A-Za-z0-9_-]{20,}\b/g, // GitLab
-  /\bcrsr_[A-Za-z0-9]{20,}\b/g, // Cursor
   /\bsk-[A-Za-z0-9_-]{20,}\b/g, // OpenAI, Anthropic, OpenRouter, DeepSeek, ...
   /\bAKIA[0-9A-Z]{16}\b/g, // AWS access key id
   /\bAIza[0-9A-Za-z_-]{35}\b/g, // Google API key

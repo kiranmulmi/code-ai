@@ -1,7 +1,7 @@
 import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import type { AppInfo, ChatSummary, Workspace } from '@app/shared';
 import { IconButton } from '../../components/IconButton';
-import { BrandLink } from '../../layout/BrandLink';
+import { Brand } from '../../layout/Brand';
 import {
   ChevronRightIcon,
   ComposeIcon,
@@ -128,7 +128,7 @@ export function ChatSidebar({
         <div className="titlebar flex h-12 shrink-0 items-center gap-1 border-b border-line pl-[calc(1rem+var(--titlebar-inset))] pr-2 xl:pl-4">
           {/* At xl the workspace sidebar to the left carries the brand and the top-left corner. */}
           <span className="xl:hidden">
-            <BrandLink isHiddenInDesktopApp />
+            <Brand isHiddenInDesktopApp />
           </span>
           <span className="hidden text-[10.5px] font-semibold uppercase tracking-wider text-ink-3 xl:block">
             Chats

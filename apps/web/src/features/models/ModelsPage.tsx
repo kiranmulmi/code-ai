@@ -135,7 +135,7 @@ export function ModelsPage() {
                   <span className="truncate text-[14px] font-medium text-ink">{model.name}</span>
                   {model.isDefault && <Badge tone="blue">default</Badge>}
                   {model.supportsReasoning && <Badge>reasoning effort</Badge>}
-                  {model.provider === 'openai' && !model.hasApiKey && model.baseUrl === null && (
+                  {!model.hasApiKey && model.baseUrl === null && (
                     <Badge tone="yellow">no API key</Badge>
                   )}
                 </div>

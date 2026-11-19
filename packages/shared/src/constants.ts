@@ -6,9 +6,9 @@
 //  tokens; times are in milliseconds unless the name says seconds (S / Seconds).
 //
 //  Keep this file free of imports: everything else imports it.
-//  Not here on purpose: UI pixel sizes and animation timings (they live with their components),
-//  the Cursor wire-protocol numbers (fixed by Cursor) and the desktop app's start/stop timeouts
-//  (apps/desktop is packaged on its own and can't import this).
+//  Not here on purpose: UI pixel sizes and animation timings (they live with their components)
+//  and the desktop app's start/stop timeouts (apps/desktop is packaged on its own and can't
+//  import this).
 // ============================================================================================
 
 // ---------- Agent settings (Settings -> Agent) ----------
@@ -156,20 +156,6 @@ export const MCP_LIMITS = {
   stderrLines: 20,
 };
 
-// ---------- Cursor models ----------
-
-export const CURSOR_TIMEOUTS = {
-  requestTimeoutMs: 15_000,
-  /** renew a sign-in token this long before it expires */
-  tokenExpirySkewMs: 5 * 60_000,
-  /** no data at all from Cursor for this long: give up */
-  idleTimeoutMs: 120_000,
-  /** after the first tool call, wait this long for more in the same turn */
-  toolCallGraceMs: 400,
-  /** how long the chat stream's address is reused */
-  agentUrlTtlMs: 60 * 60_000,
-};
-
 // ---------- Chat titles ----------
 
 export const CHAT_TITLES = {
@@ -277,10 +263,6 @@ export const TASK_COMMAND_MAX_CHARS = 4_000;
 export const API_LIMITS = {
   /** sign-in tokens already checked, kept so polling doesn't verify the same one again */
   authTokenCacheSize: 200,
-  /** a started provider sign-in waits this long for the user */
-  providerLoginTtlMs: 10 * 60_000,
-  /** provider sign-ins waiting at once; more forgets the oldest */
-  maxPendingProviderLogins: 10,
   /** an approval request counts as declined after this long */
   approvalTimeoutMs: 5 * 60_000,
   /** a question to the user counts as skipped after this long */
@@ -327,6 +309,20 @@ export const PROJECT_PEEK = {
   maxFileChars: 2500,
 };
 
+/** The snapshot of the workspace folder given to the model with every request. */
+export const WORKSPACE_OVERVIEW = {
+  /** files and folders listed, top level first */
+  maxEntries: 80,
+  /** 1 = top level only; 2 also lists what each top-level folder holds */
+  maxDepth: 2,
+  /** entries shown inside each deeper folder; the rest are counted as "+N more" */
+  maxPerFolder: 8,
+  /** characters of the README / agent notes shown */
+  docChars: 1500,
+  /** notes or package.json larger than this aren't read */
+  maxDocBytes: 256_000,
+};
+
 // ---------- Web app ----------
 
 export const WEB_APP = {
@@ -355,9 +351,6 @@ export const WEB_APP = {
   runningTasksPollMs: 10_000,
   /** how often the Git panel and its change count refresh */
   gitPollMs: 10_000,
-  /** how often a provider sign-in is checked, and failed checks in a row before giving up */
-  providerLoginPollMs: 2000,
-  providerLoginMaxFailures: 3,
   /** toasts shown at once */
   maxToasts: 4,
 };

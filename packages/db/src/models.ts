@@ -1,7 +1,6 @@
 // The models the agent can run on, app-wide, in ~/.hamro-ai/models.json (written 0600).
 // API keys are kept there and only ever leave through `settingsFor`, for a run on this
-// machine; the UI sees `hasApiKey`. A Cursor model keeps no key: `settingsFor` gives it the
-// token of the Cursor sign-in (Settings → Model providers).
+// machine; the UI sees `hasApiKey`.
 import { randomUUID } from 'node:crypto';
 import { serialized, type ModelSettings } from '@app/agent';
 import {
@@ -35,7 +34,25 @@ const savedModelSchema = z.object({
 
 type SavedModel = z.output<typeof savedModelSchema>;
 
-const modelsFileSchema = z.object({ models: z.array(savedModelSchema).default([]) });
+/**
+ * Providers the app once offered and no longer does. Models saved with one are skipped when
+ * the file is read (and dropped from it on the next change), so they don't break the list.
+ */
+const REMOVED_PROVIDERS: readonly string[] = ['cursor'];
+
+const isRemovedProviderModel = (value: unknown): boolean =>
+  typeof value === 'object' &&
+  value !== null &&
+  'provider' in value &&
+  typeof value.provider === 'string' &&
+  REMOVED_PROVIDERS.includes(value.provider);
+
+const modelsFileSchema = z.object({
+  models: z.preprocess(
+    (value) => (Array.isArray(value) ? value.filter((m) => !isRemovedProviderModel(m)) : value),
+    z.array(savedModelSchema).default([]),
+  ),
+});
 
 /** A model ready for a run: what the UI shows, and what the agent needs to call it. */
 export interface ResolvedModel {
@@ -44,14 +61,8 @@ export interface ResolvedModel {
   settings: ModelSettings;
 }
 
-/** The current Cursor access token (renewed when it ran out), or null when not signed in. */
-export type CursorTokenSource = () => Promise<string | null>;
-
 export class ModelStore {
-  constructor(
-    readonly file: string,
-    private readonly cursorToken: CursorTokenSource = () => Promise.resolve(null),
-  ) {}
+  constructor(readonly file: string) {}
 
   /** Oldest first, so the list stays put as models are added. */
   async list(): Promise<ModelProfile[]> {
@@ -72,7 +83,9 @@ export class ModelStore {
         id: randomUUID(),
         name: clean.name,
         model: clean.model,
-        ...connection(clean.provider, clean.baseUrl, clean.apiKey || null),
+        provider: clean.provider,
+        baseUrl: clean.baseUrl,
+        apiKey: clean.apiKey || null,
         maxTokens: clean.maxTokens,
         contextWindow: clean.contextWindow,
         supportsReasoning: clean.supportsReasoning,
@@ -98,11 +111,9 @@ export class ModelStore {
         ...current,
         name: clean.name,
         model: clean.model,
-        ...connection(
-          clean.provider ?? current.provider,
-          clean.baseUrl,
-          clean.apiKey === undefined ? current.apiKey : clean.apiKey || null,
-        ),
+        provider: clean.provider ?? current.provider,
+        baseUrl: clean.baseUrl,
+        apiKey: clean.apiKey === undefined ? current.apiKey : clean.apiKey || null,
         maxTokens: clean.maxTokens,
         contextWindow: clean.contextWindow,
         supportsReasoning: clean.supportsReasoning,
@@ -156,7 +167,6 @@ export class ModelStore {
     const saved =
       id === undefined ? models.find((m) => m.isDefault) : models.find((m) => m.id === id);
     if (!saved) return null;
-    const apiKey = saved.provider === 'cursor' ? await this.cursorToken() : saved.apiKey;
     return {
       profile: toProfile(saved),
       settings: {
@@ -164,7 +174,7 @@ export class ModelStore {
         provider: saved.provider,
         model: saved.model,
         baseURL: saved.baseUrl ?? undefined,
-        apiKey: apiKey ?? '',
+        apiKey: saved.apiKey ?? '',
         maxTokens: saved.maxTokens,
         contextWindow: saved.contextWindow,
         reasoningEffort: null,
@@ -232,14 +242,6 @@ function check<S extends z.ZodTypeAny>(schema: S, value: unknown): z.output<S> {
   }
   return result.data;
 }
-
-/** A Cursor model has no server or key of its own: it goes through the Cursor sign-in. */
-const connection = (
-  provider: SavedModel['provider'],
-  baseUrl: string | null,
-  apiKey: string | null,
-): Pick<SavedModel, 'provider' | 'baseUrl' | 'apiKey'> =>
-  provider === 'cursor' ? { provider, baseUrl: null, apiKey: null } : { provider, baseUrl, apiKey };
 
 const notDefault = (model: SavedModel): SavedModel =>
   model.isDefault ? { ...model, isDefault: false } : model;

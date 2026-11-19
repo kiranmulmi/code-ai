@@ -29,7 +29,7 @@ import { runCommand } from '../src/tools/run-command.js';
 const fake = (prefix: string, length: number) =>
   `${prefix}${'a1B2c3D4e5'.repeat(8).slice(0, length)}`;
 const GITHUB = fake('ghp_', 36);
-const CURSOR = fake('crsr_', 64);
+const GITLAB = fake('glpat-', 26);
 const OPENAI = fake('sk-proj-', 40);
 
 const silentLogger: AgentLogger = { file: null, event() {}, step() {}, warn() {}, error() {} };
@@ -134,7 +134,7 @@ test("run_command can't touch the app's data folders; the user's own terminal ch
 test('redactSecrets masks known token formats anywhere', () => {
   const jwt = `eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.${'d1F2'.repeat(6)}`;
   const text = [
-    `"credential": "${CURSOR}"`,
+    `"credential": "${GITLAB}"`,
     `"Authorization": "Bearer ${GITHUB}"`,
     `token=${GITHUB}`,
     `key ${OPENAI} in the logs`,
@@ -145,7 +145,7 @@ test('redactSecrets masks known token formats anywhere', () => {
   ].join('\n');
   const out = redactSecrets(text);
   for (const secret of [
-    CURSOR,
+    GITLAB,
     GITHUB,
     OPENAI,
     jwt,
@@ -203,7 +203,7 @@ test('the agent masks secrets in tool output before the model, the stream and th
     properties: { key: { type: 'string', description: 'Which one.' } },
     async run({ key }) {
       if (key === 'fail') throw new Error(`401 for Bearer ${GITHUB}`);
-      return `{ "credential": "${CURSOR}", "name": "demo" }`;
+      return `{ "credential": "${GITLAB}", "name": "demo" }`;
     },
   });
   const requests: ModelRequest[] = [];
@@ -267,7 +267,7 @@ test('the agent masks secrets in tool output before the model, the stream and th
     ['stream', streamed.join('\n')],
     ['log', logged.join('\n')],
   ] as const) {
-    assert.ok(!text.includes(CURSOR), `${where} shows the Cursor key`);
+    assert.ok(!text.includes(GITLAB), `${where} shows the GitLab token`);
     assert.ok(!text.includes(GITHUB), `${where} shows the GitHub token`);
   }
 });

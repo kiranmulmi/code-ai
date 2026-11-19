@@ -94,16 +94,3 @@ export {
 export { systemPromptFor, SYSTEM_PROMPT } from './prompt.js';
 export { errorMessage, errorCode, isRecord } from './errors.js';
 export { serialized, writeFileAtomic } from './file-io.js';
-export {
-  cursorTokens,
-  isExpired,
-  pollCursorLogin,
-  refreshCursorToken,
-  startCursorLogin,
-  type CursorFetch,
-  type CursorLoginParams,
-  type CursorPollResult,
-  type CursorRefreshResult,
-  type CursorTokens,
-} from './cursor/auth.js';
-export { CursorHttpError, fetchCursorModels, type CursorModel } from './cursor/client.js';

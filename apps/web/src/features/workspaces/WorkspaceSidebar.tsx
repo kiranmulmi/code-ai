@@ -8,7 +8,7 @@ import type { useSidebarWidth } from '../chat/useSidebarWidth';
 import { ConfirmDeleteDialog } from '../../components/ConfirmDeleteDialog';
 import { IconButton } from '../../components/IconButton';
 import type { RowMenuItem } from '../../components/RowMenu';
-import { BrandLink } from '../../layout/BrandLink';
+import { Brand } from '../../layout/Brand';
 import { ThemeToggle } from '../../layout/ThemeToggle';
 import { errorMessage } from '../../lib/api';
 import {
@@ -16,7 +16,6 @@ import {
   CrossIcon,
   FolderIcon,
   FolderPlusIcon,
-  LogoIcon,
   PanelIcon,
   PlusIcon,
   SearchIcon,
@@ -250,17 +249,10 @@ export function WorkspaceSidebar({
         }`}
       >
         {isCollapsed ? (
-          <Link
-            to="/"
-            aria-label="Home"
-            title="Hamro AI"
-            className="brand-mark [[data-desktop]_&]:hidden"
-          >
-            <LogoIcon />
-          </Link>
+          <Brand isHiddenInDesktopApp />
         ) : (
           <>
-            <BrandLink isHiddenInDesktopApp />
+            <Brand isHiddenInDesktopApp />
             <IconButton
               onClick={onToggle}
               aria-controls="workspace-sidebar"

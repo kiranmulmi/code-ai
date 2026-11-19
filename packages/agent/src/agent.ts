@@ -286,9 +286,9 @@ export function createAgent(options: AgentOptions): Agent {
     const { usage, message } = response;
     const input = inputBreakdown(request, usage.inputTokens, step);
     const output = outputBreakdown(message, usage.outputTokens);
-    // A call the server reported nothing for (Cursor reports a turn's tokens only once it
-    // ends, which a turn ending in a tool call never does) still sent its tokens: count them
-    // from the text (the unscaled parts), so the run's totals and token budget include them.
+    // A call the server reported nothing for (some servers send no usage) still sent its
+    // tokens: count them from the text (the unscaled parts), so the run's totals and token
+    // budget include them.
     const isEstimated = usage.inputTokens === 0 && usage.outputTokens === 0;
     budget.recordCall(
       isEstimated ? { inputTokens: groupTokens(input), outputTokens: groupTokens(output) } : usage,

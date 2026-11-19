@@ -101,8 +101,8 @@ export interface ModelCallUsage extends Usage {
   /** what the output tokens went to, largest first (empty if not known) */
   output: TokenGroup[];
   /**
-   * The server reported no tokens for this call (Cursor doesn't for a turn that ends in a tool
-   * call), so its counts are the parts counted from the text sent, not the server's.
+   * The server reported no tokens for this call, so its counts are the parts counted from the
+   * text sent, not the server's.
    */
   isEstimated?: boolean;
 }

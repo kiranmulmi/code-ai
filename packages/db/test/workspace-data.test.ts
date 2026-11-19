@@ -202,12 +202,12 @@ test('settings, chats, messages and runs are saved under .hamro-ai', async () =>
   await fs.writeFile(runsFile, `${JSON.stringify(older)}\n`);
   assert.deepEqual((await data.loadRuns(chat.id)).get(0)?.calls, []);
 
-  // A call saved at 0 tokens (Cursor's tool-call turns, before they were counted) loads with
+  // A call saved at 0 tokens (a server that sent no usage, before they were counted) loads with
   // its parts' tokens, marked estimated, and the run's totals include them.
   const part = (id: string, tokens: number) => ({ id, tokens, items: [] });
   const zeroCall = {
     kind: 'step',
-    model: 'cursor-model',
+    model: 'some-model',
     durationMs: 9000,
     toolCalls: ['read_file'],
     input: [part('results', 3000), part('system', 1000)],

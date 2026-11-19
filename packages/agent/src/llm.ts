@@ -1,8 +1,7 @@
 // The one place that talks to the model. It uses the OpenAI Chat Completions
 // API, which OpenAI and many other servers speak (Ollama, OpenRouter, Groq,
 // LM Studio, vLLM, Together, DeepSeek, ...). Models are set up in the app's
-// Settings -> Models and passed in per run as ModelSettings. Cursor's models, which speak
-// Cursor's own protocol instead, are called by cursor/caller.ts; createModelCaller picks.
+// Settings -> Models and passed in per run as ModelSettings.
 import OpenAI from 'openai';
 import type {
   ChatCompletionContentPart,
@@ -14,14 +13,13 @@ import type { Usage } from '@app/shared';
 import { StoppedError, isRecord } from './errors.js';
 import type { ModelMessage, ToolCall } from './memory/short-term.js';
 import type { ToolDefinition } from './tools/define.js';
-import { createCursorModelCaller } from './cursor/caller.js';
 
 /** Which model one run talks to, and how. */
 export interface ModelSettings {
   /** What the app calls the model, used in error messages. */
   label: string;
-  /** Who serves it: any OpenAI-compatible server, or Cursor (signed in; `apiKey` is its token). */
-  provider?: 'openai' | 'cursor';
+  /** Who serves it: any OpenAI-compatible server. */
+  provider?: 'openai';
   /** Any OpenAI-compatible server. Undefined means api.openai.com. */
   baseURL?: string;
   apiKey: string;
@@ -53,8 +51,7 @@ export interface ModelRequest {
   /** Cancels the call (the user stopped the run). */
   signal?: AbortSignal;
   /**
-   * The same for every call of one chat (its id). Cursor files a call under it, which may let
-   * its prompt cache match the chat's earlier calls; the Chat Completions call doesn't use it.
+   * The same for every call of one chat (its id); the Chat Completions call doesn't use it.
    */
   conversationId?: string;
 }
@@ -81,7 +78,6 @@ export interface ModelResponse {
 export type CallModel = (req: ModelRequest) => Promise<ModelResponse>;
 
 export function createModelCaller(config: ModelSettings): CallModel {
-  if (config.provider === 'cursor') return createCursorModelCaller(config);
   let client: OpenAI | undefined;
   function getClient(): OpenAI {
     // Local servers (Ollama, LM Studio) don't check the key, but the SDK needs a value.

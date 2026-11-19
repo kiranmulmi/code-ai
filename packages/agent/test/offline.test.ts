@@ -2435,7 +2435,7 @@ test('a request records each model call: what it was for, the model, its tools a
 
 test('a call the server reports no tokens for is counted from the text sent', async () => {
   const setup = await tempSetup();
-  // As Cursor: no counts for the turn that ends in a tool call, counts for the last one.
+  // Some servers send no counts for the turn that ends in a tool call, counts for the last one.
   const { callModel: scripted } = scriptedModel([
     callTools(toolCall('t1', 'recall', { query: '2+2' })),
     answer('It is 4.'),

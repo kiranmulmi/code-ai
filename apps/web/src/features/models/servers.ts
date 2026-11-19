@@ -9,14 +9,7 @@ export const SERVER_PRESETS = [
   { label: 'LM Studio', baseUrl: 'http://localhost:1234/v1', needsKey: false },
 ] as const;
 
-/**
- * "api.openai.com", "localhost:11434/v1", "Cursor": who serves the model, short enough for a
- * list.
- */
-export function serverLabel({
-  provider,
-  baseUrl,
-}: Pick<ModelProfile, 'provider' | 'baseUrl'>): string {
-  if (provider === 'cursor') return 'Cursor';
+/** "api.openai.com", "localhost:11434/v1": who serves the model, short enough for a list. */
+export function serverLabel({ baseUrl }: Pick<ModelProfile, 'baseUrl'>): string {
   return (baseUrl ?? 'https://api.openai.com/v1').replace(/^https?:\/\//, '');
 }

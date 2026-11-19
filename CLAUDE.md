@@ -18,7 +18,7 @@ apps/cli            @app/cli       terminal chat (same chats and workspaces as t
 apps/web            @app/web       React + Vite + Tailwind chat UI
 apps/desktop        @app/desktop   Electron app: runs the built API in a utility process, shows the web app in a window
 packages/agent      @app/agent     the agent: loop, planner, prompts, guardrails, LLM client, tools, memory
-packages/db         @app/db        storage (files, no database): ~/.hamro-ai/ (workspace list, models with API keys, provider sign-ins, agent settings, MCP servers, mcp.json approvals) + each workspace's .hamro-ai/<slug>/ files (chats, memory, settings, which MCP servers are on, attached files, skills, agents), Store, runInChat
+packages/db         @app/db        storage (files, no database): ~/.hamro-ai/ (workspace list, models with API keys, agent settings, MCP servers, mcp.json approvals) + each workspace's .hamro-ai/<slug>/ files (chats, memory, settings, which MCP servers are on, attached files, skills, agents), Store, runInChat
 packages/shared     @app/shared    contracts shared by api, web and agent (types, Zod schemas, envelopes)
 packages/tsconfig   @app/tsconfig  base / node / react tsconfigs
 packages/eslint-config  @app/eslint-config  flat ESLint config (base + react)
@@ -28,7 +28,7 @@ docs/standards.md   full coding standards
 Dependency direction: `shared` <- `agent` <- `db` <- `api`, `cli`; `web` depends on `shared` only. Never import "up" this chain or reach across workspaces with a relative `../../` path.
 
 - Anything two workspaces must agree on (HTTP payloads, `StreamEvent`, `Plan`, `RunResult`, limits) lives in `@app/shared`. Duplicating a contract is a defect.
-- The `~/.hamro-ai/` and workspace `.hamro-ai/` data files are read and written only in `@app/db`. Model calls live only in `@app/agent/src/llm.ts` (and `src/cursor/` for Cursor's models, which `llm.ts` hands over).
+- The `~/.hamro-ai/` and workspace `.hamro-ai/` data files are read and written only in `@app/db`. Model calls live only in `@app/agent/src/llm.ts`.
 - Internal packages are consumed from `dist`. Rebuild after changing them (`npm run build:packages`), or run `npm run dev -w @app/<pkg>` in watch mode.
 
 ## TypeScript & structure

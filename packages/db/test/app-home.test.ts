@@ -273,33 +273,42 @@ test('the old .nimbrio-ai folders move to .hamro-ai too', async () => {
   await assert.rejects(fs.access(path.join(workspace, '.nimbrio-ai')));
 });
 
-test('models: a Cursor model keeps no server or key and runs with the Cursor sign-in token', async () => {
+test('models: a saved model of a provider the app no longer offers is skipped, not an error', async () => {
   const dir = await home();
-  let token: string | null = 'cursor-token';
-  const models = new ModelStore(appHomeFile(dir, 'models'), () => Promise.resolve(token));
-  const cursor = await models.create({
-    name: 'Claude Opus 5.5',
-    model: 'claude-opus-5-5',
-    provider: 'cursor',
-    baseUrl: 'https://ignored.example.com/v1',
-    apiKey: 'ignored',
-    contextWindow: 300_000,
-  });
-  assert.equal(cursor.provider, 'cursor');
-  assert.equal(cursor.baseUrl, null);
-  assert.equal(cursor.hasApiKey, false);
-  const resolved = await models.settingsFor(cursor.id);
-  assert.equal(resolved?.settings.provider, 'cursor');
-  assert.equal(resolved?.settings.apiKey, 'cursor-token');
+  const file = appHomeFile(dir, 'models');
+  const kept = '00000000-0000-4000-8000-000000000001';
+  const removed = '00000000-0000-4000-8000-000000000002';
+  const older = '00000000-0000-4000-8000-000000000003';
+  await fs.writeFile(
+    file,
+    JSON.stringify({
+      models: [
+        {
+          id: removed,
+          name: 'Opus',
+          model: 'claude-opus-5-5',
+          provider: 'cursor',
+          isDefault: true,
+        },
+        { id: kept, name: 'GPT', model: 'gpt-4.1', provider: 'openai', apiKey: 'sk-1' },
+        // Older files without a provider read as OpenAI-compatible models.
+        { id: older, name: 'Llama', model: 'llama3.1:8b' },
+      ],
+    }),
+  );
+  const models = new ModelStore(file);
+  assert.deepEqual(
+    (await models.list()).map((m) => [m.id, m.provider, m.isDefault]),
+    [
+      [kept, 'openai', true],
+      [older, 'openai', false],
+    ],
+  );
+  assert.equal(await models.get(removed), null);
+  assert.equal(await models.settingsFor(removed), null);
+  assert.equal((await models.settingsFor())?.settings.apiKey, 'sk-1');
 
-  // Editing without a provider keeps it a Cursor model.
-  const edited = await models.update(cursor.id, { name: 'Opus', model: 'claude-opus-5-5' });
-  assert.equal(edited?.provider, 'cursor');
-  token = null;
-  assert.equal((await models.settingsFor(cursor.id))?.settings.apiKey, '');
-
-  // Older files without a provider read as OpenAI-compatible models.
-  const plain = await models.create({ name: 'GPT', model: 'gpt-4.1', apiKey: 'sk-1' });
-  assert.equal(plain.provider, 'openai');
-  assert.equal((await models.settingsFor(plain.id))?.settings.apiKey, 'sk-1');
+  // The next change writes the file without it.
+  await models.setDefault(older);
+  assert.ok(!(await fs.readFile(file, 'utf8')).includes(removed));
 });

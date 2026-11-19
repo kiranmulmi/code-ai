@@ -259,8 +259,8 @@ const runSchema = z.object({
 });
 
 /**
- * A run saved before calls the server reported no tokens for were counted (Cursor reports none
- * for a turn that ends in a tool call) has those calls at 0 tokens. Their parts were counted from
+ * A run saved before calls the server reported no tokens for were counted (some servers report
+ * none for a turn that ends in a tool call) has those calls at 0 tokens. Their parts were counted from
  * the text sent, so they stand in, marked as estimated, and the run's totals include them.
  */
 function withEstimatedCalls(run: z.infer<typeof runSchema>): z.infer<typeof runSchema> {
