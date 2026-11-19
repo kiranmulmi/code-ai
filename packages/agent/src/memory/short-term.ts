@@ -165,9 +165,13 @@ export class Conversation {
    * refer to them. Only standard fields are kept: some servers reject extras
    * they returned themselves (e.g. `reasoning_content`).
    */
-  addAssistant(message: { content?: string | null; tool_calls?: ToolCall[] | null }): void {
+  addAssistant(
+    message: { content?: string | null; tool_calls?: ToolCall[] | null },
+    { internal = false }: { internal?: boolean } = {},
+  ): void {
     const turn: AssistantMessage = { role: 'assistant', content: message.content ?? '' };
     if (message.tool_calls?.length) turn.tool_calls = message.tool_calls;
+    if (internal) this.#internal.add(this.#messages.length);
     this.#messages.push(turn);
   }
 
@@ -192,7 +196,10 @@ export class Conversation {
           steeredAt: r.steeredAt,
         });
       } else if (r.role === 'assistant') {
-        conversation.addAssistant({ content: r.content, tool_calls: r.tool_calls });
+        conversation.addAssistant(
+          { content: r.content, tool_calls: r.tool_calls },
+          { internal: r.internal },
+        );
       } else if (r.role === 'tool') {
         conversation.addToolResult(r.tool_call_id, r.content);
       }

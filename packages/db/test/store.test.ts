@@ -312,8 +312,16 @@ test('a failed request still saves what happened', async () => {
   );
   const rows = await store.loadMessages(chat.id);
   assert.deepEqual(
-    rows.map((r) => [r.role, r.display ?? r.content]),
-    [['user', 'hi']],
+    rows.map((r) => [r.role, r.display ?? r.content, r.internal]),
+    [
+      ['user', 'hi', false],
+      // Closed with a hidden note, so the next request doesn't answer this one instead.
+      [
+        'assistant',
+        '(No answer: this request failed with "server down". If the user asks again, start that request over.)',
+        true,
+      ],
+    ],
   );
   const [run] = (await store.loadRuns(chat.id)).values();
   assert.ok(run);

@@ -146,6 +146,8 @@ export interface DecideArgs {
   instructions?: string;
   /** the workspace's skills, from renderSkills() */
   skills?: string;
+  /** a snapshot of the workspace folder, from workspaceOverview() */
+  overview?: string;
 }
 
 /**
@@ -161,10 +163,12 @@ export async function decide({
   memories,
   instructions,
   skills,
+  overview,
 }: DecideArgs): Promise<{ decision: PlanDecision; usage: Usage }> {
   const context = summarizeHistory(history);
   const content = [
     instructions?.trim() ? `Workspace instructions from the user:\n${instructions.trim()}` : null,
+    overview?.trim() ? `The workspace folder the agent works in:\n${overview.trim()}` : null,
     skills ? `Skills in this workspace (loaded with use_skill):\n${skills}` : null,
     memories ? `Saved memories about the user (from earlier sessions):\n${memories}` : null,
     context ? `Conversation so far:\n${context}` : null,

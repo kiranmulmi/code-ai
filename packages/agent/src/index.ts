@@ -94,3 +94,4 @@ export {
 export { systemPromptFor, SYSTEM_PROMPT } from './prompt.js';
 export { errorMessage, errorCode, isRecord } from './errors.js';
 export { serialized, writeFileAtomic } from './file-io.js';
+export { workspaceOverview } from './workspace-overview.js';

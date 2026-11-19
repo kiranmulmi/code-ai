@@ -126,7 +126,7 @@ test('delegate_task lists the specialists and refuses unknown ones', async () =>
     ...setup,
     callModel: parent.callModel,
     logger: silentLogger,
-    config: { planning: 'off', subagents: true },
+    config: { planning: 'off', review: 'off', subagents: true },
   }).run('go');
   const first = parent.requests[0] as Request;
   const def = first.tools?.find((t) => t.function.name === 'delegate_task');
@@ -165,7 +165,7 @@ test('a specialist gets its role and only its tools, and shares notes with the n
     callModel: parent.callModel,
     subagentCallModel: child.callModel,
     logger: silentLogger,
-    config: { planning: 'off', subagents: true },
+    config: { planning: 'off', review: 'off', subagents: true },
   }).run('Find the price and write it up');
 
   assert.equal(result.status, 'done');
@@ -202,7 +202,7 @@ test('the team notes start empty on each request', async () => {
     ...setup,
     callModel: parent.callModel,
     logger: silentLogger,
-    config: { planning: 'off', subagents: true },
+    config: { planning: 'off', review: 'off', subagents: true },
   });
   await agent.run('one');
   await agent.run('two');
@@ -230,7 +230,7 @@ test('delegate_task calls in one step run at the same time, at most maxParallelS
     callModel: parent.callModel,
     subagentCallModel: child.callModel,
     logger: silentLogger,
-    config: { planning: 'off', subagents: true, maxParallelSubagents: 2 },
+    config: { planning: 'off', review: 'off', subagents: true, maxParallelSubagents: 2 },
   }).run('Research four topics');
 
   assert.equal(result.status, 'done');
@@ -257,7 +257,7 @@ test('a reviewer runs on the review model when one is set', async () => {
     subagentCallModel: subagentModel.callModel,
     reviewCallModel: reviewModel.callModel,
     logger: silentLogger,
-    config: { planning: 'off', subagents: true },
+    config: { planning: 'off', review: 'off', subagents: true },
   }).run('Review a.txt');
   assert.equal(subagentModel.requests.length, 0);
   assert.equal(reviewModel.requests.length, 1);
@@ -343,7 +343,13 @@ test('sub-agents working at once take turns with approval prompts and questions'
         type: 'answered',
         text: await terminal(() => prompt('question', question, 'x')),
       }),
-      config: { planning: 'off', subagents: true, approval: 'ask', maxParallelSubagents: 2 },
+      config: {
+        planning: 'off',
+        review: 'off',
+        subagents: true,
+        approval: 'ask',
+        maxParallelSubagents: 2,
+      },
     }).run('Write a and b');
 
   // The agent itself: never two approval prompts, or two questions, open at once.
@@ -401,7 +407,13 @@ test('with one shared terminal queue (the CLI), approvals and questions never ov
     logger: silentLogger,
     ask: () => terminal(() => prompt('y')),
     askUser: async () => ({ type: 'answered', text: await terminal(() => prompt('x')) }),
-    config: { planning: 'off', subagents: true, approval: 'ask', maxParallelSubagents: 2 },
+    config: {
+      planning: 'off',
+      review: 'off',
+      subagents: true,
+      approval: 'ask',
+      maxParallelSubagents: 2,
+    },
   }).run('Write a and b');
   assert.equal(result.status, 'done');
   assert.equal(maxOpen, 1);

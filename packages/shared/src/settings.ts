@@ -53,14 +53,14 @@ export interface AgentSettings {
 }
 
 export const DEFAULT_AGENT_SETTINGS: AgentSettings = {
-  planning: 'off',
+  planning: 'auto',
   ...AGENT_SETTING_DEFAULTS,
   approval: 'ask',
   searxngUrl: 'http://localhost:8080',
   logLevel: 'info',
   subagents: false,
   subagentModelId: null,
-  review: 'off',
+  review: 'tasks',
   reviewModelId: null,
 };
 

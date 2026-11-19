@@ -15,6 +15,7 @@ import {
   CONTEXT,
   TOKEN_USAGE,
   DEFAULT_CONTEXT_WINDOW,
+  STUCK,
   groupTokens,
   toolResultPreview,
   type AgentEvent,
@@ -74,6 +75,7 @@ import {
   type Specialist,
 } from './team/specialists.js';
 import type { AnyTool, AskUserFn, DelegatedTask, ToolContext } from './tools/define.js';
+import { workspaceOverview } from './workspace-overview.js';
 import { REVIEW_PROMPT, parseReview, reviewMessage, reviseMessage, type Review } from './critic.js';
 import type { WorkspaceTasks } from './background-tasks.js';
 import { Planner, decide } from './planner.js';
@@ -613,6 +615,8 @@ export function createAgent(options: AgentOptions): Agent {
       skills: skills.map((skill) => skill.name),
     });
     skillList = await readSkills();
+    // A sub-agent gets its task from the lead, which already knows the project.
+    const overview = isSubagent || !filesDir ? '' : await workspaceOverview(filesDir);
     const hasAttachments = attachments.length > 0 || conversation.hasAttachments();
     systemSections = systemPromptSections(
       instructions,
@@ -620,7 +624,7 @@ export function createAgent(options: AgentOptions): Agent {
       skillList,
       toolset.deferredSummary,
       disabledTools,
-      { voiceReplies, hasPlanningStep, hasAttachments, isSubagent, team: teamSection },
+      { voiceReplies, hasPlanningStep, hasAttachments, isSubagent, team: teamSection, overview },
     );
     systemPrompt = systemSections.map((section) => section.text).join('');
     // Tools this chat already called stay sent: its earlier calls refer to them.
@@ -656,6 +660,7 @@ export function createAgent(options: AgentOptions): Agent {
     let checksLeft = config.maxPlanChecks;
     let answerBeforeCheck: string | null = null; // the answer given before the last check, if any
     let reviewsLeft = config.maxReviews;
+    let stuckSteps = 0; // steps in a row where every tool call failed or repeated a result
 
     /**
      * Adds the messages the user sent since the last step, if any, and returns whether there
@@ -675,7 +680,7 @@ export function createAgent(options: AgentOptions): Agent {
     try {
       // ---- 1. Plan ----
       if (config.planning === 'auto') {
-        planThisRun = await planFirst(request, history, memories.list, budget, toolsUsed);
+        planThisRun = await planFirst(request, history, memories.list, budget, toolsUsed, overview);
       }
 
       while (true) {
@@ -780,6 +785,7 @@ export function createAgent(options: AgentOptions): Agent {
 
         // Every tool call needs a matching result before the next model call. Read-only calls
         // next to each other run at the same time; the rest one at a time, in order.
+        const stepResults: string[] = [];
         for (const batch of batchCalls(calls)) {
           if (isStopped()) {
             // The model asked for them, so they still need results; they just don't run.
@@ -816,17 +822,76 @@ export function createAgent(options: AgentOptions): Agent {
             }),
           );
           // In the order the model asked, whichever finished first.
-          for (const { id, result } of results) conversation.addToolResult(id, result);
+          for (const { id, result } of results) {
+            conversation.addToolResult(id, result);
+            stepResults.push(result);
+          }
         }
         if (isStopped()) return finish('stopped', STOPPED_TEXT);
+        // ---- Stuck? ----
+        // A step where nothing worked: every call failed or gave a result it already had.
+        // The user declining an action isn't being stuck: the agent was told what to do.
+        stuckSteps = stepResults.length && stepResults.every(isUnproductive) ? stuckSteps + 1 : 0;
+        if (stuckSteps >= STUCK.stopAfter) {
+          const limit = `made no progress for ${stuckSteps} steps in a row`;
+          logger.warn(`Stopped: the agent ${limit}`);
+          emit({ type: 'limit', reason: limit });
+          return finish(
+            'budget_exceeded',
+            await summarizeAtLimit(request, limit, runStart, budget),
+          );
+        }
+        if (stuckSteps === STUCK.nudgeAfter) {
+          logger.warn(`Stuck: ${stuckSteps} steps in a row without progress`);
+          conversation.addUser(stuckMessage(stuckSteps), { internal: true });
+        }
         // Only now: every tool call needs its result before any other message.
         await showRequestedImages();
       }
     } catch (error) {
       // Stopped mid-call: nothing half-written was added, so the chat stays consistent.
       if (error instanceof StoppedError || isStopped()) return finish('stopped', STOPPED_TEXT);
+      closeFailedRun(error);
       throw error;
     }
+  }
+
+  /**
+   * A request that failed (the model server kept failing, say) is closed in the history: tool
+   * calls still waiting get an error result, then a hidden note says there was no answer. So the
+   * next request doesn't see an unanswered question and answer that one instead.
+   */
+  function closeFailedRun(error: unknown): void {
+    const last = conversation.messages.at(-1);
+    if (last?.role === 'assistant' && last.tool_calls?.length) {
+      for (const call of last.tool_calls) {
+        conversation.addToolResult(call.id, toolError('Not run: the request failed.'));
+      }
+    } else if (last?.role === 'tool') {
+      // Results of the latest batch may be missing; give each unanswered call one.
+      const answered = new Set<string>();
+      for (let i = conversation.messages.length - 1; i >= 0; i--) {
+        const m = conversation.messages[i];
+        if (m?.role === 'tool') answered.add(m.tool_call_id);
+        else {
+          if (m?.role === 'assistant') {
+            for (const call of m.tool_calls ?? []) {
+              if (!answered.has(call.id)) {
+                conversation.addToolResult(call.id, toolError('Not run: the request failed.'));
+              }
+            }
+          }
+          break;
+        }
+      }
+    }
+    conversation.addAssistant(
+      {
+        content: `(No answer: this request failed with "${errorMessage(error)}". If the user asks again, start that request over.)`,
+      },
+      { internal: true },
+    );
+    logger.event('run_failed', { error: errorMessage(error) });
   }
 
   /**
@@ -944,6 +1009,7 @@ export function createAgent(options: AgentOptions): Agent {
     memories: string,
     budget: Budget,
     toolsUsed: string[],
+    overview = '',
   ): Promise<boolean> {
     emit({ type: 'planning' });
     const unfinished = planner.plan && !planner.isComplete() ? planner.render() : null;
@@ -956,6 +1022,7 @@ export function createAgent(options: AgentOptions): Agent {
       memories,
       instructions,
       skills: skillList,
+      overview,
     });
     logger.event('planning', decision);
     emit({
@@ -1186,6 +1253,19 @@ function describeRun(
 
 /** Each distinct call this run made (tool and arguments) with the result it last got. */
 type RepeatLog = Map<string, string>;
+
+/** A tool result that moved nothing forward: an error (not a declined approval) or a repeat. */
+function isUnproductive(result: string): boolean {
+  if (result.endsWith(REPEATED_CALL_NOTE)) return true;
+  return result.startsWith('Error: ') && !result.startsWith(DECLINED_ERROR);
+}
+
+/** The hidden note sent when the agent keeps failing: change approach instead of retrying. */
+function stuckMessage(steps: number): string {
+  return `Note: your last ${steps} steps made no progress (every tool call failed or repeated an earlier result). Stop retrying the same approach. Read the errors, then either try a clearly different way, update or re-plan with create_plan, ask the user with ask_user if only they can unblock it, or give your answer now and say plainly what didn't work.`;
+}
+
+const DECLINED_ERROR = 'Error: The user did not approve this action.';
 
 const REPEATED_CALL_NOTE =
   "Note: you made this exact call before in this task and got the same result. Don't repeat it: use the result you have, change the arguments, or try another way. If you are waiting for something to change (a background task), say so instead of checking again right away.";

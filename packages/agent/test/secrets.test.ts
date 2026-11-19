@@ -252,7 +252,7 @@ test('the agent masks secrets in tool output before the model, the stream and th
     longTermMemory: new LongTermMemory(path.join(dataDir, 'memory.json')),
     extraTools: [leaky],
     callModel,
-    config: { planning: 'off', approval: 'auto' },
+    config: { planning: 'off', review: 'off', approval: 'auto' },
     logger: { ...silentLogger, event: (_name, data) => void logged.push(JSON.stringify(data)) },
     onEvent: (event) => void streamed.push(JSON.stringify(event)),
   });

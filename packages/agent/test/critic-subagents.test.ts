@@ -170,7 +170,7 @@ test('delegate_task is only offered when sub-agents are on', async () => {
       ...setup,
       callModel: model.callModel,
       logger: silentLogger,
-      config: { planning: 'off', subagents },
+      config: { planning: 'off', review: 'off', subagents },
     }).run('hi');
     assert.equal(toolNames(model.requests[0] as Request).includes('delegate_task'), subagents);
   }
@@ -190,7 +190,7 @@ test('a sub-agent runs on its own model and context, and reports back', async ()
     subagentCallModel: child.callModel,
     logger: silentLogger,
     onEvent: (event) => events.push(event),
-    config: { planning: 'off', subagents: true },
+    config: { planning: 'off', review: 'off', subagents: true },
   }).run('What is the answer to life?');
 
   assert.equal(result.status, 'done');
@@ -237,7 +237,7 @@ test("a sub-agent's approvals are labelled with its name", async () => {
       asked.push({ tool, from });
       return true;
     },
-    config: { planning: 'off', subagents: true, approval: 'ask' },
+    config: { planning: 'off', review: 'off', subagents: true, approval: 'ask' },
   }).run('Save hi to a.txt using a sub-agent');
 
   assert.deepEqual(asked, [

@@ -213,18 +213,9 @@ export function ChatSidebar({
           onDeleted={onDeleted}
         />
 
-        {/* The drawer has every link; at xl only Workspace settings, the rest is in the workspace sidebar. */}
+        {/* The drawer has every link; at xl Workspace settings is the gear in the chat header and the rest is in the workspace sidebar. */}
         <div className="shrink-0 xl:hidden">
           <SidebarLinks info={info} error={infoError} workspaceId={workspaceId} isBusy={isBusy} />
-        </div>
-        <div className="hidden shrink-0 border-t border-line xl:block">
-          <SidebarLinks
-            info={info}
-            error={infoError}
-            workspaceId={workspaceId}
-            isBusy={isBusy}
-            only="workspace"
-          />
         </div>
 
         {/* At xl the workspace sidebar switches workspaces; the drawer keeps this button. */}

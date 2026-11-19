@@ -648,9 +648,12 @@ test('an agent without a model says where to add one', async () => {
 test('the system prompt names the workspace folder', async () => {
   const setup = await tempSetup();
   const { callModel, requests } = scriptedModel([answer('Hi.')]);
-  await createAgent({ ...setup, callModel, logger: silentLogger, config: { planning: 'off' } }).run(
-    'hello',
-  );
+  await createAgent({
+    ...setup,
+    callModel,
+    logger: silentLogger,
+    config: { planning: 'off', review: 'off' },
+  }).run('hello');
   assert.match(nth(requests, 0).system, new RegExp(`Workspace folder: ${setup.filesDir}`));
 });
 
@@ -664,7 +667,7 @@ test('loop runs the tool the model picks and returns the final answer', async ()
     ...setup,
     callModel,
     logger: silentLogger,
-    config: { planning: 'off' },
+    config: { planning: 'off', review: 'off' },
   });
   const result = await agent.run('What is 6 times 7?');
 
@@ -692,7 +695,7 @@ test('write_file is blocked when approval is denied', async () => {
     ...setup,
     callModel,
     logger: silentLogger,
-    config: { planning: 'off', approval: 'deny' },
+    config: { planning: 'off', review: 'off', approval: 'deny' },
   });
   await agent.run('Save hi to a.txt');
 
@@ -710,7 +713,7 @@ test('loop stops at the step limit', async () => {
     ...setup,
     callModel,
     logger: silentLogger,
-    config: { planning: 'off', maxSteps: 3 },
+    config: { planning: 'off', review: 'off', maxSteps: 3 },
   });
   const result = await agent.run('loop');
   assert.equal(result.status, 'budget_exceeded');
@@ -764,7 +767,7 @@ test('read-only calls next to each other run together; the rest one at a time, i
     ...setup,
     callModel,
     logger: silentLogger,
-    config: { planning: 'off' },
+    config: { planning: 'off', review: 'off' },
     onEvent: (event) => {
       if (event.type === 'tool_call') order.push(`call ${event.id}`);
       if (event.type === 'tool_result') order.push(`result ${event.id}`);
@@ -808,7 +811,7 @@ test('a call repeated with the same result gets a note to stop repeating it', as
     ...setup,
     callModel,
     logger: silentLogger,
-    config: { planning: 'off' },
+    config: { planning: 'off', review: 'off' },
   }).run('Do I have pets?');
   const resultSentTo = (request: number) => nth(toolMessages(nth(requests, request)), -1).content;
   assert.doesNotMatch(resultSentTo(1), /exact call/, 'the first call is not a repeat');
@@ -830,7 +833,7 @@ test('memory saved in one session is recalled in the next', async () => {
     ...setup,
     callModel: first.callModel,
     logger: silentLogger,
-    config: { planning: 'off' },
+    config: { planning: 'off', review: 'off' },
   }).run('I love Rust');
 
   const second = scriptedModel([
@@ -841,7 +844,7 @@ test('memory saved in one session is recalled in the next', async () => {
     ...setup,
     callModel: second.callModel,
     logger: silentLogger,
-    config: { planning: 'off' },
+    config: { planning: 'off', review: 'off' },
   }).run('What do I like?');
   assert.match(nth(toolMessages(nth(second.requests, 1)), 0).content, /Rust/);
 });
@@ -861,7 +864,7 @@ test('bad tool arguments come back as errors the model can fix', async () => {
     ...setup,
     callModel,
     logger: silentLogger,
-    config: { planning: 'off' },
+    config: { planning: 'off', review: 'off' },
   });
   await agent.run('break things');
 
@@ -883,7 +886,7 @@ test('tool calls are run even when the server reports finish_reason stop', async
     ...setup,
     callModel,
     logger: silentLogger,
-    config: { planning: 'off' },
+    config: { planning: 'off', review: 'off' },
   }).run('2+2?');
   assert.deepEqual(result.toolsUsed, ['recall']);
   assert.equal(result.text, '4');
@@ -956,7 +959,7 @@ test('streamed text is passed on as text_delta events in order', async () => {
     ...setup,
     callModel,
     logger: silentLogger,
-    config: { planning: 'off' },
+    config: { planning: 'off', review: 'off' },
     onEvent: (e) => events.push(e),
   });
   const result = await agent.run('2+2?');
@@ -997,7 +1000,7 @@ test('each model call reports the run tokens so far as a usage event', async () 
     ...setup,
     callModel,
     logger: silentLogger,
-    config: { planning: 'off' },
+    config: { planning: 'off', review: 'off' },
     onEvent: (e) => events.push(e),
   });
   const result = await agent.run('2+2?');
@@ -1040,7 +1043,7 @@ test("while a call streams, usage events estimate its tokens on top of the run's
     ...setup,
     callModel,
     logger: silentLogger,
-    config: { planning: 'off' },
+    config: { planning: 'off', review: 'off' },
     onEvent: (e) => events.push(e),
   });
   await agent.run('2+2?');
@@ -1089,7 +1092,7 @@ test("every model call of a chat carries the chat's id", async () => {
     callModel,
     chatId: 'chat-1',
     logger: silentLogger,
-    config: { planning: 'auto' },
+    config: { planning: 'auto', review: 'off' },
   }).run('What is 6 times 7?');
   assert.equal(requests.length, 3);
   assert.deepEqual(
@@ -1112,7 +1115,7 @@ test('with the planning step off, the agent plans itself and its plan is checked
     ...setup,
     callModel,
     logger: silentLogger,
-    config: { planning: 'off' },
+    config: { planning: 'off', review: 'off' },
     onEvent: (e) => events.push(e),
   }).run('Do A, then B');
 
@@ -1128,9 +1131,11 @@ test('with the planning step off, the agent plans itself and its plan is checked
   assert.equal(result.text, 'Both are done now.');
 });
 
-test('by default there is no planning step: the agent plans itself', () => {
-  assert.equal(loadAgentConfig({}).planning, 'off');
-  assert.equal(DEFAULT_AGENT_SETTINGS.planning, 'off');
+test('by default the planning step is on, and answers of tool-using tasks are reviewed', () => {
+  assert.equal(loadAgentConfig({}).planning, 'auto');
+  assert.equal(DEFAULT_AGENT_SETTINGS.planning, 'auto');
+  assert.equal(DEFAULT_AGENT_SETTINGS.review, 'tasks');
+  assert.equal(DEFAULT_AGENT_SETTINGS.subagents, false);
 });
 
 test('with the planning step on, the agent is told a plan may be made for it', async () => {
@@ -1258,7 +1263,7 @@ test('hitting the step limit writes up the findings with a tool-free call', asyn
     ...setup,
     callModel,
     logger: silentLogger,
-    config: { planning: 'off', maxSteps: 2 },
+    config: { planning: 'off', review: 'off', maxSteps: 2 },
   });
   const result = await agent.run('add lots of numbers');
   assert.equal(result.status, 'budget_exceeded');
@@ -1444,7 +1449,7 @@ test("memories changed outside the chat are sent again; the agent's own changes 
     ...setup,
     callModel,
     logger: silentLogger,
-    config: { planning: 'off' },
+    config: { planning: 'off', review: 'off' },
   });
   await agent.run('I prefer short answers');
   assert.doesNotMatch(
@@ -1622,7 +1627,7 @@ test('attached files are listed for the model and view_image shows the image nex
     attachments: store,
     callModel,
     logger: silentLogger,
-    config: { planning: 'off' },
+    config: { planning: 'off', review: 'off' },
   });
   // Files alone are a message too.
   const result = await agent.run('', { attachments });
@@ -1822,7 +1827,7 @@ test('stopping a run halts it cleanly and keeps the chat consistent', async () =
     callModel,
     signal: stop.signal,
     logger: silentLogger,
-    config: { planning: 'off' },
+    config: { planning: 'off', review: 'off' },
     onEvent: (event) => {
       if (event.type === 'tool_call') ran.push(event.id);
       if (event.type === 'tool_result' && event.id === 't1') stop.abort();
@@ -1848,7 +1853,7 @@ test('stopping a run halts it cleanly and keeps the chat consistent', async () =
     callModel: second,
     signal: early.signal,
     logger: silentLogger,
-    config: { planning: 'off' },
+    config: { planning: 'off', review: 'off' },
     onEvent: (event) => {
       if (event.type === 'model_call') early.abort();
     },
@@ -1890,7 +1895,7 @@ test('skills are listed in the system prompt and use_skill loads one', async () 
     skills: skillStore([TICKET_SKILL]),
     callModel,
     logger: silentLogger,
-    config: { planning: 'off' },
+    config: { planning: 'off', review: 'off' },
   });
   const result = await agent.run('Check MW-4929');
   assert.equal(result.status, 'done');
@@ -2008,7 +2013,7 @@ test('a picked folder skill comes with its file list', async () => {
     skills: skillStore([DESIGN_SKILL], DESIGN_FILES),
     callModel,
     logger: silentLogger,
-    config: { planning: 'off' },
+    config: { planning: 'off', review: 'off' },
   });
   await agent.run('Build a landing page', { skills: [DESIGN_SKILL] });
   const sent = JSON.stringify(nth(requests, 0).messages);
@@ -2025,7 +2030,7 @@ test('skills the user picked come with the message in full and are saved on it',
     skills: skillStore([TICKET_SKILL]),
     callModel,
     logger: silentLogger,
-    config: { planning: 'off' },
+    config: { planning: 'off', review: 'off' },
   });
   await agent.run('Check MW-4929', { skills: [TICKET_SKILL] });
 
@@ -2128,7 +2133,7 @@ test('MCP tools are listed by name and sent only after load_mcp_tools', async ()
     extraTools: fakeMcpTools(calls),
     callModel,
     logger: silentLogger,
-    config: { planning: 'off' },
+    config: { planning: 'off', review: 'off' },
   });
   const result = await agent.run('What is MW-1 about?');
   assert.equal(result.status, 'done');
@@ -2162,7 +2167,7 @@ test('load_mcp_tools takes a prefix, reports unknown names, and earlier calls st
     extraTools: fakeMcpTools(calls),
     callModel,
     logger: silentLogger,
-    config: { planning: 'off' },
+    config: { planning: 'off', review: 'off' },
   });
   await agent.run('Load the Jira tools.');
   const loaded = nth(toolMessages(nth(requests, 1)), 0).content;
@@ -2176,7 +2181,7 @@ test('load_mcp_tools takes a prefix, reports unknown names, and earlier calls st
     extraTools: fakeMcpTools(calls),
     callModel,
     logger: silentLogger,
-    config: { planning: 'off' },
+    config: { planning: 'off', review: 'off' },
   });
   await next.run('Thanks');
   // load_mcp_tools itself was called earlier, but only MCP tools that were called come back.
@@ -2204,7 +2209,7 @@ test('a chat that called an MCP tool sends its definition again from the start',
     extraTools: fakeMcpTools(calls),
     callModel,
     logger: silentLogger,
-    config: { planning: 'off' },
+    config: { planning: 'off', review: 'off' },
   });
   await agent.run('And again?');
   assert.deepEqual(
@@ -2220,7 +2225,7 @@ test('without MCP tools there is no load_mcp_tools and no MCP list', async () =>
     ...setup,
     callModel,
     logger: silentLogger,
-    config: { planning: 'off' },
+    config: { planning: 'off', review: 'off' },
   });
   await agent.run('hello');
   assert.ok(!toolNames(nth(requests, 0)).includes('load_mcp_tools'));
@@ -2238,7 +2243,7 @@ test('a workspace that turns tool groups off sends neither their tools nor their
     disabledTools: ['files', 'commands', 'web', 'plans'],
     callModel,
     logger: silentLogger,
-    config: { planning: 'off' },
+    config: { planning: 'off', review: 'off' },
   });
   await agent.run('Read notes.txt');
   const first = nth(requests, 0);
@@ -2263,7 +2268,7 @@ test('voice mode asks for short spoken replies, before the workspace instruction
     ...setup,
     callModel,
     logger: silentLogger,
-    config: { planning: 'off' as const },
+    config: { planning: 'off' as const, review: 'off' as const },
   };
   await createAgent({ ...options, instructions: 'Reply in Nepali.' }).run('hello');
   assert.doesNotMatch(nth(requests, 0).system ?? '', /Voice conversation:/);
@@ -2284,7 +2289,7 @@ test('attachment and skill tools are sent only when the chat has files or skills
     ...setup,
     callModel,
     logger: silentLogger,
-    config: { planning: 'off' },
+    config: { planning: 'off', review: 'off' },
   });
   await agent.run('hello');
   const plain = toolNames(nth(requests, 0));
@@ -2298,7 +2303,7 @@ test('attachment and skill tools are sent only when the chat has files or skills
     skills: skillStore([TICKET_SKILL]),
     callModel,
     logger: silentLogger,
-    config: { planning: 'off' },
+    config: { planning: 'off', review: 'off' },
   });
   await withFiles.run('What is this?', { attachments });
   const names = toolNames(nth(requests, 1));
@@ -2328,7 +2333,7 @@ test('a tool the chat called before stays sent after its group is turned off, bu
     disabledTools: ['web'],
     callModel,
     logger: silentLogger,
-    config: { planning: 'off' },
+    config: { planning: 'off', review: 'off' },
   });
   await agent.run('Search for Y');
   const names = toolNames(nth(requests, 0));
@@ -2386,7 +2391,7 @@ test('a request adds up its calls, cache included', async () => {
     ...setup,
     callModel: cachingModel,
     logger: silentLogger,
-    config: { planning: 'off' },
+    config: { planning: 'off', review: 'off' },
   });
   const result = await agent.run('hello');
   assert.deepEqual(result.usage, {
@@ -2407,7 +2412,7 @@ test('a request records each model call: what it was for, the model, its tools a
     ...setup,
     callModel,
     logger: silentLogger,
-    config: { planning: 'off' },
+    config: { planning: 'off', review: 'off' },
   });
   const result = await agent.run('look around');
   assert.deepEqual(
@@ -2450,7 +2455,7 @@ test('a call the server reports no tokens for is counted from the text sent', as
     ...setup,
     callModel,
     logger: silentLogger,
-    config: { planning: 'off' },
+    config: { planning: 'off', review: 'off' },
   });
   const result = await agent.run('2+2?');
   const [first, second] = result.calls;
@@ -2486,7 +2491,7 @@ test('each call says what its tokens went to, adding up to what the server repor
     ...setup,
     callModel: reporting,
     logger: silentLogger,
-    config: { planning: 'off' },
+    config: { planning: 'off', review: 'off' },
   });
   const { calls } = await agent.run('what is 1+1');
   const second = nth(calls, 1);
@@ -2670,7 +2675,7 @@ test('near the context window, older messages are summarized and the chat goes o
     callModel,
     logger: silentLogger,
     disabledTools: ['files', 'commands', 'web', 'plans'] as const,
-    config: { planning: 'off' as const },
+    config: { planning: 'off' as const, review: 'off' as const },
   };
   // How big the system prompt and tools are on their own, to pick a window that fits them.
   await createAgent({ ...options, disabledTools: [...options.disabledTools] }).run('hi');
@@ -2745,7 +2750,7 @@ test('messages sent mid-run reach the model between steps and before it settles 
     ...setup,
     callModel,
     logger: silentLogger,
-    config: { planning: 'off' },
+    config: { planning: 'off', review: 'off' },
     steering: { take: () => takes.shift() ?? [] },
     onEvent: (event) => events.push(event),
   });
@@ -2803,7 +2808,7 @@ test('ask_user waits for the answer and tells the model what the user picked', a
     ...setup,
     callModel,
     logger: silentLogger,
-    config: { planning: 'off' },
+    config: { planning: 'off', review: 'off' },
     askUser: async (question) => {
       asked.push(question);
       const next = answers.shift();
@@ -2837,5 +2842,100 @@ test('ask_user refuses bad options, and says to ask in the reply where nobody ca
   await assert.rejects(
     run({ question: 'Which?', options: titleOptions }, { askUser: null }),
     /Ask in your reply instead/,
+  );
+});
+
+test('a run that keeps failing is told to change approach, then stopped with a write-up', async () => {
+  const setup = await tempSetup();
+  // Each step reads a different missing file: never the same call, always an error.
+  const failing = Array.from({ length: 8 }, (_, i) =>
+    callTools(toolCall(`r${i}`, 'read_file', { path: `missing-${i}.txt` })),
+  );
+  const { callModel, requests } = scriptedModel([...failing, answer('Nothing could be read.')]);
+  const agent = createAgent({
+    ...setup,
+    callModel,
+    logger: silentLogger,
+    config: { planning: 'off', review: 'off', maxSteps: 30 },
+  });
+  const result = await agent.run('read the files');
+  assert.equal(result.status, 'budget_exceeded');
+  assert.equal(result.steps, 6, 'stopped after 6 steps without progress, not at the step limit');
+  const nudged = requests.findIndex((req) =>
+    req.messages.some((m) => m.role === 'user' && String(m.content).includes('made no progress')),
+  );
+  assert.equal(nudged, 3, 'the note comes right after the third failing step');
+  assert.equal(nth(requests, -1).tools, undefined, 'the write-up is a tool-free call');
+});
+
+test('a declined action or a step that works resets the stuck count', async () => {
+  const setup = await tempSetup();
+  await fs.writeFile(path.join(setup.filesDir, 'ok.txt'), 'fine');
+  const miss = (i: number) =>
+    callTools(toolCall(`m${i}`, 'read_file', { path: `missing-${i}.txt` }));
+  const { callModel, requests } = scriptedModel([
+    miss(1),
+    miss(2),
+    callTools(toolCall('ok', 'read_file', { path: 'ok.txt' })), // progress
+    miss(3),
+    miss(4),
+    callTools(toolCall('w', 'write_file', { path: 'x.txt', content: 'x' })), // declined
+    miss(5),
+    answer('Done.'),
+  ]);
+  const agent = createAgent({
+    ...setup,
+    callModel,
+    logger: silentLogger,
+    approve: async () => false,
+    config: { planning: 'off', review: 'off', approval: 'ask' },
+  });
+  const result = await agent.run('go');
+  assert.equal(result.status, 'done');
+  assert.ok(
+    !requests.some((req) =>
+      req.messages.some((m) => m.role === 'user' && String(m.content).includes('made no progress')),
+    ),
+    'never three unproductive steps in a row',
+  );
+});
+
+test('a failed run leaves a hidden note and closes open tool calls', async () => {
+  const setup = await tempSetup();
+  const conversation = new Conversation();
+  let calls = 0;
+  const callModel: CallModel = async () => {
+    if (calls++ === 0) {
+      return {
+        model: 'fake',
+        usage: { inputTokens: 1, outputTokens: 1 },
+        finishReason: 'tool_calls',
+        message: {
+          role: 'assistant',
+          content: null,
+          tool_calls: [toolCall('c1', 'recall', { query: 'x' })],
+        },
+      };
+    }
+    throw new Error('Model server error: down');
+  };
+  const agent = createAgent({
+    ...setup,
+    conversation,
+    callModel,
+    logger: silentLogger,
+    config: { planning: 'off', review: 'off' },
+  });
+  await assert.rejects(agent.run('hi'), /down/);
+  const last = nth(conversation.messages, -1);
+  assert.equal(last.role, 'assistant');
+  assert.match(
+    String(last.content),
+    /No answer: this request failed with "Model server error: down"/,
+  );
+  assert.deepEqual(
+    conversation.visible().map((m) => m.role),
+    ['user', 'assistant', 'tool'],
+    'the tool call and its closing result stay, the note is hidden',
   );
 });

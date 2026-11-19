@@ -162,7 +162,7 @@ test('workspaces sharing a folder each keep their own servers', async () => {
     const moved = await pidOf(inFolder(elsewhere, 'ws-1'), 'alpha');
     assert.equal(moved.cwd, elsewhere);
     assert.notEqual(moved.pid, a.pid);
-    assert.ok(!isAlive(a.pid), 'the old folder\'s server stopped, none left behind');
+    assert.ok(!isAlive(a.pid), "the old folder's server stopped, none left behind");
   } finally {
     await hub.close();
   }
@@ -225,7 +225,7 @@ test('the agent calls an MCP tool, asking first unless it is auto-approved', asy
         asked.push(name);
         return false;
       },
-      config: { planning: 'off' },
+      config: { planning: 'off', review: 'off' },
     });
     await agent.run('Echo hello');
     const toolResult = seen[1]?.find((m) => m.role === 'tool');

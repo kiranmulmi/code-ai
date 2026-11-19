@@ -121,7 +121,7 @@ test('a failed request is closed in the history, hidden from the chat', async ()
     conversation,
     callModel,
     logger: silentLogger,
-    config: { planning: 'off' as const },
+    config: { planning: 'off' as const, review: 'off' as const },
   };
   await assert.rejects(createAgent(options).run('what is this project about?'), /timed out/);
   await createAgent(options).run('hello are you still working?');

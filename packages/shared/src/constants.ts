@@ -83,6 +83,14 @@ export const CONTEXT = {
 
 // ---------- Planning ----------
 
+/** Spotting a run that is stuck: steps in a row where every tool call failed or repeated. */
+export const STUCK = {
+  /** after this many such steps the agent is told to change approach (once per streak) */
+  nudgeAfter: 3,
+  /** after this many it stops and writes up what it found */
+  stopAfter: 6,
+};
+
 export const PLANNING = {
   /** the most steps a plan may have */
   maxPlanSteps: 20,

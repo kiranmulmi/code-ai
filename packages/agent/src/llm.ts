@@ -118,67 +118,87 @@ export function createModelCaller(config: ModelSettings): CallModel {
     // Passed through as written: servers accept different values than OpenAI's list.
     if (config.reasoningEffort) params.reasoning_effort = config.reasoningEffort as ReasoningEffort;
 
-    let content = '';
-    let refusal: string | null = null;
-    const pieces: (ToolCall | undefined)[] = [];
-    let finishReason: string | null = null;
-    let usage: unknown = null;
+    // Set fresh on each attempt below; a retry starts over.
+    let content: string;
+    let refusal: string | null;
+    let pieces: (ToolCall | undefined)[];
+    let finishReason: string | null;
+    let usage: unknown;
     let model = config.model;
 
-    try {
-      const stream = await getClient().chat.completions.create(params, { signal });
-      for await (const chunk of stream) {
-        if (chunk.model) model = chunk.model;
-        if (chunk.usage) usage = chunk.usage;
-        const choice = chunk.choices?.[0];
-        if (!choice) continue;
-        const delta = choice.delta ?? {};
+    for (let attempt = 0; ; attempt++) {
+      content = '';
+      refusal = null;
+      pieces = [];
+      finishReason = null;
+      usage = null;
+      let streamed = false; // once output reached the caller, a retry would repeat it
+      const output = (piece: string) => {
+        streamed = true;
+        onOutput?.(piece);
+      };
+      try {
+        const stream = await getClient().chat.completions.create(params, { signal });
+        for await (const chunk of stream) {
+          if (chunk.model) model = chunk.model;
+          if (chunk.usage) usage = chunk.usage;
+          const choice = chunk.choices?.[0];
+          if (!choice) continue;
+          const delta = choice.delta ?? {};
 
-        if (delta.content) {
-          content += delta.content;
-          onText?.(delta.content);
-          onOutput?.(delta.content);
-        }
-        if (delta.refusal) {
-          refusal = (refusal ?? '') + delta.refusal;
-          onOutput?.(delta.refusal);
-        }
-        // Not in OpenAI's types: the reasoning text some servers stream (DeepSeek, vLLM, Ollama,
-        // OpenRouter). Not kept, only counted.
-        const reasoning = reasoningPiece(delta);
-        if (reasoning) {
-          onOutput?.(reasoning);
-          onReasoning?.(reasoning);
-        }
+          if (delta.content) {
+            content += delta.content;
+            streamed = true;
+            onText?.(delta.content);
+            output(delta.content);
+          }
+          if (delta.refusal) {
+            refusal = (refusal ?? '') + delta.refusal;
+            output(delta.refusal);
+          }
+          // Not in OpenAI's types: the reasoning text some servers stream (DeepSeek, vLLM, Ollama,
+          // OpenRouter). Not kept, only counted.
+          const reasoning = reasoningPiece(delta);
+          if (reasoning) {
+            output(reasoning);
+            streamed = true;
+            onReasoning?.(reasoning);
+          }
 
-        // Tool calls arrive in pieces: the first piece has the id and name, later
-        // pieces add to the arguments string. `index` says which call a piece is for.
-        for (const piece of delta.tool_calls ?? []) {
-          const i = piece.index ?? pieces.length;
-          const call = (pieces[i] ??= {
-            id: '',
-            type: 'function',
-            function: { name: '', arguments: '' },
-          });
-          if (piece.id) call.id = piece.id;
-          if (piece.function?.name && !call.function.name) {
-            call.function.name = piece.function.name;
-            onOutput?.(piece.function.name);
+          // Tool calls arrive in pieces: the first piece has the id and name, later
+          // pieces add to the arguments string. `index` says which call a piece is for.
+          for (const piece of delta.tool_calls ?? []) {
+            const i = piece.index ?? pieces.length;
+            const call = (pieces[i] ??= {
+              id: '',
+              type: 'function',
+              function: { name: '', arguments: '' },
+            });
+            if (piece.id) call.id = piece.id;
+            if (piece.function?.name && !call.function.name) {
+              call.function.name = piece.function.name;
+              output(piece.function.name);
+            }
+            if (piece.function?.arguments) {
+              call.function.arguments += piece.function.arguments;
+              output(piece.function.arguments);
+            }
           }
-          if (piece.function?.arguments) {
-            call.function.arguments += piece.function.arguments;
-            onOutput?.(piece.function.arguments);
-          }
+          if (choice.finish_reason) finishReason = choice.finish_reason;
         }
-        if (choice.finish_reason) finishReason = choice.finish_reason;
+        break;
+      } catch (error) {
+        if (signal?.aborted) throw new StoppedError();
+        if (!streamed && attempt < STREAM_RETRIES && isStreamError(error)) {
+          await wait(STREAM_RETRY_DELAY_MS * (attempt + 1), signal);
+          continue;
+        }
+        throw describeApiError(
+          error,
+          config,
+          messages.some((m) => m.role === 'user' && Boolean(m.images?.length)),
+        );
       }
-    } catch (error) {
-      if (signal?.aborted) throw new StoppedError();
-      throw describeApiError(
-        error,
-        config,
-        messages.some((m) => m.role === 'user' && Boolean(m.images?.length)),
-      );
     }
 
     // Some servers leave ids empty; every call needs one to match its result.
@@ -246,6 +266,36 @@ function toApiMessage(
   return { role: 'user', content: parts };
 }
 
+/** Retries of an error sent inside the stream, before any output (the SDK retries the rest). */
+const STREAM_RETRIES = 2;
+const STREAM_RETRY_DELAY_MS = 250;
+
+/**
+ * An error the server sent inside an open stream (an `error` event, no HTTP status), or a
+ * dropped stream. HTTP errors were already retried by the SDK; client errors aren't worth it.
+ */
+function isStreamError(error: unknown): boolean {
+  if (error instanceof OpenAI.APIUserAbortError) return false;
+  if (error instanceof OpenAI.APIConnectionError) return true;
+  return error instanceof OpenAI.APIError && error.status === undefined;
+}
+
+/** Waits `ms`, or stops early (StoppedError) when the run is stopped. */
+function wait(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) return reject(new StoppedError());
+    const timer = setTimeout(() => {
+      signal?.removeEventListener('abort', onAbort);
+      resolve();
+    }, ms);
+    const onAbort = () => {
+      clearTimeout(timer);
+      reject(new StoppedError());
+    };
+    signal?.addEventListener('abort', onAbort, { once: true });
+  });
+}
+
 function describeApiError(error: unknown, config: ModelSettings, hasImages: boolean): unknown {
   const where = config.baseURL || 'https://api.openai.com/v1';
   if (error instanceof OpenAI.AuthenticationError) {
@@ -280,7 +330,9 @@ function describeApiError(error: unknown, config: ModelSettings, hasImages: bool
     });
   }
   if (error instanceof OpenAI.APIError) {
-    return new Error(`Model server error ${error.status}: ${error.message}`, { cause: error });
+    // Errors sent inside the stream have no status: leave it out rather than say "undefined".
+    const status = error.status === undefined ? '' : ` ${error.status}`;
+    return new Error(`Model server error${status}: ${error.message}`, { cause: error });
   }
   return error;
 }

@@ -288,6 +288,7 @@ export function ChatScreen({
               isPanelShown={isPanelShown}
               onTogglePanel={togglePanel}
               onShowSidebar={isSidebarCollapsed ? () => setIsSidebarCollapsed(false) : undefined}
+              workspace={workspace.data}
             />
             <ChatView
               workspaceId={workspaceId}
