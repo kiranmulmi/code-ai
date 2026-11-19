@@ -172,6 +172,29 @@ export class ModelStore {
     };
   }
 
+  /**
+   * The models a run's helpers use, from Settings → Agent: sub-agents and the reviewer. One
+   * that isn't set, or was deleted since, is left out: they then use the run's own model.
+   */
+  async helpersFor({
+    subagentModelId,
+    reviewModelId,
+  }: {
+    subagentModelId: string | null;
+    reviewModelId: string | null;
+  }): Promise<{ subagentModel?: ModelSettings; reviewModel?: ModelSettings }> {
+    const settingsOf = async (id: string | null) =>
+      id ? ((await this.settingsFor(id))?.settings ?? undefined) : undefined;
+    const [subagentModel, reviewModel] = await Promise.all([
+      settingsOf(subagentModelId),
+      settingsOf(reviewModelId),
+    ]);
+    return {
+      ...(subagentModel ? { subagentModel } : {}),
+      ...(reviewModel ? { reviewModel } : {}),
+    };
+  }
+
   /** The saved models, with exactly one default whenever there are any. */
   async #read(): Promise<SavedModel[]> {
     const raw = await readJson(this.file);

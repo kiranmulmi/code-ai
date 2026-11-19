@@ -25,6 +25,8 @@ export const CALL_KIND_LABELS: Record<ModelCallKind, string> = {
   planner: 'Planning',
   compaction: 'Summarizing earlier messages',
   limit_summary: 'Summary at the limit',
+  review: 'Reviewing the answer',
+  subagent: 'Sub-agent',
 };
 
 export const TOKEN_GROUP_LABELS: Record<TokenGroupId, string> = {

@@ -28,6 +28,7 @@ const ACTIVITY: Record<string, (args: Record<string, unknown>) => string> = {
   remember: () => 'Saving to memory',
   recall: () => 'Searching memory',
   forget: () => 'Deleting from memory',
+  delegate_task: (a) => `Sub-agent: ${shorten(text(a.label) || text(a.task), 60)}`,
 };
 
 /** A short line for the plan panel about what a tool call is doing. */

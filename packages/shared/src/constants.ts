@@ -41,7 +41,7 @@ export const CONTEXT = {
   /** summarize older messages at this share of the usable window... */
   summarizeAtShare: 0.8,
   /** ...or at this many tokens, whichever comes first */
-  summarizeAtTokens: 80_000,
+  summarizeAtTokens: 200_000,
   /** newest messages kept word for word when summarizing: this share of the usable window */
   keepRecentShare: 0.25,
   /** one summarizing call reads at most this share of the usable window */

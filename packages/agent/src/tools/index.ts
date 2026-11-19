@@ -22,6 +22,7 @@ import { webSearch } from './web-search.js';
 import { copySkillFile, readSkillFile, useSkill } from './skills.js';
 import { loadMcpTools } from './load-mcp-tools.js';
 import { fetchPage } from './fetch-page.js';
+import { delegateTask } from './delegate.js';
 
 const TOOLS: readonly AnyTool[] = [
   createPlan,
@@ -117,17 +118,23 @@ function firstSentence(tool: AnyTool, max = 160): string {
   return line.length > max ? `${line.slice(0, max - 1).trimEnd()}…` : `${line}.`;
 }
 
+/** Sent only when sub-agents are on (and never to a sub-agent). */
+export const DELEGATE_TOOL = delegateTask.name;
+
 /**
  * The built-in tools, then `extra` ones (from MCP servers). The extra ones are deferred: the
  * model sees their names (`deferredSummary`) and loads the ones it needs with load_mcp_tools.
  * Tools in `disabledGroups` are left out (unless a chat already called one: see `disabled`).
+ * With `subagents`, delegate_task comes last among the built-in tools.
  */
 export function buildToolset(
   extra: readonly AnyTool[] = [],
   disabledGroups: readonly ToolGroup[] = [],
+  { subagents = false }: { subagents?: boolean } = {},
 ): Toolset {
-  const mcp = extra.filter((tool) => !TOOLS.some((t) => t.name === tool.name));
-  const builtIn = mcp.length ? [...TOOLS, loadMcpTools] : [...TOOLS];
+  const own = subagents ? [...TOOLS, delegateTask] : [...TOOLS];
+  const mcp = extra.filter((tool) => !own.some((t) => t.name === tool.name));
+  const builtIn = mcp.length ? [...own, loadMcpTools] : own;
   const tools = [...builtIn, ...mcp];
   const isOff = (t: AnyTool) => {
     const group = GROUP_OF[t.name];

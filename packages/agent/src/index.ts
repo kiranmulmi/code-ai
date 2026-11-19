@@ -58,6 +58,7 @@ export {
   type InputCheck,
 } from './guardrails.js';
 export { buildToolset, type Toolset } from './tools/index.js';
+export { parseReview, type Review } from './critic.js';
 export { imageDataUrl, type AttachmentStore } from './attachments.js';
 export { BackgroundTasks, type WorkspaceTasks } from './background-tasks.js';
 export type { SkillStore } from './skills.js';

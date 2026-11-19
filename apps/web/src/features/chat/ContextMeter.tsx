@@ -1,23 +1,32 @@
 import { CONTEXT } from '@app/shared';
 import { compactNumber } from '../../lib/format';
 
-/** How full the model's context window was at the last model call: a thin bar and a label. */
+/**
+ * How full the model's context was at the last model call: a thin bar and a label. The bar fills
+ * toward the point where older messages get summarized (on a large window that is far below the
+ * window itself), so a summary never happens while the bar still looks nearly empty.
+ */
 export function ContextMeter({
   usedTokens,
   windowTokens,
+  summarizeAtTokens,
 }: {
   usedTokens: number;
   windowTokens: number;
+  /** From the agent; older events lack it, so fall back to the same rule the agent uses. */
+  summarizeAtTokens?: number;
 }) {
-  const share = windowTokens > 0 ? Math.min(1, usedTokens / windowTokens) : 0;
+  const summarizesAt =
+    summarizeAtTokens && summarizeAtTokens > 0
+      ? summarizeAtTokens
+      : Math.min(windowTokens * CONTEXT.summarizeAtShare, CONTEXT.summarizeAtTokens);
+  const share = summarizesAt > 0 ? Math.min(1, usedTokens / summarizesAt) : 0;
   const percent = Math.round(share * 100);
-  // The agent summarizes at a share of the window or a fixed token count, whichever comes first.
-  const summarizesAt = Math.min(windowTokens * CONTEXT.summarizeAtShare, CONTEXT.summarizeAtTokens);
-  const isNear = windowTokens > 0 && usedTokens >= summarizesAt;
+  const isNear = share >= 0.85;
   return (
     <span
       className="ml-auto inline-flex items-center gap-1.5"
-      title={`The last request used ${usedTokens.toLocaleString('en')} of the model's ${windowTokens.toLocaleString('en')}-token context window. From ${Math.round(summarizesAt).toLocaleString('en')} tokens on, older messages are summarized for the model.`}
+      title={`The last request used ${usedTokens.toLocaleString('en')} tokens. Older messages are summarized for the model at ${Math.round(summarizesAt).toLocaleString('en')} tokens (the model's full window is ${windowTokens.toLocaleString('en')}).`}
     >
       <span aria-hidden className="h-1 w-12 overflow-hidden rounded-full bg-line-2">
         <span
@@ -27,8 +36,10 @@ export function ContextMeter({
       </span>
       <span>
         Context{' '}
-        <span className={`font-medium ${isNear ? 'text-warn' : 'text-ink-2'}`}>{percent}%</span> of{' '}
-        {compactNumber(windowTokens)}
+        <span className={`font-medium ${isNear ? 'text-warn' : 'text-ink-2'}`}>
+          {compactNumber(usedTokens)}
+        </span>{' '}
+        / {compactNumber(Math.round(summarizesAt))} before summary
       </span>
     </span>
   );

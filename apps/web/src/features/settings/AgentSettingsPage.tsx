@@ -4,11 +4,14 @@ import {
   APPROVAL_MODES,
   DEFAULT_AGENT_SETTINGS,
   LOG_LEVELS,
+  REVIEW_MODES,
   SETTINGS_LIMITS,
   agentSettingsSchema,
   type AgentSettings,
   type ApprovalMode,
   type LogLevel,
+  type ModelProfile,
+  type ReviewMode,
 } from '@app/shared';
 import { Button } from '../../components/Button';
 import { ERROR, HINT, INPUT, INPUT_ERROR, INPUT_OK, LABEL, SECTION } from '../../components/form';
@@ -20,6 +23,7 @@ import { errorMessage } from '../../lib/api';
 import { compactNumber } from '../../lib/format';
 import { fromPath } from '../../lib/routerState';
 import { useToast } from '../../lib/toast';
+import { useModels } from '../models/useModels';
 import { fetchSettings, saveSettings } from './api';
 import { SettingsTabs } from './SettingsTabs';
 import { APP_NAME } from '../../lib/brand';
@@ -68,6 +72,15 @@ const APPROVALS: Record<ApprovalMode, { title: string; detail: string }> = {
   },
 };
 
+const REVIEWS: Record<ReviewMode, { title: string; detail: string }> = {
+  off: { title: 'Off', detail: 'Answers go straight to you.' },
+  tasks: {
+    title: 'After tasks',
+    detail: 'A reviewer checks answers the agent used tools for, and can send them back once.',
+  },
+  always: { title: 'Every answer', detail: 'A reviewer checks every answer, chat included.' },
+};
+
 const LOG_TEXT: Record<LogLevel, string> = {
   debug: 'Every event',
   info: 'Steps and problems',
@@ -91,6 +104,7 @@ export function AgentSettingsPage() {
   const [errors, setErrors] = useState<FieldErrors>({});
   const [loadError, setLoadError] = useState<unknown>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const models = useModels();
 
   usePageHeader({
     title: 'Settings',
@@ -324,6 +338,85 @@ export function AgentSettingsPage() {
         </section>
 
         <section className="panel">
+          <SectionHeader
+            title="Sub-agents and review"
+            detail="Extra model calls that can make long tasks better, at more tokens and time."
+          />
+          <div className="flex flex-col divide-y divide-line-2">
+            <div className={`${SECTION} flex items-start justify-between gap-4`}>
+              <div>
+                <p className={LABEL}>Sub-agents</p>
+                <p className={HINT}>
+                  Lets the agent hand a self-contained part of a task to a sub-agent (
+                  <span className="font-mono">delegate_task</span>), which works in a fresh context
+                  with the same tools and reports back. Sub-agents share the message&apos;s token
+                  budget and ask for approval like the agent does.
+                </p>
+              </div>
+              <Switch
+                isOn={draft.subagents}
+                onChange={(isOn) => set('subagents', isOn)}
+                label="Sub-agents"
+              />
+            </div>
+            {draft.subagents && (
+              <ModelPicker
+                id="setting-subagent-model"
+                label="Sub-agent model"
+                hint="A cheaper or faster model often does well on delegated parts."
+                value={draft.subagentModelId}
+                models={models.data}
+                error={errors.subagentModelId}
+                onChange={(id) => set('subagentModelId', id)}
+              />
+            )}
+            <div className={SECTION}>
+              <p className={LABEL}>Review answers</p>
+              <div
+                role="radiogroup"
+                aria-label="Review answers"
+                className="mt-2 inline-flex rounded-lg border border-line bg-surface-2 p-0.5"
+              >
+                {REVIEW_MODES.map((mode) => {
+                  const isOn = draft.review === mode;
+                  return (
+                    <button
+                      key={mode}
+                      type="button"
+                      role="radio"
+                      aria-checked={isOn}
+                      onClick={() => set('review', mode)}
+                      className={`h-7 rounded-md px-3 text-[12.5px] font-medium transition-colors ${
+                        isOn
+                          ? 'bg-surface text-ink shadow-[0_0_0_1px_var(--line)]'
+                          : 'text-ink-3 hover:text-ink'
+                      }`}
+                    >
+                      {REVIEWS[mode].title}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className={HINT}>
+                {REVIEWS[draft.review].detail} The reviewer sees the request, the plan, what the
+                tools found and the answer, but not the rest of the chat.
+              </p>
+            </div>
+            {draft.review !== 'off' && (
+              <ModelPicker
+                id="setting-review-model"
+                label="Reviewer model"
+                hint="A different model from the agent's catches more of its blind spots."
+                value={draft.reviewModelId}
+                models={models.data}
+                error={errors.reviewModelId}
+                onChange={(id) => set('reviewModelId', id)}
+              />
+            )}
+          </div>
+        </section>
+
+        <section className="panel">
           <SectionHeader title="Web search and logging" />
           <div className="flex flex-col divide-y divide-line-2">
             <div className={SECTION}>
@@ -422,6 +515,56 @@ export function AgentSettingsPage() {
           {isSaving ? 'Saving…' : 'Save'}
         </Button>
       </FormActions>
+    </div>
+  );
+}
+
+/** Picks a saved model for sub-agents or the reviewer; empty means the model of the chat. */
+function ModelPicker({
+  id,
+  label,
+  hint,
+  value,
+  models,
+  error,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  hint: string;
+  value: string | null;
+  models: readonly ModelProfile[] | null;
+  error: string | undefined;
+  onChange: (id: string | null) => void;
+}) {
+  // A model deleted since still shows, so saving doesn't silently change it.
+  const isMissing = value !== null && models !== null && !models.some((m) => m.id === value);
+  return (
+    <div className={SECTION}>
+      <label htmlFor={id} className={LABEL}>
+        {label}
+      </label>
+      <select
+        id={id}
+        value={value ?? ''}
+        aria-invalid={error ? true : undefined}
+        onChange={(event) => onChange(event.target.value || null)}
+        className={`${INPUT} ${error ? INPUT_ERROR : INPUT_OK} max-w-[40ch]`}
+      >
+        <option value="">Same as the chat</option>
+        {models?.map((model) => (
+          <option key={model.id} value={model.id}>
+            {model.name}
+          </option>
+        ))}
+        {isMissing && <option value={value}>Deleted model (uses the chat&apos;s)</option>}
+      </select>
+      {error && (
+        <p role="alert" className={ERROR}>
+          {error}
+        </p>
+      )}
+      <p className={HINT}>{hint}</p>
     </div>
   );
 }

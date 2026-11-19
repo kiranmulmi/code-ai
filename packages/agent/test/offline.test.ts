@@ -2595,11 +2595,11 @@ test('limits scale with the window, and long transcripts are summarized in parts
   assert.equal(contextBudget(200_000, 300_000).reserve, 100_000, 'the reply gets at most half');
   assert.ok(contextLimits(small).toolOutputChars < 20_000);
   assert.equal(contextLimits(contextBudget(1_000_000, null)).toolOutputChars, 12_000);
-  // Summarizing starts at 80% of a small window, but at 80k tokens on a large one.
+  // Summarizing starts at 80% of a small window, but at 200k tokens on a large one.
   assert.equal(compactThreshold(small), Math.floor(small.usable * 0.8));
   const large = contextBudget(1_000_000, null);
-  assert.equal(compactThreshold(large), 80_000);
-  assert.ok(keepRecentTokens(large) <= 80_000 / 3, 'a summary frees most of the request');
+  assert.equal(compactThreshold(large), 200_000);
+  assert.ok(keepRecentTokens(large) <= 200_000 / 3, 'a summary frees most of the request');
   const long: ModelMessage[] = Array.from({ length: 20 }, (_, i) => ({
     role: 'user',
     content: `${i} ${'y'.repeat(3_000)}`,

@@ -57,6 +57,8 @@ export function createRunsService(
         if (!inputCheck.ok) throw new ValidationError(inputCheck.reason);
       }
       const { settings: model } = await models.forRun(modelId, reasoningEffort);
+      // Sub-agents and the reviewer can run on their own models (Settings → Agent).
+      const helperModels = await store.models.helpersFor(config);
       const title = titleFrom(message.trim() ? message : (files[0]?.name ?? ''));
       const chat = existing ?? (await store.createChat(workspace.id, title));
       if (runs.isRunning(chat.id)) {
@@ -106,6 +108,7 @@ export function createRunsService(
             agentOptions: {
               config,
               model,
+              ...helperModels,
               approve: approver.approve,
               askUser: asker.askUser,
               signal,

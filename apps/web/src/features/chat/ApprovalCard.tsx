@@ -28,7 +28,14 @@ export function ApprovalCard({
         <div className="flex min-w-0 items-center gap-2">
           <ShieldIcon size={15} className={`shrink-0 ${isOpen ? 'text-warn' : 'text-ink-3'}`} />
           <span className="font-medium text-ink">
-            The agent wants to run <span className="font-mono text-[13px]">{item.tool}</span>
+            {item.subagent ? (
+              <>
+                Sub-agent <span className="text-ink-2">“{item.subagent}”</span> wants to run{' '}
+              </>
+            ) : (
+              'The agent wants to run '
+            )}
+            <span className="font-mono text-[13px]">{item.tool}</span>
           </span>
         </div>
         {isOpen ? (

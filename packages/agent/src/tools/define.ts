@@ -15,6 +15,16 @@ export interface McpToolsLoaded {
   unknown: string[];
 }
 
+/** A part of the task for a sub-agent (delegate_task). */
+export interface DelegatedTask {
+  task: string;
+  /** a short name, shown to the user and in the sub-agent's approval requests */
+  label: string;
+}
+
+/** Runs a sub-agent on the task and resolves with what to tell the model. */
+export type DelegateFn = (task: DelegatedTask) => Promise<string>;
+
 /** What a tool can reach while it runs. */
 export interface ToolContext {
   planner: Planner;
@@ -39,6 +49,8 @@ export interface ToolContext {
   showImage: (attachmentId: string) => void;
   /** aborted when the user stops the run: long tools (run_command) stop early */
   signal?: AbortSignal;
+  /** delegate_task: runs a sub-agent; null when sub-agents are off (and inside a sub-agent) */
+  delegate?: DelegateFn | null;
 }
 
 /**

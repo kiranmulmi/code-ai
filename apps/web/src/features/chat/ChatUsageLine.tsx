@@ -51,7 +51,11 @@ export function ChatUsageLine({
         <span>{counts}</span>
       )}
       {context && (
-        <ContextMeter usedTokens={context.usedTokens} windowTokens={context.windowTokens} />
+        <ContextMeter
+          usedTokens={context.usedTokens}
+          windowTokens={context.windowTokens}
+          summarizeAtTokens={context.summarizeAtTokens}
+        />
       )}
     </p>
   );

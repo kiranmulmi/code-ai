@@ -15,8 +15,18 @@ import { CONTEXT } from '@app/shared';
 /** Prompts the human and returns their answer. */
 export type AskFn = (question: string) => Promise<string>;
 
+/** Who wants a tool run, when it isn't the agent itself. */
+export interface ApprovalSource {
+  /** the sub-agent's label (delegate_task) */
+  subagent: string;
+}
+
 /** Decides whether a tool with side effects may run with this input. */
-export type ApproveFn = (toolName: string, input: unknown) => Promise<boolean>;
+export type ApproveFn = (
+  toolName: string,
+  input: unknown,
+  from?: ApprovalSource,
+) => Promise<boolean>;
 
 // ---------- Input checks ----------
 
@@ -331,7 +341,7 @@ export function limitToolOutput(text: string, maxChars = MAX_TOOL_OUTPUT_CHARS):
  * @param ask prompts the human; required for "ask"
  */
 export function createApprover(mode: ApprovalMode, ask?: AskFn): ApproveFn {
-  return async function approve(toolName, input) {
+  return async function approve(toolName, input, from) {
     if (mode === 'auto') return true;
     if (mode === 'deny' || !ask) return false;
     const reason =
@@ -340,7 +350,7 @@ export function createApprover(mode: ApprovalMode, ask?: AskFn): ApproveFn {
     const shown = preview.length > 1500 ? `${preview.slice(0, 1500)}\n...` : preview;
     const why = typeof reason === 'string' && reason.trim() ? `Why: ${reason.trim()}\n` : '';
     const answer = await ask(
-      `\nThe agent wants to run ${toolName}.\n${why}With:\n${shown}\nAllow? [y/N] `,
+      `\n${from ? `The sub-agent "${from.subagent}"` : 'The agent'} wants to run ${toolName}.\n${why}With:\n${shown}\nAllow? [y/N] `,
     );
     return /^y(es)?$/i.test(answer.trim());
   };

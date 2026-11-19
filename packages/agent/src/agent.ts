@@ -4,7 +4,8 @@
 //   2. Act:     the model works in a loop - call tools, read results, decide again,
 //               updating the plan as it goes.
 //   3. Check:   before accepting a final answer, open plan steps are sent back
-//               to the model once to finish or explain.
+//               to the model once to finish or explain; then, if review is on, a
+//               reviewer (critic.ts) checks the answer and can send issues back once.
 //   4. Limit:   if the step or token budget runs out, one last tool-free call
 //               writes up what was found instead of stopping empty-handed.
 //
@@ -19,6 +20,7 @@ import {
   type AgentEvent,
   type Attachment,
   type ModelCallKind,
+  type ReviewMode,
   type RunResult,
   type RunStatus,
   type Skill,
@@ -62,8 +64,9 @@ import {
   transcriptChunks,
 } from './context.js';
 import { withoutReason, type ToolDefinition } from './tools/define.js';
-import { ATTACHMENT_TOOLS, SKILL_TOOLS, buildToolset } from './tools/index.js';
-import type { AnyTool, AskUserFn, ToolContext } from './tools/define.js';
+import { ATTACHMENT_TOOLS, DELEGATE_TOOL, SKILL_TOOLS, buildToolset } from './tools/index.js';
+import type { AnyTool, AskUserFn, DelegatedTask, ToolContext } from './tools/define.js';
+import { REVIEW_PROMPT, parseReview, reviewMessage, reviseMessage, type Review } from './critic.js';
 import type { WorkspaceTasks } from './background-tasks.js';
 import { Planner, decide } from './planner.js';
 import { Conversation, type ModelMessage, type ToolCall } from './memory/short-term.js';
@@ -73,13 +76,14 @@ import {
   checkInput,
   createApprover,
   limitToolOutput,
+  type ApprovalSource,
   type ApproveFn,
   type AskFn,
 } from './guardrails.js';
 import { createLogger, type AgentLogger } from './logger.js';
 import { errorMessage, isRecord } from './errors.js';
 
-export type { ApproveFn, AskFn };
+export type { ApprovalSource, ApproveFn, AskFn };
 
 /** A message the user sent while the agent worked (see `SteeringInbox`). */
 export interface SteeringMessage {
@@ -121,6 +125,14 @@ export interface AgentRunOptions {
   model?: ModelSettings;
   /** replaces the API call and `model` (used by tests) */
   callModel?: CallModel;
+  /** the model sub-agents (delegate_task) run on; without it, the run's own model */
+  subagentModel?: ModelSettings;
+  /** replaces the sub-agents' API call (tests) */
+  subagentCallModel?: CallModel;
+  /** the model the reviewer runs on; without it, the run's own model */
+  reviewModel?: ModelSettings;
+  /** replaces the reviewer's API call (tests) */
+  reviewCallModel?: CallModel;
   /** the context window when `model` doesn't give one (tests); else DEFAULT_CONTEXT_WINDOW */
   contextWindow?: number;
   logger?: AgentLogger;
@@ -155,6 +167,8 @@ export interface AgentOptions extends AgentRunOptions {
   disabledTools?: readonly ToolGroup[];
   /** the workspace's background tasks (BackgroundTasks.forWorkspace); without it commands can't run in the background */
   tasks?: WorkspaceTasks;
+  /** set for a sub-agent (delegate_task): its prompt says it reports to another agent */
+  role?: 'agent' | 'subagent';
 }
 
 /** What comes with one user prompt besides its text. */
@@ -192,7 +206,16 @@ export function createAgent(options: AgentOptions): Agent {
     if (signal?.aborted) return Promise.reject(new StoppedError());
     return baseCallModel({ ...request, signal, ...(chatId ? { conversationId: chatId } : {}) });
   };
+  /** The reviewer's calls: its own model when one is set, with the same stop signal. */
+  const reviewBase =
+    options.reviewCallModel ??
+    (options.reviewModel ? createModelCaller(options.reviewModel) : baseCallModel);
+  const callReviewer: CallModel = (request) => {
+    if (signal?.aborted) return Promise.reject(new StoppedError());
+    return reviewBase({ ...request, signal });
+  };
   const isStopped = () => signal?.aborted === true;
+  const isSubagent = options.role === 'subagent';
   const emit = options.onEvent ?? (() => {});
   /** For one model call: reports, once, that the model began reasoning. */
   const reasoningOnce = () => {
@@ -212,6 +235,7 @@ export function createAgent(options: AgentOptions): Agent {
     kind: ModelCallKind,
     request: ModelRequest,
     step?: StepParts,
+    caller: CallModel = callModel,
   ) => {
     const startedAt = Date.now();
     // The server reports the call's tokens only once it ends. Until then the run's tokens show
@@ -235,7 +259,7 @@ export function createAgent(options: AgentOptions): Agent {
       });
     };
     emitLive();
-    const response = await callModel({
+    const response = await caller({
       ...request,
       onOutput: (piece) => {
         outputCharacters += piece.length;
@@ -274,7 +298,9 @@ export function createAgent(options: AgentOptions): Agent {
   const approve = options.approve ?? createApprover(config.approval, options.ask);
 
   const disabledTools = options.disabledTools ?? [];
-  const toolset = buildToolset(options.extraTools, disabledTools);
+  // A sub-agent never gets delegate_task: no sub-agents of sub-agents.
+  const canDelegate = config.subagents && !isSubagent;
+  const toolset = buildToolset(options.extraTools, disabledTools, { subagents: canDelegate });
   const plannerPrompt = buildPlannerPrompt(toolset.summary);
   const instructions = options.instructions ?? '';
   const { filesDir, longTermMemory } = options;
@@ -312,7 +338,7 @@ export function createAgent(options: AgentOptions): Agent {
     '',
     toolset.deferredSummary,
     disabledTools,
-    { voiceReplies, hasPlanningStep },
+    { voiceReplies, hasPlanningStep, isSubagent },
   );
   let systemPrompt = systemSections.map((section) => section.text).join('');
   let skillList = '';
@@ -336,6 +362,8 @@ export function createAgent(options: AgentOptions): Agent {
       if (!imagesToShow.includes(id)) imagesToShow.push(id);
     },
   };
+  /** The budget of the run in progress, for delegate_task. */
+  let currentBudget: Budget | null = null;
   // Data URLs of the images in the conversation, loaded once per request.
   const imageUrls = new Map<string, string>();
   const missingImages = new Set<string>();
@@ -401,7 +429,7 @@ export function createAgent(options: AgentOptions): Agent {
   }
 
   /** Run one tool call and return the text to send back to the model. */
-  async function runTool(name: string, rawArguments: string): Promise<string> {
+  async function runTool(name: string, rawArguments: string, callId = ''): Promise<string> {
     const tool = toolset.byName.get(name);
     if (!tool) return toolError(`There is no tool named "${name}".`);
     if (toolset.disabled.has(name)) {
@@ -430,7 +458,11 @@ export function createAgent(options: AgentOptions): Agent {
     }
 
     try {
-      const output = await tool.runValidated(input, toolContext);
+      const context =
+        name === DELEGATE_TOOL && canDelegate
+          ? { ...toolContext, delegate: (task: DelegatedTask) => delegate(callId, task) }
+          : toolContext;
+      const output = await tool.runValidated(input, context);
       const text = typeof output === 'string' ? output : JSON.stringify(output, null, 2);
       logger.event('tool_result', { tool: name, ok: true, chars: text.length });
       return limitToolOutput(text, limits.toolOutputChars);
@@ -477,6 +509,7 @@ export function createAgent(options: AgentOptions): Agent {
     { attachments = [], skills = [] }: RunInput = {},
   ): Promise<RunResult> {
     const budget = new Budget(config);
+    currentBudget = budget;
     const toolsUsed: string[] = [];
     const finish = (status: RunStatus, text: string): RunResult => {
       const result: RunResult = {
@@ -510,7 +543,7 @@ export function createAgent(options: AgentOptions): Agent {
       skillList,
       toolset.deferredSummary,
       disabledTools,
-      { voiceReplies, hasPlanningStep, hasAttachments },
+      { voiceReplies, hasPlanningStep, hasAttachments, isSubagent },
     );
     systemPrompt = systemSections.map((section) => section.text).join('');
     // Tools this chat already called stay sent: its earlier calls refer to them.
@@ -545,6 +578,7 @@ export function createAgent(options: AgentOptions): Agent {
     let planThisRun = false; // the check step only applies to plans made for this request
     let checksLeft = config.maxPlanChecks;
     let answerBeforeCheck: string | null = null; // the answer given before the last check, if any
+    let reviewsLeft = config.maxReviews;
 
     /**
      * Adds the messages the user sent since the last step, if any, and returns whether there
@@ -599,8 +633,10 @@ export function createAgent(options: AgentOptions): Agent {
         meter.calibrate(sent.raw, usage.inputTokens);
         emit({
           type: 'context',
-          usedTokens: usage.inputTokens ? usage.inputTokens + usage.outputTokens : sent.tokens,
+          // Input only: that is what the summarize threshold is measured against.
+          usedTokens: usage.inputTokens || sent.tokens,
           windowTokens: contextWindow.window,
+          summarizeAtTokens: compactThreshold(contextWindow),
         });
         logger.event('model_response', {
           finish_reason: finishReason,
@@ -635,9 +671,15 @@ export function createAgent(options: AgentOptions): Agent {
             continue;
           }
           // ---- 3. Check ----
+          // After a check, a reply much shorter than the earlier answer is an addendum
+          // ("nothing new found, X is still missing"), so keep both. A full rewrite replaces it.
+          const answer: string =
+            answerBeforeCheck && text.length < answerBeforeCheck.length * 0.6
+              ? [answerBeforeCheck, text].filter(Boolean).join('\n\n')
+              : text;
           if (planThisRun && checksLeft > 0 && !planner.isComplete()) {
             checksLeft -= 1;
-            answerBeforeCheck = text;
+            answerBeforeCheck = answer;
             const unfinished = planner.unfinishedSteps();
             logger.step(`check: ${unfinished.length} plan step(s) still open`);
             emit({ type: 'check', unfinished });
@@ -646,12 +688,17 @@ export function createAgent(options: AgentOptions): Agent {
             });
             continue;
           }
-          // After a check, a reply much shorter than the earlier answer is an addendum
-          // ("nothing new found, X is still missing"), so keep both. A full rewrite replaces it.
-          if (answerBeforeCheck && text.length < answerBeforeCheck.length * 0.6) {
-            return finish('done', [answerBeforeCheck, text].filter(Boolean).join('\n\n'));
+          if (answer && reviewsLeft > 0 && shouldReview(config.review, toolsUsed)) {
+            reviewsLeft -= 1;
+            const review = await reviewAnswer(request, runStart, budget, answer);
+            if (isStopped()) return finish('stopped', STOPPED_TEXT);
+            if (review.verdict === 'revise') {
+              answerBeforeCheck = answer;
+              conversation.addUser(reviseMessage(review.issues), { internal: true });
+              continue;
+            }
           }
-          return finish('done', text || '(The model returned an empty response.)');
+          return finish('done', answer || '(The model returned an empty response.)');
         }
 
         // Every tool call needs a matching result before the next model call. Read-only calls
@@ -678,7 +725,7 @@ export function createAgent(options: AgentOptions): Agent {
                   ? toolError(
                       "Your output hit the token limit, so this call's arguments were cut off. Retry with smaller input.",
                     )
-                  : await runTool(name, args);
+                  : await runTool(name, args, call.id);
               const result = noteRepeat(repeats, name, args, ran);
               if (result !== ran) logger.warn(`${name} was called again with the same result`);
               emit({ type: 'tool_result', id: call.id, name, ...toolResultPreview(result) });
@@ -867,6 +914,94 @@ export function createAgent(options: AgentOptions): Agent {
   }
 
   /** Out of steps or tokens: one tool-free call that writes up what was found so far. */
+  /**
+   * The reviewer checks the answer against the request and this run's findings. A failed
+   * review call passes the answer: the review only ever adds a chance to fix it.
+   */
+  async function reviewAnswer(
+    request: string,
+    runStart: number,
+    budget: Budget,
+    answer: string,
+  ): Promise<Review> {
+    emit({ type: 'reviewing' });
+    const content = reviewMessage({
+      request,
+      plan: planner.plan ? planner.render() : null,
+      findings: describeRun(conversation.messages.slice(runStart + 1)),
+      answer,
+    });
+    let review: Review = { verdict: 'pass', issues: [] };
+    try {
+      const { message } = await callRecorded(
+        budget,
+        'review',
+        { system: REVIEW_PROMPT, messages: [{ role: 'user', content }] },
+        undefined,
+        callReviewer,
+      );
+      review = parseReview(message.content ?? '');
+    } catch (error) {
+      if (error instanceof StoppedError || isStopped()) throw error;
+      logger.warn(`The review failed, so the answer stands: ${errorMessage(error)}`);
+    }
+    logger.event('review', { verdict: review.verdict, issues: review.issues });
+    emit({ type: 'review', verdict: review.verdict, issues: review.issues });
+    return review;
+  }
+
+  /**
+   * delegate_task: a sub-agent with a fresh conversation and plan works on the task, with the
+   * same workspace, tools (but delegate_task), stop signal and approvals (labelled with it).
+   * It may use what is left of this run's token budget; its calls count toward this run.
+   */
+  async function delegate(callId: string, { task, label }: DelegatedTask): Promise<string> {
+    const budget = currentBudget;
+    if (!budget) throw new Error('No run in progress.');
+    const tokensLeft = Math.floor(budget.maxTotalTokens - budget.budgetTokens());
+    if (tokensLeft <= 0)
+      throw new Error('The token budget is used up. Finish without a sub-agent.');
+    const from: ApprovalSource = { subagent: label };
+    const ownModel = options.subagentCallModel
+      ? { callModel: options.subagentCallModel }
+      : options.subagentModel
+        ? { callModel: undefined, model: options.subagentModel }
+        : {};
+    logger.step(`sub-agent "${label}" started`);
+    const child = createAgent({
+      ...options,
+      ...ownModel,
+      role: 'subagent',
+      config: {
+        ...config,
+        planning: 'off',
+        review: 'off',
+        subagents: false,
+        maxTotalTokens: tokensLeft,
+      },
+      approve: (name, input) => approve(name, input, from),
+      onEvent: (event) => emit({ type: 'subagent', callId, event }),
+      conversation: new Conversation(),
+      planner: new Planner(),
+      memoryShown: null,
+      steering: undefined,
+      voiceReplies: false,
+      chatId: undefined,
+    });
+    const result = await child.run(task);
+    for (const call of result.calls) {
+      budget.recordCall(call, { ...call, kind: 'subagent' });
+    }
+    emit({ type: 'usage', steps: budget.steps, usage: budget.usage() });
+    logger.step(`sub-agent "${label}" ended: ${result.status}`);
+    if (result.status === 'stopped') throw new StoppedError();
+    const note =
+      result.status === 'done'
+        ? ''
+        : `[The sub-agent ended early (${result.status}); its report may be incomplete.]\n\n`;
+    return `${note}${result.text}`;
+  }
+
   async function summarizeAtLimit(
     prompt: string,
     limit: string,
@@ -923,6 +1058,13 @@ const STOPPED_TEXT = 'Stopped by the user.';
 const LIVE_USAGE_INTERVAL_MS = TOKEN_USAGE.liveIntervalMs;
 
 const PLAN_TOOLS = new Set(['create_plan', 'update_plan', 'add_plan_steps']);
+
+/** Whether the reviewer checks this answer: `tasks` skips answers that needed no tools. */
+function shouldReview(mode: ReviewMode, toolsUsed: readonly string[]): boolean {
+  if (mode === 'always') return true;
+  if (mode === 'tasks') return toolsUsed.some((name) => !PLAN_TOOLS.has(name));
+  return false;
+}
 const MEMORY_TOOLS = new Set(['remember', 'forget']);
 
 /** This run's messages as plain text (for the summary call), newest kept if too long. */

@@ -7,7 +7,7 @@ import { inlineArgs, prettyJson } from '../../lib/format';
 import { stepSummary } from './tools';
 import { ChevronRightIcon, CrossIcon } from '../../lib/icons';
 import { languageForPath } from '../../lib/languages';
-import type { ToolItem } from './conversation';
+import type { SubagentActivity, ToolItem } from './conversation';
 import { toolIcon } from './toolIcon';
 import { ToolInput } from './ToolInput';
 
@@ -109,8 +109,36 @@ function ResultText({ item }: { item: ToolItem }) {
   );
 }
 
+/** delegate_task: the sub-agent's tool calls, as small rows under the step, and what it's doing now. */
+function SubagentSteps({ activity }: { activity: SubagentActivity }) {
+  return (
+    <div className="ml-[30px] flex flex-col gap-px border-l border-line-2 pl-2.5 text-[11px]">
+      {activity.tools.map((tool) => (
+        <div key={tool.id} className="flex h-6 items-center gap-2">
+          <StepIcon name={tool.name} state={tool.state} />
+          <span className="shrink-0 font-mono font-semibold text-ink-3">{tool.name}</span>
+          <span className="min-w-0 flex-1 truncate font-mono text-ink-3 opacity-75">
+            {stepSummary(tool.args).text}
+          </span>
+        </div>
+      ))}
+      {activity.status && <div className="h-6 leading-6 text-ink-3">{activity.status}</div>}
+    </div>
+  );
+}
+
 /** One tool call. Click it to see the input and result, which open in a card below it. */
 export function ToolStep({ item }: { item: ToolItem }) {
+  if (!item.subagent) return <ToolCall item={item} />;
+  return (
+    <div className="flex flex-col">
+      <ToolCall item={item} />
+      <SubagentSteps activity={item.subagent} />
+    </div>
+  );
+}
+
+function ToolCall({ item }: { item: ToolItem }) {
   const summary = stepSummary(item.args);
   return (
     <details className="group text-[12.5px]">

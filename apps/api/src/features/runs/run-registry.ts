@@ -109,7 +109,7 @@ export class RunRegistry {
   createApprover(chatId: string, mode: ApprovalMode, send: (event: StreamEvent) => void) {
     const mine = new Set<string>();
 
-    const approve: ApproveFn = async (toolName, input) => {
+    const approve: ApproveFn = async (toolName, input, from) => {
       if (mode === 'deny') return false;
       if (mode === 'auto' || this.running.get(chatId)?.autoApprove) return true;
       const id = randomUUID();
@@ -124,7 +124,13 @@ export class RunRegistry {
         const timer = setTimeout(() => settle(false), APPROVAL_TIMEOUT_MS);
         this.pendingApprovals.set(id, settle);
         mine.add(id);
-        send({ type: 'approval', id, tool: toolName, input });
+        send({
+          type: 'approval',
+          id,
+          tool: toolName,
+          input,
+          ...(from ? { subagent: from.subagent } : {}),
+        });
       });
     };
 

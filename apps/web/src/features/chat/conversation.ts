@@ -1,4 +1,5 @@
 import type {
+  AgentEvent,
   Attachment,
   ChatDetail,
   ModelCallUsage,
@@ -41,7 +42,19 @@ export type ToolItem = {
   args: string;
   state: ToolState;
   result: string;
+  /** delegate_task: what its sub-agent is doing, newest last */
+  subagent?: SubagentActivity;
 };
+
+/** A sub-agent's work, shown inside its delegate_task step. */
+export type SubagentActivity = {
+  /** its tool calls (plan tools left out) */
+  tools: SubagentTool[];
+  /** what it's doing now, e.g. "Running read_file…"; null once it ends */
+  status: string | null;
+};
+
+export type SubagentTool = { id: string; name: string; args: string; state: ToolState };
 
 export type ApprovalState = 'pending' | 'sending' | 'allowed' | 'denied';
 
@@ -51,6 +64,8 @@ export type ApprovalItem = {
   approvalId: string;
   tool: string;
   input: unknown;
+  /** the sub-agent asking, when it isn't the agent itself */
+  subagent: string | null;
   state: ApprovalState;
   error: string | null;
 };
@@ -145,7 +160,7 @@ export type ConversationState = {
    * How full the model's context window was at the last model call (null until one is made
    * after the chat opens).
    */
-  context: { usedTokens: number; windowTokens: number } | null;
+  context: { usedTokens: number; windowTokens: number; summarizeAtTokens?: number } | null;
   /** The question the agent is waiting on, if any (tools run one at a time). */
   question: OpenQuestion | null;
   /** Counter for React keys, so the reducer stays pure. */
@@ -503,10 +518,27 @@ class Draft {
       return;
     }
     if (item?.kind !== 'tool') return;
-    flow[index] = { ...item, state: ok ? 'ok' : 'error', result: preview };
+    const subagent = item.subagent && { ...item.subagent, status: null };
+    flow[index] = {
+      ...item,
+      state: ok ? 'ok' : 'error',
+      result: preview,
+      ...(subagent ? { subagent } : {}),
+    };
   }
 
-  addApproval(approvalId: string, tool: string, input: unknown): void {
+  /** A sub-agent's event: it updates the delegate_task step it runs under. */
+  addSubagentEvent(callId: string, event: AgentEvent): void {
+    const flow = this.agent?.flow;
+    if (!flow) return;
+    const index = flow.findIndex((item) => item.kind === 'tool' && item.callId === callId);
+    const item = flow[index];
+    if (item?.kind !== 'tool') return;
+    const next = subagentActivity(item.subagent ?? { tools: [], status: 'Starting…' }, event);
+    if (next !== item.subagent) flow[index] = { ...item, subagent: next };
+  }
+
+  addApproval(approvalId: string, tool: string, input: unknown, subagent: string | null): void {
     this.closeSegment();
     const agent = this.ensureAgent();
     agent.flow.push({
@@ -515,6 +547,7 @@ class Draft {
       approvalId,
       tool,
       input,
+      subagent,
       state: 'pending',
       error: null,
     });
@@ -668,6 +701,36 @@ function fromHistory(detail: ChatDetail): ConversationState {
   });
 }
 
+/** A sub-agent's work after one of its events; the same object when nothing shows changed. */
+export function subagentActivity(current: SubagentActivity, event: AgentEvent): SubagentActivity {
+  switch (event.type) {
+    case 'tool_call':
+      if (PLAN_TOOL_NAMES.has(event.name)) return current;
+      return {
+        tools: [
+          ...current.tools,
+          { id: event.id, name: event.name, args: event.args, state: 'running' },
+        ],
+        status: describeActivity(event.name, event.args),
+      };
+    case 'tool_result':
+      return {
+        ...current,
+        tools: current.tools.map((tool) =>
+          tool.id === event.id ? { ...tool, state: event.ok ? 'ok' : 'error' } : tool,
+        ),
+      };
+    case 'model_call':
+      return current.status === 'Working…' ? current : { ...current, status: 'Working…' };
+    case 'text_delta':
+      return current.status === 'Writing its report…'
+        ? current
+        : { ...current, status: 'Writing its report…' };
+    default:
+      return current;
+  }
+}
+
 function applyEvent(state: ConversationState, event: RunEvent, at: number): ConversationState {
   const draft = new Draft(state);
   let plan = state.plan;
@@ -716,7 +779,11 @@ function applyEvent(state: ConversationState, event: RunEvent, at: number): Conv
       plan = { ...plan, activity: 'Thinking about the next step' };
       break;
     case 'context':
-      draft.context = { usedTokens: event.usedTokens, windowTokens: event.windowTokens };
+      draft.context = {
+        usedTokens: event.usedTokens,
+        windowTokens: event.windowTokens,
+        summarizeAtTokens: event.summarizeAtTokens,
+      };
       break;
     case 'usage':
       draft.setRunUsage(event.usage);
@@ -743,7 +810,27 @@ function applyEvent(state: ConversationState, event: RunEvent, at: number): Conv
       plan = withPlan(withPhase(plan, 'working', at), event.plan);
       break;
     case 'approval':
-      draft.addApproval(event.id, event.tool, event.input);
+      draft.addApproval(event.id, event.tool, event.input, event.subagent ?? null);
+      break;
+    case 'subagent':
+      draft.addSubagentEvent(event.callId, event.event);
+      break;
+    case 'reviewing':
+      draft.closeSegment(false); // the answer so far stays a proper answer
+      draft.setStatus('Reviewing the answer…');
+      plan = { ...plan, activity: 'Reviewing the answer' };
+      break;
+    case 'review':
+      if (event.verdict === 'revise') {
+        draft.addNote(
+          `The reviewer found ${plural(event.issues.length, 'issue')}, so the agent goes back to fix ${event.issues.length === 1 ? 'it' : 'them'}:\n${event.issues.map((issue) => `- ${issue}`).join('\n')}`,
+          'warn',
+        );
+        draft.setStatus('Fixing the answer…');
+      } else {
+        draft.addNote('The reviewer checked the answer and found no issues.');
+        draft.setStatus(null);
+      }
       break;
     case 'approval_closed':
       draft.updateApproval(event.id, { state: event.allowed ? 'allowed' : 'denied', error: null });

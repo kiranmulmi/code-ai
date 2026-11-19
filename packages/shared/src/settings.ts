@@ -14,6 +14,14 @@ export const PLANNING_MODES = ['auto', 'off'] as const;
 export type PlanningMode = (typeof PLANNING_MODES)[number];
 
 /**
+ * When a reviewer (a separate model call that sees only the request, the findings and the
+ * answer) checks the agent's final answer before the user gets it. `off`: never. `tasks`: when
+ * the agent used tools for the request. `always`: every answer.
+ */
+export const REVIEW_MODES = ['off', 'tasks', 'always'] as const;
+export type ReviewMode = (typeof REVIEW_MODES)[number];
+
+/**
  * How the agent behaves, app-wide, set in Settings -> Agent. Server options (PORT, ...)
  * stay in .env.
  */
@@ -32,6 +40,14 @@ export interface AgentSettings {
   searxngUrl: string;
   /** What the agent prints to the server's terminal. The JSONL run logs are always written. */
   logLevel: LogLevel;
+  /** The agent may hand parts of a task to sub-agents (delegate_task), each with a fresh context. */
+  subagents: boolean;
+  /** The model sub-agents run on (a saved model's id); null: the chat's model. */
+  subagentModelId: string | null;
+  /** When a reviewer checks the agent's final answer. */
+  review: ReviewMode;
+  /** The model the reviewer runs on (a saved model's id); null: the chat's model. */
+  reviewModelId: string | null;
 }
 
 export const DEFAULT_AGENT_SETTINGS: AgentSettings = {
@@ -40,6 +56,10 @@ export const DEFAULT_AGENT_SETTINGS: AgentSettings = {
   approval: 'ask',
   searxngUrl: 'http://localhost:8080',
   logLevel: 'info',
+  subagents: false,
+  subagentModelId: null,
+  review: 'off',
+  reviewModelId: null,
 };
 
 const wholeNumber = (label: string, { min, max }: { min: number; max: number }) =>
@@ -48,6 +68,15 @@ const wholeNumber = (label: string, { min, max }: { min: number; max: number }) 
     .int(`${label} must be a whole number.`)
     .min(min, `${label} must be at least ${min.toLocaleString('en')}.`)
     .max(max, `${label} can be at most ${max.toLocaleString('en')}.`);
+
+/** A saved model's id, or null (or empty, from a form) for the chat's own model. */
+const optionalModelId = z
+  .string()
+  .trim()
+  .transform((value) => (value === '' ? null : value))
+  .pipe(z.string().uuid('Pick a saved model.').nullable())
+  .nullable()
+  .transform((value) => value ?? null);
 
 export const agentSettingsSchema = z.object({
   planning: z.enum(PLANNING_MODES),
@@ -62,6 +91,10 @@ export const agentSettingsSchema = z.object({
     .regex(/^https?:\/\/[^\s]+$/i, 'Use an http:// or https:// URL, like http://localhost:8080.')
     .transform((value) => value.replace(/\/+$/, '')),
   logLevel: z.enum(LOG_LEVELS),
+  subagents: z.boolean(),
+  subagentModelId: optionalModelId,
+  review: z.enum(REVIEW_MODES),
+  reviewModelId: optionalModelId,
 });
 
 export type AgentSettingsInput = z.input<typeof agentSettingsSchema>;
@@ -85,5 +118,9 @@ export function readAgentSettings(raw: unknown): AgentSettings {
     approval: field('approval'),
     searxngUrl: field('searxngUrl'),
     logLevel: field('logLevel'),
+    subagents: field('subagents'),
+    subagentModelId: field('subagentModelId'),
+    review: field('review'),
+    reviewModelId: field('reviewModelId'),
   };
 }

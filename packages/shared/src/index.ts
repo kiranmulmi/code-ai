@@ -54,12 +54,14 @@ export {
   DEFAULT_AGENT_SETTINGS,
   LOG_LEVELS,
   PLANNING_MODES,
+  REVIEW_MODES,
   agentSettingsSchema,
   readAgentSettings,
   type AgentSettings,
   type AgentSettingsInput,
   type LogLevel,
   type PlanningMode,
+  type ReviewMode,
 } from './settings.js';
 
 export {
@@ -160,6 +162,7 @@ export {
   type ApprovalDecision,
   type ModelCallKind,
   type ModelCallUsage,
+  type ReviewVerdict,
   type TokenGroup,
   type TokenGroupId,
   type TokenItem,

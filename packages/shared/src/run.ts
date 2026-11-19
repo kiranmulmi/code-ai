@@ -30,9 +30,17 @@ export interface Usage {
 
 /**
  * What a model call was for: a step of the agent loop, the planner deciding whether to plan,
- * summarizing older messages to fit the context window, or the summary written at a limit.
+ * summarizing older messages to fit the context window, the summary written at a limit, the
+ * reviewer checking the final answer, or any call a sub-agent made (delegate_task).
  */
-export const MODEL_CALL_KINDS = ['step', 'planner', 'compaction', 'limit_summary'] as const;
+export const MODEL_CALL_KINDS = [
+  'step',
+  'planner',
+  'compaction',
+  'limit_summary',
+  'review',
+  'subagent',
+] as const;
 
 export type ModelCallKind = (typeof MODEL_CALL_KINDS)[number];
 
@@ -129,8 +137,11 @@ export type AgentEvent =
   | { type: 'plan'; plan: Plan | null }
   | { type: 'check'; unfinished: NumberedPlanStep[] }
   | { type: 'limit'; reason: string }
-  /** After each model call: how full the model's context window was (input plus output). */
-  | { type: 'context'; usedTokens: number; windowTokens: number }
+  /**
+   * After each model call: the request's size (input tokens), the model's window, and the size
+   * at which older messages get summarized (the point the context meter fills toward).
+   */
+  | { type: 'context'; usedTokens: number; windowTokens: number; summarizeAtTokens: number }
   /**
    * The run's tokens so far, so they show live. `usage` counts every call made and `steps` the
    * working steps (not the planner or summaries), as `RunResult` does at the end. Servers report a call's tokens only once it ends, so while one
@@ -145,7 +156,18 @@ export type AgentEvent =
    * A message the user sent during the run (`POST /v1/chats/:id/run/messages`) reached the
    * model: it was added to the conversation before this step. `id` is the one that POST gave.
    */
-  | { type: 'steer'; id: string; text: string; sentAt: string };
+  | { type: 'steer'; id: string; text: string; sentAt: string }
+  /** The reviewer started checking the final answer. */
+  | { type: 'reviewing' }
+  /** The reviewer's verdict: `revise` sends the issues back to the agent for another pass. */
+  | { type: 'review'; verdict: ReviewVerdict; issues: string[] }
+  /**
+   * Something a sub-agent did, for the delegate_task call `callId` that started it. Its own
+   * events, as the agent's; a sub-agent never starts another.
+   */
+  | { type: 'subagent'; callId: string; event: AgentEvent };
+
+export type ReviewVerdict = 'pass' | 'revise';
 
 /**
  * Everything `POST /v1/runs` streams, one per server-sent event as `data: <json>`.
@@ -155,7 +177,14 @@ export type AgentEvent =
 export type StreamEvent =
   | AgentEvent
   | { type: 'chat'; chat: ChatSummary }
-  | { type: 'approval'; id: string; tool: string; input: unknown }
+  | {
+      type: 'approval';
+      id: string;
+      tool: string;
+      input: unknown;
+      /** the sub-agent (delegate_task label) asking, when it isn't the agent itself */
+      subagent?: string;
+    }
   | { type: 'approval_closed'; id: string; allowed: boolean }
   /** The agent asks the user (ask_user) and waits; answered with `POST /v1/questions/:id`. */
   | { type: 'question'; id: string; question: string; options: QuestionOption[] }

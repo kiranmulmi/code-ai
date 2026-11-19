@@ -65,6 +65,29 @@ function createPrinter() {
         if (!isAtLineStart) process.stdout.write('\n');
         isAtLineStart = true;
         lastBlock = '';
+      } else if (event.type === 'reviewing') {
+        if (!isAtLineStart) process.stdout.write('\n');
+        console.log('\x1b[2m(Reviewing the answer…)\x1b[0m');
+        isAtLineStart = true;
+      } else if (event.type === 'review') {
+        if (event.verdict === 'revise') {
+          console.log(
+            `\x1b[33m(The reviewer found ${event.issues.length} issue(s); the agent goes back to fix them:)\x1b[0m`,
+          );
+          for (const issue of event.issues) console.log(`\x1b[2m  - ${issue}\x1b[0m`);
+          lastBlock = ''; // the revised answer follows
+        } else {
+          console.log('\x1b[2m(The reviewer found no issues.)\x1b[0m');
+        }
+        isAtLineStart = true;
+      } else if (event.type === 'subagent') {
+        // Only the sub-agent's tool calls: its report reaches the agent, not the screen.
+        const inner = event.event;
+        if (inner.type === 'tool_call' && !inner.name.endsWith('_plan')) {
+          if (!isAtLineStart) process.stdout.write('\n');
+          console.log(`\x1b[2m  [sub-agent] ${inner.name}\x1b[0m`);
+          isAtLineStart = true;
+        }
       } else if (event.type === 'compaction') {
         if (!isAtLineStart) process.stdout.write('\n');
         console.log(
@@ -181,10 +204,13 @@ async function main(): Promise<void> {
       const current = session.chat ?? (await store.createChat(workspace.id, titleFrom(text)));
       const resolved = await store.models.settingsFor(model.id);
       if (!resolved) throw new Error(`"${model.name}" was deleted. Pick another with /model.`);
+      // Settings -> Agent in the web app (limits, approvals, planning), read per message.
+      const saved = await store.settings.get();
       const agentOptions: AgentRunOptions = {
         ...baseOptions,
-        // Settings -> Agent in the web app (limits, approvals, planning), read per message.
-        config: { ...config, ...(await store.settings.get()) },
+        config: { ...config, ...saved },
+        // Sub-agents and the reviewer can run on their own models.
+        ...(await store.models.helpersFor(saved)),
         model: {
           ...resolved.settings,
           reasoningEffort: resolved.profile.supportsReasoning ? effort : null,

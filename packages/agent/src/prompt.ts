@@ -156,6 +156,10 @@ export function renderSkills(skills: readonly Pick<Skill, 'name' | 'description'
  * Voice mode: the user speaks their messages (transcribed, so expect small mistakes) and the
  * reply is read aloud, so it has to sound right, not look right.
  */
+/** For a sub-agent (delegate_task): who reads its answer, and what it should contain. */
+export const SUBAGENT_ROLE = `Sub-agent:
+You are a sub-agent. Another AI agent gave you the task in the first message, as one part of a bigger request from the user. Your final answer goes to that agent, not to the user, and it can't ask you follow-up questions. Do the task fully with your tools, then report: what you did, what you found (with paths, links and exact values), and anything you couldn't do and why. Keep the report factual and compact: no greetings, no offers of further help.`;
+
 export const VOICE_REPLIES = `Voice conversation:
 The user is talking to you by voice: their messages are speech turned into text (expect small transcription mistakes and guess the intended words), and your reply is read aloud to them. Answer like a person talking: short, natural sentences, the main point first, usually two to four sentences unless they ask for more. No Markdown, headings, tables, bullet lists, emoji or URLs. Don't read out code or file contents: say what you did or found, and offer to show details in the chat. Tools still work as usual; before a long task, say in one short sentence what you're about to do.`;
 
@@ -184,7 +188,14 @@ export function systemPromptSections(
     voiceReplies = false,
     hasPlanningStep = true,
     hasAttachments = false,
-  }: { voiceReplies?: boolean; hasPlanningStep?: boolean; hasAttachments?: boolean } = {},
+    isSubagent = false,
+  }: {
+    voiceReplies?: boolean;
+    hasPlanningStep?: boolean;
+    hasAttachments?: boolean;
+    /** a sub-agent (delegate_task): it reports to the agent that started it */
+    isSubagent?: boolean;
+  } = {},
 ): PromptSection[] {
   const text = String(instructions ?? '').trim();
   // Sections for skills and attached files only when the chat has some, so each call is smaller.
@@ -192,6 +203,7 @@ export function systemPromptSections(
   const sections: PromptSection[] = [
     { label: 'Agent instructions', text: folder ? `${base}\n\nWorkspace folder: ${folder}` : base },
   ];
+  if (isSubagent) sections.push({ label: 'Sub-agent role', text: `\n\n${SUBAGENT_ROLE}` });
   // Before the workspace instructions, so the user's own style rules still win.
   if (voiceReplies) sections.push({ label: 'Voice reply rules', text: `\n\n${VOICE_REPLIES}` });
   if (text) {
