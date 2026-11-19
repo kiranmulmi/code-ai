@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { LIMITS, type ChatSummary } from '@app/shared';
 import { timeAgo } from '../../lib/format';
-import { ChatIcon, EditIcon, TrashIcon } from '../../lib/icons';
+import { EditIcon, TrashIcon } from '../../lib/icons';
 
 const ACTION =
   'grid h-6 w-6 place-items-center rounded-md text-ink-3 transition-colors hover:bg-[color-mix(in_srgb,var(--ink)_8%,transparent)] hover:text-ink';
@@ -62,22 +62,22 @@ export function ChatListItem({
         {isRunning ? (
           <span role="img" aria-label="Working" className="live-dot" />
         ) : (
-          <ChatIcon
-            size={15}
-            className={`transition-colors ${isActive ? 'text-accent' : 'text-ink-4 group-hover:text-ink-3'}`}
+          <span
+            aria-hidden
+            className={`h-1.5 w-1.5 rounded-full transition-colors ${isActive ? 'bg-accent' : 'bg-ink-4 group-hover:bg-ink-3'}`}
           />
         )}
       </span>
       <span className={`min-w-0 flex-1 truncate ${isActive ? 'font-semibold' : 'font-medium'}`}>
         {chat.title}
       </span>
-      <span className="shrink-0 text-[11px] tabular-nums text-ink-4 group-focus-within:hidden group-hover:hidden [@media(hover:none)]:hidden">
+      <span className="shrink-0 text-[10.5px] tabular-nums text-ink-4 group-focus-within:hidden group-hover:hidden [@media(hover:none)]:hidden">
         {timeAgo(chat.updatedAt ?? chat.createdAt)}
       </span>
     </>
   );
   const rowClass =
-    'flex min-w-0 flex-1 items-center gap-2.5 py-2 pl-4 pr-2 text-left text-[13px] outline-none';
+    'flex min-w-0 flex-1 items-center gap-2.5 py-2 pl-4 pr-2 text-left text-[12.5px] outline-none';
 
   return (
     <li
