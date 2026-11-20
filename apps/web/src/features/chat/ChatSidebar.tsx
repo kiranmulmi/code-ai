@@ -146,10 +146,10 @@ export function ChatSidebar({
           </IconButton>
         </div>
 
-        <div className="flex shrink-0 flex-col gap-2 px-3 pt-4">
+        <div className="flex shrink-0 flex-col gap-1.5 px-1.5 pt-3">
           {workspace && (
             // Where you are: plain text on the sidebar's background, no card.
-            <div title={workspace.path} className="mb-1 flex min-w-0 items-center px-3 py-1">
+            <div title={workspace.path} className="mb-1 flex min-w-0 items-center px-2.5 py-0.5">
               <span className="flex min-w-0 flex-col leading-tight">
                 <h2 className="truncate text-[14.5px] font-extrabold tracking-tight text-ink">
                   {workspace.name}
@@ -163,20 +163,20 @@ export function ChatSidebar({
             onClick={onNewChat}
             disabled={isBusy}
             title={isBusy ? 'Wait for the agent to finish' : 'Start a new chat'}
-            className="flex h-9 w-full items-center gap-2.5 rounded-xl bg-accent-soft px-3 text-[13px] font-semibold text-accent-2 transition-colors hover:bg-accent-bg disabled:cursor-not-allowed disabled:opacity-60"
+            className="flex h-7 w-full items-center gap-1.5 rounded-md bg-accent-soft px-2.5 text-[13px] font-semibold text-accent-2 transition-colors hover:bg-accent-bg disabled:cursor-not-allowed disabled:opacity-60"
           >
-            <ComposeIcon size={14} />
+            <ComposeIcon size={13} />
             New chat
           </button>
         </div>
 
         {hasChats && (
-          <div className="shrink-0 px-3 pt-1">
+          <div className="shrink-0 px-1.5 pt-1">
             <label className="group/search relative flex items-center">
               <span className="sr-only">Search chats</span>
               <SearchIcon
                 size={14}
-                className="pointer-events-none absolute left-3 text-ink-3 transition-colors group-focus-within/search:text-accent"
+                className="pointer-events-none absolute left-2.5 text-ink-3 transition-colors group-focus-within/search:text-accent"
               />
               <input
                 type="search"
@@ -186,7 +186,7 @@ export function ChatSidebar({
                 onKeyDown={(event) => {
                   if (event.key === 'Escape') setQuery('');
                 }}
-                className="h-9 w-full rounded-xl border border-transparent bg-transparent pl-[34px] pr-7 text-[13px] text-ink outline-none transition-colors placeholder:text-ink-3 hover:bg-subtle focus:border-line focus:bg-surface [&::-webkit-search-cancel-button]:hidden"
+                className="h-7 w-full rounded-md border border-transparent bg-transparent pl-[30px] pr-7 text-[12.5px] text-ink outline-none transition-colors placeholder:text-ink-3 hover:bg-subtle focus:border-line focus:bg-surface [&::-webkit-search-cancel-button]:hidden"
               />
               {query && (
                 <button

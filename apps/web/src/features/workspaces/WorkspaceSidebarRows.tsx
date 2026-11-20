@@ -19,7 +19,7 @@ export const isWorkspaceDrag = (event: DragEvent) =>
   event.dataTransfer.types.includes(WORKSPACE_DRAG_TYPE);
 
 const MENU_BUTTON =
-  'absolute right-1.5 top-1/2 hidden h-6 w-6 -translate-y-1/2 place-items-center rounded-md text-ink-3 transition-colors hover:bg-[color-mix(in_srgb,var(--ink)_8%,transparent)] hover:text-ink group-focus-within:grid group-hover:grid aria-expanded:grid [@media(hover:none)]:grid';
+  'absolute right-1 top-1/2 hidden h-5 w-5 -translate-y-1/2 place-items-center rounded text-ink-3 transition-colors hover:bg-[color-mix(in_srgb,var(--ink)_8%,transparent)] hover:text-ink group-focus-within:grid group-hover:grid aria-expanded:grid [@media(hover:none)]:grid';
 
 /** The ⋯ button of a row and the menu it opens. */
 function RowActions({ label, items }: { label: string; items: RowMenuItem[] }) {
@@ -35,7 +35,7 @@ function RowActions({ label, items }: { label: string; items: RowMenuItem[] }) {
         onClick={(event) => setAnchor(anchor ? null : event.currentTarget)}
         className={MENU_BUTTON}
       >
-        <DotsIcon size={14} />
+        <DotsIcon size={13} />
       </button>
       {anchor && <RowMenu items={items} anchor={anchor} onClose={() => setAnchor(null)} />}
     </>
@@ -61,8 +61,8 @@ export function FolderNameInput({
     onDone(save && name && name !== initial ? name : null);
   };
   return (
-    <div className="flex h-9 items-center gap-2 rounded-lg px-2">
-      <FolderIcon size={15} className="shrink-0 text-accent" />
+    <div className="flex h-[22px] items-center gap-1.5 pl-[27px] pr-2">
+      <FolderIcon size={14} className="shrink-0 text-ft-folder" />
       <input
         autoFocus
         value={draft}
@@ -76,7 +76,7 @@ export function FolderNameInput({
           if (event.key === 'Enter') finish(true);
           if (event.key === 'Escape') finish(false);
         }}
-        className="min-w-0 flex-1 rounded-md border border-accent bg-surface px-2 py-1 text-[13px] text-ink outline-none ring-2 ring-accent-bg"
+        className="min-w-0 flex-1 rounded-sm border border-accent bg-surface px-1 py-0 font-explorer text-[13px] leading-[18px] text-ink outline-none"
       />
     </div>
   );
@@ -120,19 +120,19 @@ export function FolderRow({
         onDoubleClick={onRename}
         aria-expanded={isOpen}
         title={group.name}
-        className={`flex h-9 w-full items-center gap-1.5 rounded-lg pl-1 pr-2 text-left text-[13px] font-medium transition-colors ${
+        className={`flex h-[22px] w-full items-center gap-1.5 rounded pl-2.5 pr-2 text-left font-explorer text-[13px] leading-[18px] transition-colors ${
           isDropTarget
             ? 'bg-accent-soft text-ink ring-1 ring-accent'
-            : 'text-ink-2 hover:bg-surface-2 hover:text-ink'
+            : 'text-ink hover:bg-surface-2'
         }`}
       >
         <ChevronRightIcon
           size={11}
           className={`shrink-0 text-ink-3 transition-transform ${isOpen ? 'rotate-90' : ''}`}
         />
-        <Icon size={15} className="shrink-0 text-ink-3" />
+        <Icon size={14} className="shrink-0 text-ft-folder" />
         <span className="min-w-0 flex-1 truncate">{group.name}</span>
-        <span className="shrink-0 text-[11px] tabular-nums text-ink-4 group-focus-within:invisible group-hover:invisible [@media(hover:none)]:invisible">
+        <span className="shrink-0 text-[10.5px] tabular-nums text-ink-4 group-focus-within:invisible group-hover:invisible [@media(hover:none)]:invisible">
           {count}
         </span>
       </button>
@@ -196,11 +196,11 @@ export function WorkspaceRow({
             ? `relative grid h-10 w-10 place-items-center rounded-xl transition-colors ${
                 isCurrent ? 'bg-accent-soft ring-1 ring-accent' : 'hover:bg-surface-2'
               } ${isLocked ? 'cursor-not-allowed opacity-60' : ''}`
-            : `flex h-9 items-center gap-2.5 rounded-lg pr-2 text-[13px] transition-colors ${
-                isIndented ? 'pl-6' : 'pl-2'
+            : `flex h-[22px] items-center gap-1.5 rounded pr-7 font-explorer text-[13px] leading-[18px] transition-colors ${
+                isIndented ? 'pl-[44px]' : 'pl-2.5'
               } ${
                 isCurrent
-                  ? 'bg-accent-soft font-semibold text-ink'
+                  ? 'bg-accent-soft font-medium text-accent-2'
                   : 'text-ink-2 hover:bg-surface-2 hover:text-ink'
               } ${isLocked ? 'cursor-not-allowed opacity-60' : ''}`
         }

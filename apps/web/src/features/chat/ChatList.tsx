@@ -2,11 +2,14 @@ import { useCallback, useMemo, useState } from 'react';
 import type { ChatSummary } from '@app/shared';
 import { ConfirmDeleteDialog } from '../../components/ConfirmDeleteDialog';
 import { errorMessage } from '../../lib/api';
-import { ChatIcon } from '../../lib/icons';
+import { ChatIcon, ChevronRightIcon } from '../../lib/icons';
 import { useToast } from '../../lib/toast';
 import { deleteChat, renameChat } from './api';
 import { groupChatsByDay } from './chatGroups';
 import { ChatListItem } from './ChatListItem';
+
+/** Chats shown at first, and how many more each "Load more" adds. */
+const PAGE_SIZE = 15;
 
 const SHIMMER =
   'block animate-shimmer rounded-md bg-[linear-gradient(90deg,var(--surface-2)_0%,var(--line-2)_50%,var(--surface-2)_100%)] bg-[length:200%_100%] motion-reduce:animate-none';
@@ -61,13 +64,29 @@ export function ChatList({
 
   const cancelDelete = useCallback(() => setPendingDelete(null), []);
 
+  // Back to one page when the workspace changes.
+  const [limit, setLimit] = useState(PAGE_SIZE);
+  const [limitFor, setLimitFor] = useState(workspaceId);
+  if (limitFor !== workspaceId) {
+    setLimitFor(workspaceId);
+    setLimit(PAGE_SIZE);
+  }
+
   const needle = query.trim().toLowerCase();
-  const groups = useMemo(() => {
-    const matching = needle
-      ? (chats ?? []).filter((chat) => chat.title.toLowerCase().includes(needle))
-      : (chats ?? []);
-    return groupChatsByDay(matching);
-  }, [chats, needle]);
+  const { groups, hiddenCount } = useMemo(() => {
+    // A search looks through every chat; otherwise one page at a time, always reaching the open chat.
+    if (needle) {
+      const matching = (chats ?? []).filter((chat) => chat.title.toLowerCase().includes(needle));
+      return { groups: groupChatsByDay(matching), hiddenCount: 0 };
+    }
+    const all = chats ?? [];
+    const activeIndex = all.findIndex((chat) => chat.id === activeChatId);
+    const shown = Math.max(limit, activeIndex + 1);
+    return {
+      groups: groupChatsByDay(all.slice(0, shown)),
+      hiddenCount: Math.max(0, all.length - shown),
+    };
+  }, [chats, needle, limit, activeChatId]);
 
   return (
     <>
@@ -135,6 +154,20 @@ export function ChatList({
             </ul>
           </section>
         ))}
+
+        {hiddenCount > 0 && (
+          <button
+            type="button"
+            onClick={() => setLimit((current) => current + PAGE_SIZE)}
+            className="mx-3 mt-1 flex items-center gap-2.5 rounded-r-xl py-2 pl-4 pr-2 text-left text-[12.5px] font-medium text-ink-3 transition-colors hover:bg-subtle hover:text-ink"
+          >
+            <span aria-hidden className="grid h-4 w-4 shrink-0 place-items-center">
+              <ChevronRightIcon size={11} className="rotate-90" />
+            </span>
+            Load more
+            <span className="text-[11px] tabular-nums text-ink-4">({hiddenCount})</span>
+          </button>
+        )}
       </div>
       <ConfirmDeleteDialog
         open={pendingDelete !== null}

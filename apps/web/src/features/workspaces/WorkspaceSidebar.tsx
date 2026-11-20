@@ -299,7 +299,7 @@ export function WorkspaceSidebar({
                 event.preventDefault();
                 navigate(`/workspaces/${firstMatch.id}`);
               }}
-              className="h-9 w-full rounded-lg border border-line bg-surface pl-8 pr-7 text-[13px] text-ink outline-none transition-colors placeholder:text-ink-3 focus:border-line-strong [&::-webkit-search-cancel-button]:hidden"
+              className="h-7 w-full rounded-md border border-line bg-surface pl-8 pr-7 text-[12.5px] text-ink outline-none transition-colors placeholder:text-ink-3 focus:border-line-strong [&::-webkit-search-cancel-button]:hidden"
             />
             {query && (
               <button
@@ -317,7 +317,7 @@ export function WorkspaceSidebar({
 
       <div
         className={`min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain [scrollbar-width:thin] ${
-          isCollapsed ? 'px-2 py-3' : 'px-2 pb-2 pt-3'
+          isCollapsed ? 'px-2 py-3' : 'px-1.5 pb-2 pt-2'
         }`}
         style={isCollapsed ? undefined : { minWidth: EXPANDED_MIN_WIDTH }}
         {...(isCollapsed ? {} : dropHandlers('top'))}
@@ -328,7 +328,7 @@ export function WorkspaceSidebar({
           </ul>
         ) : (
           <>
-            <div className="flex items-center pb-1 pl-2">
+            <div className="flex items-center pb-0.5 pl-2.5">
               <p className="flex-1 text-[10.5px] font-semibold uppercase tracking-wider text-ink-3">
                 {needle ? `${arranged.shown} of ${workspaces.length}` : 'Workspaces'}
               </p>
@@ -337,9 +337,9 @@ export function WorkspaceSidebar({
                 onClick={() => setIsCreating(true)}
                 aria-label="New folder"
                 title="New folder"
-                className="grid h-6 w-6 place-items-center rounded-md text-ink-3 transition-colors hover:bg-surface-2 hover:text-ink"
+                className="grid h-5 w-5 place-items-center rounded text-ink-3 transition-colors hover:bg-surface-2 hover:text-ink"
               >
-                <FolderPlusIcon size={14} />
+                <FolderPlusIcon size={13} />
               </button>
             </div>
             {isCreating && <FolderNameInput label="New folder name" onDone={createFolder} />}
@@ -348,7 +348,7 @@ export function WorkspaceSidebar({
                 No workspaces match “{query.trim()}”
               </p>
             )}
-            <ul className="flex flex-col gap-0.5">
+            <ul className="flex flex-col">
               {arranged.folders.map(({ group, workspaces: inside }) => {
                 // A search opens every folder it found something in.
                 const isOpen = Boolean(needle) || !closedIds.includes(group.id);
@@ -373,12 +373,12 @@ export function WorkspaceSidebar({
                       />
                     )}
                     {isOpen && inside.length > 0 && (
-                      <ul className="mt-0.5 flex flex-col gap-0.5">
+                      <ul className="flex flex-col">
                         {inside.map((workspace) => row(workspace, true))}
                       </ul>
                     )}
                     {isOpen && inside.length === 0 && !needle && (
-                      <p className="py-1.5 pl-9 pr-2 text-[12px] text-ink-4">
+                      <p className="py-0.5 pl-[44px] pr-2 text-[12px] leading-[18px] text-ink-4">
                         Drag a workspace here, or use its ⋯ menu.
                       </p>
                     )}
@@ -387,10 +387,10 @@ export function WorkspaceSidebar({
               })}
             </ul>
             {arranged.folders.length > 0 && arranged.loose.length > 0 && (
-              <div className="mx-2 my-1.5 border-t border-line" aria-hidden="true" />
+              <div className="mx-2 my-1 border-t border-line" aria-hidden="true" />
             )}
             <ul
-              className={`flex flex-col gap-0.5 rounded-lg transition-shadow ${
+              className={`flex flex-col rounded-md transition-shadow ${
                 isTopDrop ? 'ring-1 ring-accent' : ''
               }`}
             >
