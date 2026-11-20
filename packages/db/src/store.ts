@@ -31,6 +31,7 @@ import { moveFlatWorkspaceData, moveLegacyFolders } from './legacy-folders.js';
 import { WorkspaceAttachments } from './attachments.js';
 import { WorkspaceSkills } from './workspace-skills.js';
 import { WorkspaceAgents } from './workspace-agents.js';
+import { WorkspaceNotes } from './workspace-notes.js';
 import { McpServerStore } from './mcp-servers.js';
 import { McpTrust } from './mcp-trust.js';
 import { ModelStore } from './models.js';
@@ -391,6 +392,11 @@ export class Store {
   /** One workspace's own specialist sub-agents: .hamro-ai/<workspace>/agents/<name>.md. */
   agents(workspace: Pick<Workspace, 'path' | 'name'>): WorkspaceAgents {
     return new WorkspaceAgents(workspace.path, workspace.name);
+  }
+
+  /** One workspace's notes (the Notes tab): notes.json in its data folder. */
+  notes(workspace: Pick<Workspace, 'path' | 'name'>): WorkspaceNotes {
+    return new WorkspaceNotes(workspace.path, workspace.name);
   }
 
   /** Which MCP servers one workspace turned on: .hamro-ai/<workspace>/mcp.json, and whether it's approved. */

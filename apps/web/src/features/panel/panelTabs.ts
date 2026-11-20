@@ -1,8 +1,8 @@
 /**
- * The panel's top tabs: the workspace's files, its terminal, what changed in git, and the
- * background tasks the agent left running.
+ * The panel's top tabs: the workspace's files, its terminal, what changed in git, the
+ * background tasks the agent left running, and the user's own notes.
  */
-export const PANEL_TABS = ['files', 'terminal', 'git', 'tasks'] as const;
+export const PANEL_TABS = ['files', 'terminal', 'git', 'tasks', 'notes'] as const;
 
 export type PanelTab = (typeof PANEL_TABS)[number];
 
@@ -12,7 +12,7 @@ export interface OptionalPanelTabs {
   git: boolean;
 }
 
-/** The top tabs this workspace shows: Files and Tasks always, Terminal and Git diff when on. */
+/** The top tabs this workspace shows: Files, Tasks and Notes always, Terminal and Git diff when on. */
 export function visiblePanelTabs(optional: OptionalPanelTabs): readonly PanelTab[] {
   return PANEL_TABS.filter((tab) =>
     tab === 'terminal' ? optional.terminal : tab === 'git' ? optional.git : true,
@@ -32,6 +32,7 @@ export const PANEL_TAB_LABEL: Record<PanelTab | LowerPanelTab, string> = {
   terminal: 'Terminal',
   git: 'Git diff',
   tasks: 'Tasks',
+  notes: 'Notes',
   memory: 'Memory',
   mcp: 'MCP',
   skills: 'Skills',

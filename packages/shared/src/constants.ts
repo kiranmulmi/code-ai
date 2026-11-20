@@ -362,3 +362,11 @@ export const WEB_APP = {
   /** toasts shown at once */
   maxToasts: 4,
 };
+
+/** A workspace's notes (notes.json in its data folder). */
+export const NOTE_LIMITS = {
+  /** notes one workspace can have */
+  count: 500,
+  titleChars: 200,
+  bodyChars: 100_000,
+} as const;

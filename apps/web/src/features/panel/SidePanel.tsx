@@ -5,6 +5,7 @@ import {
   ExpandIcon,
   FolderIcon,
   GitDiffIcon,
+  NoteIcon,
   PanelIcon,
   PulseIcon,
   TerminalIcon,
@@ -14,6 +15,8 @@ import type { AsyncResource } from '../../lib/useAsync';
 import { FilesPanel } from './files/FilesPanel';
 import { GitPanel } from './git/GitPanel';
 import { useGitChangeCount } from './git/useGitChangeCount';
+import { NotesPanel } from './notes/NotesPanel';
+import { useNotes } from './notes/useNotes';
 import { TasksPanel } from './tasks/TasksPanel';
 import { useRunningTasks } from './tasks/useRunningTasks';
 import { LowerPanel } from './LowerPanel';
@@ -32,6 +35,7 @@ const PANEL_TAB_ICON: Record<PanelTab, ReactNode> = {
   terminal: <TerminalIcon size={14} />,
   git: <GitDiffIcon size={14} />,
   tasks: <PulseIcon size={14} />,
+  notes: <NoteIcon size={14} />,
 };
 
 /** A small count beside a tab's label (running tasks, changed files). */
@@ -47,7 +51,7 @@ function TabCount({ title, children }: { title: string; children: ReactNode }) {
 }
 
 /**
- * Files, the terminal, the git diff or the background tasks on top, Memory, MCP servers and
+ * Files, the terminal, the git diff, the background tasks or the notes on top, Memory, MCP servers and
  * Skills in a section below (LowerPanel). A resizable column on wide screens (collapsed from
  * the header's Panel button), a drawer on small ones.
  */
@@ -91,6 +95,9 @@ export function SidePanel({
   const running = useRunningTasks(workspaceId, isBusy);
   const runningCount = running.tasks?.length ?? 0;
   const changed = useGitChangeCount(workspaceId, optionalTabs.git, isBusy);
+  // Loaded here so an open note's list survives switching tabs; reloaded when picked.
+  const notes = useNotes(workspaceId);
+  const { reload: reloadNotes } = notes;
   return (
     <>
       {isDrawerOpen && (
@@ -102,7 +109,7 @@ export function SidePanel({
       )}
       <aside
         id="side-panel"
-        aria-label="Files, memory, MCP servers and terminal"
+        aria-label="Files, notes, memory, MCP servers and terminal"
         // Wide screens: the column's width animates (ChatScreen) while the content keeps its
         // width and fades, so it slides in and out instead of squashing.
         className={`fixed inset-y-0 right-0 z-40 flex min-h-0 w-[min(440px,92vw)] flex-col border-l border-line bg-surface shadow-dialog transition-[transform,visibility,opacity] duration-300 lg:relative lg:inset-auto lg:z-10 lg:w-auto lg:translate-x-0 lg:overflow-hidden lg:border-line-2 lg:shadow-none ${
@@ -127,7 +134,15 @@ export function SidePanel({
             className="panel-tabs flex min-w-0 flex-1 items-stretch"
           >
             {visiblePanelTabs(optionalTabs).map((id) => (
-              <PanelTabButton key={id} id={id} isActive={tab === id} onSelect={() => onTab(id)}>
+              <PanelTabButton
+                key={id}
+                id={id}
+                isActive={tab === id}
+                onSelect={() => {
+                  if (id === 'notes' && tab !== 'notes') reloadNotes();
+                  onTab(id);
+                }}
+              >
                 {PANEL_TAB_ICON[id]}
                 {PANEL_TAB_LABEL[id]}
                 {id === 'tasks' && runningCount > 0 && (
@@ -174,6 +189,7 @@ export function SidePanel({
           {tab === 'terminal' && <TerminalPanel workspaceId={workspaceId} />}
           {tab === 'git' && <GitPanel workspaceId={workspaceId} isBusy={isBusy} />}
           {tab === 'tasks' && <TasksPanel workspaceId={workspaceId} running={running} />}
+          {tab === 'notes' && <NotesPanel workspaceId={workspaceId} notes={notes} />}
         </div>
         <LowerPanel workspaceId={workspaceId} memories={memories} skills={skills} isBusy={isBusy} />
         {footer && (

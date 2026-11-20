@@ -107,6 +107,8 @@ export {
 
 export { type Memory, type MemoryRemoval } from './memory.js';
 
+export { noteInputSchema, type Note, type NoteInput } from './note.js';
+
 export {
   FILE_ENTRY_KINDS,
   FILE_SEARCH_MODES,

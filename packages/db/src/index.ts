@@ -33,6 +33,7 @@ export {
   formatAgentFile,
   parseAgentFile,
 } from './workspace-agents.js';
+export { WorkspaceNotes } from './workspace-notes.js';
 export {
   runInChat,
   titleFrom,

@@ -694,3 +694,13 @@ export function GoogleIcon({ size = 18, ...rest }: IconProps) {
     </svg>
   );
 }
+
+export function NoteIcon({ size = 14, ...rest }: IconProps) {
+  return (
+    <svg {...base(size)} {...rest}>
+      <path d="M3.5 2.5h9v7l-3 4h-6z" />
+      <path d="M12.5 9.5h-3v4" />
+      <path d="M5.5 5.5h5M5.5 8h3" />
+    </svg>
+  );
+}

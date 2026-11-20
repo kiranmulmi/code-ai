@@ -516,8 +516,8 @@
   .panel-tabs {
     container-type: inline-size;
   }
-  /* Four tabs: their icons go first when the panel is narrow. */
-  @container (max-width: 400px) {
+  /* Up to five tabs: their icons go first when the panel is narrow. */
+  @container (max-width: 460px) {
     .panel-tabs [role='tab'] > svg {
       display: none;
     }
