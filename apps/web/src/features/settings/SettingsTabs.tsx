@@ -70,8 +70,8 @@ export function SettingsSideTabs({ children }: { children: ReactNode }) {
             {({ isActive }) => (
               <>
                 <span
-                  className={`grid h-6 w-6 shrink-0 place-items-center rounded-lg ${
-                    isActive ? 'bg-accent text-on-accent' : 'bg-accent-soft text-accent-2'
+                  className={`grid h-6 w-6 shrink-0 place-items-center rounded-lg transition-[background-color,color,transform] duration-200 ${
+                    isActive ? 'scale-105 bg-accent text-on-accent' : 'bg-accent-soft text-accent-2'
                   }`}
                 >
                   {tab.icon}
@@ -82,7 +82,8 @@ export function SettingsSideTabs({ children }: { children: ReactNode }) {
           </NavLink>
         ))}
       </nav>
-      <div className="min-w-0 flex-1">
+      {/* Keyed by path, so each tab's page fades in when it's picked. */}
+      <div key={location.pathname} className="min-w-0 flex-1 animate-fade-in">
         <SideTabsContext.Provider value>{children}</SideTabsContext.Provider>
       </div>
     </div>

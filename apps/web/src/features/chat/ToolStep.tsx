@@ -53,7 +53,7 @@ const RUNNING_TEXT =
 const NEAR_END = 24;
 
 /**
- * A run of consecutive tool calls: a "Tool calls" header with their count, then plain rows on
+ * A run of consecutive tool calls: a "tool calls (n)" header, then plain rows on
  * the chat background, no card around them. Four rows show at once; the rest scroll inside a
  * capped box that stays on the newest call (unless the reader has scrolled up), with the older
  * calls fading out at the top edge.
@@ -81,17 +81,18 @@ export function ToolSteps({ items }: { items: readonly ToolItem[] }) {
 
   return (
     <section className="flex flex-col gap-1">
-      <div className="flex items-center gap-1.5 px-2.5 text-[11px] font-medium text-ink-3">
-        <span>Tool calls</span>
+      <div className="flex items-center px-2.5 text-[11px] font-medium text-ink-3">
+        <span>tool calls (</span>
         <span
-          // A new key each time the count changes, so the badge pops again.
+          // A new key each time the count changes, so the count pops again.
           key={items.length}
-          className={`rounded-md bg-surface-2 px-1.5 text-[10.5px] tabular-nums text-ink-2 ${
+          className={`inline-block tabular-nums ${
             items.length > initialKeys.size ? 'animate-pop motion-reduce:animate-none' : ''
           }`}
         >
           {items.length}
         </span>
+        <span>)</span>
       </div>
       <div
         ref={ref}

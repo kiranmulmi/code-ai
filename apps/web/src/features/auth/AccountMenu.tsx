@@ -110,7 +110,7 @@ function SignedInMenu({ auth }: { auth: SignedIn }) {
       {isOpen && (
         <div
           role="menu"
-          className="absolute inset-x-2 bottom-[calc(100%+4px)] z-30 overflow-hidden rounded-xl border border-line bg-surface shadow-float"
+          className="absolute inset-x-2 bottom-[calc(100%+4px)] z-30 origin-bottom animate-menu-up overflow-hidden rounded-xl border border-line bg-surface shadow-float"
         >
           <div className="flex items-center gap-3 border-b border-line-2 px-3 py-3">
             <Avatar auth={auth} size={36} />

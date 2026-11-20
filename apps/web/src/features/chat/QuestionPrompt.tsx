@@ -86,7 +86,7 @@ export function QuestionPrompt({
         aria-label="The agent asks you"
         className="mx-auto w-full max-w-[1000px] px-4 pt-2 sm:px-6"
       >
-        <div className="panel flex items-center gap-2 rounded-l-none border-l-[3px] border-l-accent py-1 pl-3 pr-1.5 shadow-float">
+        <div className="panel flex animate-menu-up items-center gap-2 rounded-l-none border-l-[3px] border-l-accent py-1 pl-3 pr-1.5 shadow-float">
           <button
             type="button"
             onClick={() => setIsMinimized(false)}
@@ -125,7 +125,7 @@ export function QuestionPrompt({
       onKeyDown={onKeyDown}
       className="mx-auto w-full max-w-[1000px] px-4 pt-2 sm:px-6"
     >
-      <div className="panel flex max-h-[45vh] flex-col gap-2 rounded-l-none border-l-[3px] border-l-accent px-3 py-2.5 shadow-float">
+      <div className="panel flex max-h-[45vh] animate-rise flex-col gap-2 rounded-l-none border-l-[3px] border-l-accent px-3 py-2.5 shadow-float">
         <div className="flex items-start justify-between gap-2">
           <div className="flex min-w-0 items-start gap-2">
             <QuestionIcon size={14} className="mt-0.5 shrink-0 text-accent" />

@@ -20,7 +20,7 @@ const STEPS = [
 /** Decoration beside the headline: a teal orb in a ring, with a small coral moon. */
 function Orb() {
   return (
-    <div aria-hidden className="relative hidden h-40 w-40 shrink-0 md:block">
+    <div aria-hidden className="empty-state-orb relative h-40 w-40 shrink-0">
       <div className="absolute inset-0 rounded-full border-2 border-dashed border-accent-bg" />
       <div className="absolute inset-5 rounded-full bg-[linear-gradient(145deg,var(--brand-from),var(--brand-mid)_45%,var(--brand-to))] shadow-float" />
       <div className="absolute inset-5 rounded-full bg-[radial-gradient(circle_at_32%_28%,rgb(255_255_255/0.45),transparent_45%)]" />
@@ -40,11 +40,11 @@ export function EmptyState({
 }) {
   const name = workspace && showWorkspaceName ? workspace.name : null;
   return (
-    <section className="mt-[4vh] w-full">
+    <section className="empty-state mt-[4vh] w-full animate-rise">
       <div className="flex items-center justify-between gap-8">
         <div className="min-w-0">
           <span className="tag">New chat</span>
-          <h2 className="mt-4 text-[30px] font-extrabold leading-[1.1] text-ink sm:text-[38px]">
+          <h2 className="empty-state-title mt-4 text-[30px] font-extrabold leading-[1.1] text-ink">
             What should we
             <br />
             work on{' '}
@@ -64,9 +64,13 @@ export function EmptyState({
         <Orb />
       </div>
 
-      <ol className="mt-7 grid gap-3 sm:grid-cols-3">
+      <ol className="empty-state-steps mt-7 grid gap-3">
         {STEPS.map((step, index) => (
-          <li key={step.title} className="panel flex items-start gap-3 p-4">
+          <li
+            key={step.title}
+            style={{ animationDelay: `${120 + index * 80}ms` }}
+            className="panel flex animate-rise items-start gap-3 p-4 transition-[box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:shadow-float"
+          >
             <span className="step-number">{String(index + 1).padStart(2, '0')}</span>
             <span className="min-w-0">
               <span className="block text-[14px] font-bold text-ink">{step.title}</span>

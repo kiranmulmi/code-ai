@@ -52,7 +52,7 @@ export function UserMessage({
     }
   }
   return (
-    <div className="group/message flex flex-col items-end gap-1.5">
+    <div className="group/message flex animate-rise flex-col items-end gap-1.5">
       {images.length > 0 && (
         <div className="flex max-w-[92%] flex-wrap justify-end gap-1.5 md:max-w-[80%]">
           {images.map((image, index) => (

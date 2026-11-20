@@ -105,7 +105,7 @@ export function AgentMessage({
   const answer = answerText(turn);
 
   return (
-    <div className="flex flex-col gap-1.5">
+    <div className="flex animate-rise flex-col gap-1.5">
       {blocks}
       {turn.status && <StatusLine text={turn.status} startedAt={runStartedAt} />}
       {turn.liveMeta && !turn.meta && (

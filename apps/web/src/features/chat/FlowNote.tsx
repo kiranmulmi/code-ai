@@ -5,7 +5,7 @@ export function FlowNote({ item }: { item: NoteItem }) {
   const isWarn = item.tone === 'warn';
   return (
     <div
-      className={`flex items-center gap-2 px-0.5 text-[13px] ${isWarn ? 'text-warn' : 'text-ink-3'}`}
+      className={`flex animate-fade-in items-center gap-2 px-0.5 text-[13px] ${isWarn ? 'text-warn' : 'text-ink-3'}`}
     >
       <span
         aria-hidden

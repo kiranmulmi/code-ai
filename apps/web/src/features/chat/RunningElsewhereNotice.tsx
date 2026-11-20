@@ -13,7 +13,7 @@ export function RunningElsewhereNotice({
   isStopping: boolean;
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-3">
+    <div className="flex animate-fade-in flex-wrap items-center gap-3">
       <StatusLine text="The agent is still working on this chat in another tab." />
       <Button size="sm" onClick={onReload}>
         <RefreshIcon /> Reload

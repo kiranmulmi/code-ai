@@ -81,7 +81,7 @@ export function ChatListItem({
 
   return (
     <li
-      className={`group relative mx-3 flex items-center rounded-r-xl transition-colors has-[a:focus-visible]:ring-2 has-[a:focus-visible]:ring-focus ${
+      className={`group relative mx-3 flex animate-slide-in-left items-center rounded-r-xl transition-colors has-[a:focus-visible]:ring-2 has-[a:focus-visible]:ring-focus ${
         isActive
           ? 'bg-accent-soft text-ink before:absolute before:inset-y-0 before:left-0 before:w-[3px] before:bg-accent'
           : 'text-ink-2 hover:bg-subtle hover:text-ink'

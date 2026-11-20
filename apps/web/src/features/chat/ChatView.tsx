@@ -162,7 +162,7 @@ export function ChatView({
             <li
               key={message.key}
               title={message.text}
-              className="flex max-w-[92%] items-center gap-1.5 rounded-xl border border-dashed border-line bg-surface px-3 py-1.5 text-[12.5px] text-ink-2 md:max-w-[80%]"
+              className="flex max-w-[92%] animate-slide-in-right items-center gap-1.5 rounded-xl border border-dashed border-line bg-surface px-3 py-1.5 text-[12.5px] text-ink-2 md:max-w-[80%]"
             >
               <span className="shrink-0 text-ink-3">Waiting for the next step:</span>
               <span className="min-w-0 truncate">{message.text}</span>

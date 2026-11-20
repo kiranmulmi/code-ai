@@ -263,7 +263,7 @@ export function Composer({
         }`}
       >
         {isDragging && (
-          <div className="pointer-events-none absolute inset-0 z-10 grid place-items-center rounded-2xl bg-accent-soft text-[13px] font-medium text-accent">
+          <div className="pointer-events-none absolute inset-0 z-10 grid animate-fade-in place-items-center rounded-2xl bg-accent-soft text-[13px] font-medium text-accent">
             Drop to insert the full path
           </div>
         )}

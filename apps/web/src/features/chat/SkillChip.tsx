@@ -5,7 +5,7 @@ export function SkillChip({ name, onRemove }: { name: string; onRemove?: () => v
   return (
     <span
       title={`Skill: ${name}`}
-      className="inline-flex h-7 max-w-full items-center gap-1.5 rounded-lg border border-accent-bg bg-accent-soft pl-2 pr-2 text-[12px] font-medium text-accent-2"
+      className="inline-flex h-7 max-w-full animate-scale-in items-center gap-1.5 rounded-lg border border-accent-bg bg-accent-soft pl-2 pr-2 text-[12px] font-medium text-accent-2"
     >
       <SkillIcon size={12} className="shrink-0" />
       <span className="truncate font-mono">{name}</span>

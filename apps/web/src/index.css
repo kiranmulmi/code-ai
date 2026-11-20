@@ -410,6 +410,33 @@
     mask-image: linear-gradient(to bottom, black 55%, transparent);
   }
 
+  /* The empty chat (EmptyState) sizes to the chat column, not the window: with the sidebars
+     and side panel open the column can be narrow on a wide screen. */
+  .empty-state {
+    container-type: inline-size;
+  }
+  .empty-state-orb {
+    display: none;
+  }
+  .empty-state-steps {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  @container (min-width: 560px) {
+    .empty-state-title {
+      font-size: 38px;
+    }
+  }
+  @container (min-width: 640px) {
+    .empty-state-orb {
+      display: block;
+    }
+  }
+  @container (min-width: 720px) {
+    .empty-state-steps {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+
   /* Answers rendered by components/Markdown.tsx. */
   .markdown p,
   .markdown ul,
@@ -510,17 +537,6 @@
   }
   .markdown li.task-list-item input[type='checkbox'] {
     @apply mr-2 h-3.5 w-3.5 translate-y-[2px] accent-[var(--accent)];
-  }
-
-  /* The panel's tabs drop their icons when the panel is too narrow for icon and name. */
-  .panel-tabs {
-    container-type: inline-size;
-  }
-  /* Up to five tabs: their icons go first when the panel is narrow. */
-  @container (max-width: 460px) {
-    .panel-tabs [role='tab'] > svg {
-      display: none;
-    }
   }
 
   /* Tables: a rounded card with a tinted header row and soft row lines. */
@@ -689,4 +705,73 @@
 ::highlight(preview-current) {
   background-color: var(--search-current);
   color: var(--ink);
+}
+
+/* ---- Motion -------------------------------------------------------------------------------
+   The animate-* utilities (tailwind.config.js) do the entrances; these add the small things
+   that apply everywhere. In the base layer, so a component's own classes still win. Every
+   animation and transition in the app is switched off for reduced motion (end of file). */
+@layer base {
+  /* Buttons sink a touch when pressed. `scale` (not `transform`), so it composes with any
+     translate a button already has. */
+  button {
+    transition-property:
+      color, background-color, border-color, box-shadow, opacity, transform, scale, filter;
+    transition-duration: 150ms;
+    transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
+  }
+  button:not(:disabled):active {
+    scale: 0.96;
+  }
+  /* Switches and plain text-like buttons shouldn't shrink. */
+  button[role='switch']:active,
+  button[role='tab']:active,
+  button[role='menuitem']:active,
+  button[role='option']:active,
+  [role='menu'] button:active,
+  [role='listbox'] button:active {
+    scale: none;
+  }
+
+  /* Details/summary disclosures: the body fades in when opened. */
+  details[open] > :not(summary) {
+    animation: fade-in 0.2s ease-out backwards;
+  }
+}
+
+/* The empty state's orb drifts gently. */
+.empty-state-orb {
+  animation: float 6s ease-in-out infinite;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  button:not(:disabled):active {
+    scale: none;
+  }
 }

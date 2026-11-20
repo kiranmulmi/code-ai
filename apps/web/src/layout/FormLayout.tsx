@@ -1,4 +1,4 @@
-import { Outlet, useMatch } from 'react-router-dom';
+import { Outlet, useLocation, useMatch } from 'react-router-dom';
 import { useAppInfo } from '../features/chat/useAppInfo';
 import { useWorkspaces } from '../features/workspaces/useWorkspaces';
 import { AppNav } from './AppNav';
@@ -9,6 +9,7 @@ import { Topbar } from './Topbar';
 export function FormLayout() {
   // Settings and MCP pages belong to a workspace; /workspaces/new matches as "new" and finds none.
   const workspaceId = useMatch('/workspaces/:workspaceId/*')?.params.workspaceId;
+  const { pathname } = useLocation();
   const info = useAppInfo();
   const workspaces = useWorkspaces();
   const list = workspaces.data ?? [];
@@ -27,7 +28,10 @@ export function FormLayout() {
         <div className="min-h-0 flex-1 overflow-y-auto">
           <main className="mx-auto w-full min-w-0 max-w-[960px] px-4 pb-14 pt-6 sm:px-8 sm:pt-8">
             <Topbar />
-            <Outlet />
+            {/* Keyed by path, so each settings page rises in when you move to it. */}
+            <div key={pathname} className="animate-rise">
+              <Outlet />
+            </div>
           </main>
         </div>
       </div>

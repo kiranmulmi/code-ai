@@ -42,9 +42,7 @@ export function PlanStepSection({
         </span>
         <div className="flex min-w-0 flex-col gap-0.5">
           {status !== 'done' && !isActive && (
-            <span
-              className="text-[10px] font-medium uppercase tracking-[0.12em] text-ink-3"
-            >
+            <span className="text-[10px] font-medium uppercase tracking-[0.12em] text-ink-3">
               {STATUS_LABEL[status]}
             </span>
           )}

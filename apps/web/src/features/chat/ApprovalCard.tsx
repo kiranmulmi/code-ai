@@ -17,7 +17,7 @@ export function ApprovalCard({
   const isOpen = item.state === 'pending' || item.state === 'sending';
   return (
     <div
-      className={`panel flex flex-col gap-3 rounded-l-none border-l-[3px] px-4 py-3.5 ${
+      className={`panel flex animate-scale-in flex-col gap-3 rounded-l-none border-l-[3px] px-4 py-3.5 transition-[border-color] duration-300 ${
         isOpen
           ? 'border-l-warn-line'
           : item.state === 'allowed'

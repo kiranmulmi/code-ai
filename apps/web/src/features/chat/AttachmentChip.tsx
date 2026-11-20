@@ -71,7 +71,7 @@ export function AttachmentChip({
     </>
   );
 
-  const frame = `group relative flex w-[220px] max-w-full items-center gap-2.5 rounded-xl border bg-surface py-1.5 pl-1.5 pr-2.5 ${
+  const frame = `group relative flex w-[220px] max-w-full animate-scale-in items-center gap-2.5 rounded-xl border bg-surface py-1.5 pl-1.5 pr-2.5 ${
     isError ? 'border-danger-line' : 'border-line'
   }`;
 

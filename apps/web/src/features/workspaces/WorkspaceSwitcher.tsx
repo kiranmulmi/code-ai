@@ -209,8 +209,8 @@ export function WorkspaceSwitcher({
           className={`absolute z-30 flex max-h-[min(560px,70vh)] flex-col overflow-hidden rounded-xl border border-line bg-surface shadow-float ${
             isSidebar
               ? // A floating card inset from the sidebar's edges, just above (or below) the button.
-                `inset-x-2 ${opensUp ? 'bottom-[calc(100%+4px)]' : 'top-[calc(100%+4px)]'}`
-              : 'left-0 top-[calc(100%+6px)] w-[min(300px,calc(100vw-24px))]'
+                `inset-x-2 ${opensUp ? 'bottom-[calc(100%+4px)] animate-menu-up' : 'top-[calc(100%+4px)] animate-menu-down'}`
+              : 'left-0 top-[calc(100%+6px)] w-[min(300px,calc(100vw-24px))] animate-menu-down'
           }`}
         >
           <WorkspaceOptions

@@ -136,6 +136,49 @@ export default {
           from: { transform: 'scaleX(1)' },
           to: { transform: 'scaleX(0)' },
         },
+        // Motion used across the app (all switched off by prefers-reduced-motion in index.css).
+        'fade-in': {
+          from: { opacity: '0' },
+          to: { opacity: '1' },
+        },
+        // Dialogs: a small rise and grow from the centre.
+        'dialog-in': {
+          from: { opacity: '0', transform: 'translateY(8px) scale(0.97)' },
+          to: { opacity: '1', transform: 'none' },
+        },
+        // Menus that drop down from their button, and ones that open upwards.
+        'menu-down': {
+          from: { opacity: '0', transform: 'translateY(-6px) scale(0.98)' },
+          to: { opacity: '1', transform: 'none' },
+        },
+        'menu-up': {
+          from: { opacity: '0', transform: 'translateY(6px) scale(0.98)' },
+          to: { opacity: '1', transform: 'none' },
+        },
+        // Content that arrives from below: messages, cards, pages.
+        rise: {
+          from: { opacity: '0', transform: 'translateY(10px)' },
+          to: { opacity: '1', transform: 'none' },
+        },
+        'slide-in-right': {
+          from: { opacity: '0', transform: 'translateX(12px)' },
+          to: { opacity: '1', transform: 'none' },
+        },
+        'slide-in-left': {
+          from: { opacity: '0', transform: 'translateX(-12px)' },
+          to: { opacity: '1', transform: 'none' },
+        },
+        'scale-in': {
+          from: { opacity: '0', transform: 'scale(0.9)' },
+          to: { opacity: '1', transform: 'none' },
+        },
+        float: {
+          '0%, 100%': { transform: 'translateY(0)' },
+          '50%': { transform: 'translateY(-6px)' },
+        },
+        'spin-slow': {
+          to: { transform: 'rotate(360deg)' },
+        },
       },
       animation: {
         blink: 'blink 1s ease-in-out infinite',
@@ -149,6 +192,20 @@ export default {
         'toast-in': 'toast-in 0.22s ease-out',
         // Its duration is set inline per toast (animationDuration).
         'toast-timer': 'toast-timer linear forwards',
+        'fade-in': 'fade-in 0.2s ease-out backwards',
+        'dialog-in': 'dialog-in 0.24s cubic-bezier(0.2, 0, 0, 1) backwards',
+        'menu-down': 'menu-down 0.16s cubic-bezier(0.2, 0, 0, 1) backwards',
+        'menu-up': 'menu-up 0.16s cubic-bezier(0.2, 0, 0, 1) backwards',
+        rise: 'rise 0.32s cubic-bezier(0.2, 0, 0, 1) backwards',
+        'slide-in-right': 'slide-in-right 0.24s cubic-bezier(0.2, 0, 0, 1) backwards',
+        'slide-in-left': 'slide-in-left 0.24s cubic-bezier(0.2, 0, 0, 1) backwards',
+        'scale-in': 'scale-in 0.2s cubic-bezier(0.2, 0, 0, 1) backwards',
+        float: 'float 5s ease-in-out infinite',
+        'spin-slow': 'spin-slow 24s linear infinite',
+      },
+      transitionTimingFunction: {
+        // Material's "emphasized" curve: quick start, gentle settle.
+        emphasized: 'cubic-bezier(0.2, 0, 0, 1)',
       },
     },
   },

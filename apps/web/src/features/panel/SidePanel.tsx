@@ -31,11 +31,11 @@ import { PanelTabButton } from './PanelTabButton';
 import type { usePanelWidth } from './usePanelWidth';
 
 const PANEL_TAB_ICON: Record<PanelTab, ReactNode> = {
-  files: <FolderIcon size={14} />,
-  terminal: <TerminalIcon size={14} />,
-  git: <GitDiffIcon size={14} />,
-  tasks: <PulseIcon size={14} />,
-  notes: <NoteIcon size={14} />,
+  files: <FolderIcon size={16} />,
+  terminal: <TerminalIcon size={16} />,
+  git: <GitDiffIcon size={16} />,
+  tasks: <PulseIcon size={16} />,
+  notes: <NoteIcon size={16} />,
 };
 
 /** A small count beside a tab's label (running tasks, changed files). */
@@ -104,7 +104,7 @@ export function SidePanel({
         <div
           aria-hidden
           onClick={onCloseDrawer}
-          className="fixed inset-0 z-30 bg-overlay lg:hidden"
+          className="fixed inset-0 z-30 animate-fade-in bg-overlay lg:hidden"
         />
       )}
       <aside
@@ -138,13 +138,13 @@ export function SidePanel({
                 key={id}
                 id={id}
                 isActive={tab === id}
+                label={PANEL_TAB_LABEL[id]}
                 onSelect={() => {
                   if (id === 'notes' && tab !== 'notes') reloadNotes();
                   onTab(id);
                 }}
               >
                 {PANEL_TAB_ICON[id]}
-                {PANEL_TAB_LABEL[id]}
                 {id === 'tasks' && runningCount > 0 && (
                   <TabCount title={`${runningCount} running`}>{runningCount}</TabCount>
                 )}
@@ -181,7 +181,9 @@ export function SidePanel({
           role="tabpanel"
           aria-labelledby={`panel-tab-${tab}`}
           data-panel-body
-          className={`min-h-0 flex-1 lg:min-w-[var(--panel-w)] ${
+          // Keyed by tab, so each tab's content fades in when it's picked.
+          key={tab}
+          className={`min-h-0 flex-1 animate-fade-in lg:min-w-[var(--panel-w)] ${
             tab === 'terminal' ? 'overflow-hidden' : 'overflow-y-auto'
           }`}
         >

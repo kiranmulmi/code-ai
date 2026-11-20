@@ -115,7 +115,11 @@ export function ChatSidebar({
   return (
     <>
       {isOpen && (
-        <div aria-hidden onClick={onClose} className="fixed inset-0 z-30 bg-overlay xl:hidden" />
+        <div
+          aria-hidden
+          onClick={onClose}
+          className="fixed inset-0 z-30 animate-fade-in bg-overlay xl:hidden"
+        />
       )}
       <nav
         id="chat-sidebar"

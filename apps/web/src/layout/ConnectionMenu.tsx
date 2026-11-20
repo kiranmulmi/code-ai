@@ -112,7 +112,7 @@ export function ConnectionMenu({
         <div
           role="dialog"
           aria-label="Server and approvals"
-          className="absolute right-0 top-[calc(100%+8px)] z-30 w-[min(340px,calc(100vw-24px))] rounded-xl border border-line bg-surface shadow-float"
+          className="absolute right-0 top-[calc(100%+8px)] z-30 w-[min(340px,calc(100vw-24px))] origin-top-right animate-menu-down rounded-xl border border-line bg-surface shadow-float"
         >
           <div className="flex items-center gap-2.5 border-b border-line px-4 py-3">
             <span aria-hidden className={`h-2 w-2 shrink-0 rounded-full ${dot}`} />

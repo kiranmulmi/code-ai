@@ -180,7 +180,7 @@ export function WorkspaceRow({
   };
 
   return (
-    <li className="group relative">
+    <li className="group relative animate-slide-in-left">
       <Link
         to={`/workspaces/${workspace.id}`}
         onClick={blockWhileBusy}

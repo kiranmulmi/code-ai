@@ -164,7 +164,8 @@ export function LowerPanel({
           id="lower-panel-body"
           role="tabpanel"
           aria-labelledby={`panel-tab-${tab}`}
-          className="min-h-0 flex-1 overflow-y-auto p-4"
+          key={tab}
+          className="min-h-0 flex-1 animate-fade-in overflow-y-auto p-4"
         >
           {tab === 'memory' && <MemoryPanel workspaceId={workspaceId} memories={memories} />}
           {tab === 'mcp' && <McpPanel workspaceId={workspaceId} isBusy={isBusy} />}

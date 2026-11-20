@@ -86,7 +86,7 @@ export function ComposerMenu({
           aria-label={menuLabel}
           onKeyDown={onMenuKeyDown}
           onClick={(event) => event.stopPropagation()}
-          className="absolute bottom-[calc(100%+6px)] left-0 z-30 max-h-[50vh] w-[min(300px,calc(100vw-40px))] overflow-y-auto rounded-xl border border-line bg-surface py-1.5 shadow-float"
+          className="absolute bottom-[calc(100%+6px)] left-0 z-30 max-h-[50vh] origin-bottom-left animate-menu-up w-[min(300px,calc(100vw-40px))] overflow-y-auto rounded-xl border border-line bg-surface py-1.5 shadow-float"
         >
           {showHeading && <div className="eyebrow px-3.5 pb-1.5 pt-1">{menuLabel}</div>}
           {children(close)}

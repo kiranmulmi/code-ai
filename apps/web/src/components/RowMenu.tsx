@@ -13,7 +13,7 @@ const GAP = 4;
 const EDGE = 8;
 
 const MENU =
-  'z-[75] w-max min-w-44 max-w-72 rounded-xl border border-line bg-surface py-1 shadow-float';
+  'z-[75] w-max min-w-44 max-w-72 origin-top-right animate-menu-down rounded-xl border border-line bg-surface py-1 shadow-float';
 
 /**
  * A row's action menu: closes on a pick, an outside click or Escape. Without `anchor` it opens

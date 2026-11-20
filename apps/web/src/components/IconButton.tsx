@@ -11,7 +11,7 @@ export function IconButton({
     <button
       {...rest}
       type={type}
-      className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-transparent bg-transparent text-ink-2 transition-colors hover:bg-surface-2 hover:text-ink disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
+      className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-transparent bg-transparent text-ink-2 transition-[background-color,color,transform] duration-150 hover:bg-surface-2 hover:text-ink disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
     >
       {children}
     </button>

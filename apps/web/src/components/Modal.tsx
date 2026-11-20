@@ -58,9 +58,9 @@ export function Modal({
       aria-label={title}
       className="fixed inset-0 z-[70] grid place-items-center"
     >
-      <div className="absolute inset-0 bg-overlay" onClick={onClose} />
+      <div className="absolute inset-0 animate-fade-in bg-overlay" onClick={onClose} />
       <div
-        className={`relative flex flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-dialog ${
+        className={`relative flex animate-dialog-in flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-dialog ${
           size === 'wide'
             ? 'h-[86vh] w-[min(1200px,calc(100%-32px))]'
             : size === 'xl'

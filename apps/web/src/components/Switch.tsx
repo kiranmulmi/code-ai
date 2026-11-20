@@ -27,7 +27,7 @@ export function Switch({
     >
       <span
         aria-hidden
-        className={`absolute top-1/2 h-3.5 w-3.5 -translate-y-1/2 rounded-full bg-white shadow-[0_1px_2px_rgb(0_0_0/0.25)] transition-[left] duration-150 ${
+        className={`absolute top-1/2 h-3.5 w-3.5 -translate-y-1/2 rounded-full bg-white shadow-[0_1px_2px_rgb(0_0_0/0.25)] transition-[left,width] duration-200 ease-emphasized ${
           isOn ? 'left-[18px]' : 'left-[2px]'
         }`}
       />

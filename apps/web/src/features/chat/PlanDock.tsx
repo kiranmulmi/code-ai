@@ -46,7 +46,7 @@ export function PlanDock({ state }: { state: PlanState }) {
     <div className="shrink-0 px-4 sm:px-6">
       <section
         aria-label="Task"
-        className="chat-card mx-auto w-full max-w-[1000px] overflow-hidden"
+        className="chat-card mx-auto w-full max-w-[1000px] animate-rise overflow-hidden"
       >
         <button
           type="button"
@@ -88,7 +88,7 @@ export function PlanDock({ state }: { state: PlanState }) {
           />
         </button>
         {isOpen && (
-          <div className="flex max-h-[38vh] flex-col gap-3 overflow-y-auto border-t border-line-2 px-4 py-3">
+          <div className="flex max-h-[38vh] animate-enter flex-col gap-3 overflow-y-auto border-t border-line-2 px-4 py-3">
             <p className="text-[13px] font-bold leading-snug text-ink">{plan.goal}</p>
             <PlanTimeline
               plan={plan}
