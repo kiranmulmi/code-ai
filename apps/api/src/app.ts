@@ -35,6 +35,8 @@ import { skillsRouter } from './features/skills/skills.routes.js';
 import { agentsRouter } from './features/agents/agents.routes.js';
 import { createAgentsService } from './features/agents/agents.service.js';
 import { notesRouter } from './features/notes/notes.routes.js';
+import { pluginsRouter } from './features/plugins/plugins.routes.js';
+import { createPluginsService } from './features/plugins/plugins.service.js';
 import { createNotesService } from './features/notes/notes.service.js';
 import { SKILL_UPLOAD_BODY_LIMIT, createSkillsService } from './features/skills/skills.service.js';
 import { modelsRouter } from './features/models/models.routes.js';
@@ -120,6 +122,7 @@ export function createApp(context: AppContext) {
   v1.use(agentsRouter(createAgentsService(context, workspaces)));
   v1.use(notesRouter(createNotesService(context, workspaces)));
   v1.use(mcpRouter(createMcpService(context, workspaces)));
+  v1.use(pluginsRouter(createPluginsService(context, workspaces, models)));
   v1.use(filesRouter(files));
   v1.use(gitRouter(git));
   v1.use(tasksRouter(tasks));

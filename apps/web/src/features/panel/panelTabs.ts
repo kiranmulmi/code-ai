@@ -20,10 +20,10 @@ export function visiblePanelTabs(optional: OptionalPanelTabs): readonly PanelTab
 }
 
 /**
- * The tabs of the section below them: the skills, the specialist sub-agents, what the agent
- * remembers, the MCP servers.
+ * The tabs of the section below them: the skills, the specialist sub-agents, the tool plugins
+ * the AI writes, what the agent remembers, the MCP servers.
  */
-export const LOWER_PANEL_TABS = ['skills', 'agents', 'memory', 'mcp'] as const;
+export const LOWER_PANEL_TABS = ['skills', 'agents', 'tools', 'memory', 'mcp'] as const;
 
 export type LowerPanelTab = (typeof LOWER_PANEL_TABS)[number];
 
@@ -37,6 +37,7 @@ export const PANEL_TAB_LABEL: Record<PanelTab | LowerPanelTab, string> = {
   mcp: 'MCP',
   skills: 'Skills',
   agents: 'Agents',
+  tools: 'Tools',
 };
 
 export function parsePanelTab(stored: string | null): PanelTab {

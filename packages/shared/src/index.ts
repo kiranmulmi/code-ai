@@ -240,3 +240,21 @@ export {
 } from './task.js';
 
 export { type AuthConfig, type AuthUser } from './auth.js';
+
+export {
+  PLUGIN_NAME_PATTERN,
+  PLUGIN_REQUEST_MAX_CHARS,
+  pluginInputSchema,
+  pluginNameSchema,
+  pluginTestSchema,
+  pluginWriteSchema,
+  toPluginName,
+  type Plugin,
+  type PluginInput,
+  type PluginSummary,
+  type PluginTestRequest,
+  type PluginTestResult,
+  type PluginToolInfo,
+  type PluginWriteRequest,
+  type WrittenPlugin,
+} from './plugin.js';

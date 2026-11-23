@@ -370,3 +370,17 @@ export const NOTE_LIMITS = {
   titleChars: 200,
   bodyChars: 100_000,
 } as const;
+
+/** Tool plugins (plugins/<name>/ in the app's data folder), made in the Tools tab. */
+export const PLUGIN_LIMITS = {
+  /** also the MCP server name, which can be at most 32 */
+  nameLength: 32,
+  descriptionLength: 300,
+  /** tools.mjs */
+  codeChars: 100_000,
+  envCount: 30,
+  /** a request to the plugin writer */
+  requestChars: 4000,
+  /** a test: loading the code and running one tool */
+  testTimeoutMs: 60_000,
+} as const;

@@ -62,6 +62,13 @@ export {
   type InputCheck,
 } from './guardrails.js';
 export { buildToolset, type Toolset } from './tools/index.js';
+export type {
+  PluginForAgent,
+  PluginSaveInput,
+  PluginTestInput,
+  PluginWorkshop,
+  SavedPluginReport,
+} from './tools/plugins.js';
 export { parseReview, type Review } from './critic.js';
 export { imageDataUrl, type AttachmentStore } from './attachments.js';
 export { BackgroundTasks, type WorkspaceTasks } from './background-tasks.js';
@@ -95,3 +102,16 @@ export { systemPromptFor, SYSTEM_PROMPT } from './prompt.js';
 export { errorMessage, errorCode, isRecord } from './errors.js';
 export { serialized, writeFileAtomic } from './file-io.js';
 export { workspaceOverview } from './workspace-overview.js';
+export {
+  PLUGIN_CODE_FILE,
+  PLUGIN_SERVER_FILE,
+  PLUGIN_SERVER_SOURCE,
+  PLUGIN_SERVER_VERSION,
+  parseWrittenPlugin,
+  pluginNodeCommand,
+  testPluginCode,
+  writePlugin,
+  writePluginFiles,
+  type PluginDraft,
+  type PluginTestOptions,
+} from './plugins/index.js';

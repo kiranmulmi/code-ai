@@ -65,7 +65,14 @@ import {
   transcriptChunks,
 } from './context.js';
 import { withoutReason, type ToolDefinition } from './tools/define.js';
-import { ATTACHMENT_TOOLS, DELEGATE_TOOL, SKILL_TOOLS, buildToolset } from './tools/index.js';
+import {
+  ATTACHMENT_TOOLS,
+  DELEGATE_TOOL,
+  PLUGIN_BUILD_TOOLS,
+  SKILL_TOOLS,
+  buildToolset,
+} from './tools/index.js';
+import { LIST_TOOL_PLUGINS, type PluginWorkshop } from './tools/plugins.js';
 import { Board } from './team/board.js';
 import {
   BUILT_IN_SPECIALISTS,
@@ -175,6 +182,8 @@ export interface AgentOptions extends AgentRunOptions {
   attachments?: AttachmentStore;
   /** the workspace's skills: listed in the system prompt, loaded with use_skill */
   skills?: SkillStore;
+  /** tool plugins: the agent can write, test and save them from the chat (list_tool_plugins) */
+  plugins?: PluginWorkshop;
   /** tool groups the workspace turned off: not sent, and refused if called */
   disabledTools?: readonly ToolGroup[];
   /** the workspace's background tasks (BackgroundTasks.forWorkspace); without it commands can't run in the background */
@@ -341,6 +350,7 @@ export function createAgent(options: AgentOptions): Agent {
     notes: canDelegate || team !== null,
     readOnly: specialist?.readOnly ?? false,
     specialists,
+    plugins: options.plugins !== undefined,
   });
   const teamSection = canDelegate ? ('lead' as const) : specialist;
   const plannerPrompt = buildPlannerPrompt(toolset.summary);
@@ -397,6 +407,7 @@ export function createAgent(options: AgentOptions): Agent {
     attachments: attachmentStore,
     skills: skillStore,
     tasks: options.tasks ?? null,
+    plugins: options.plugins ?? null,
     askUser,
     loadTools: toolset.deferred.size ? loadTools : null,
     signal,
@@ -513,6 +524,8 @@ export function createAgent(options: AgentOptions): Agent {
           ? { ...toolContext, notes, delegate: (task: DelegatedTask) => delegate(callId, task) }
           : { ...toolContext, notes };
       const output = await tool.runValidated(input, context);
+      // Looking at the plugins is the way in to testing and saving one.
+      if (name === LIST_TOOL_PLUGINS) for (const t of PLUGIN_BUILD_TOOLS) activeTools.add(t);
       // Secrets are masked before the result goes anywhere: the model, the chat file, the
       // live stream and the log all get this text.
       const text = redactSecrets(

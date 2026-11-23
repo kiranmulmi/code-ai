@@ -33,6 +33,7 @@ import { WorkspaceSkills } from './workspace-skills.js';
 import { WorkspaceAgents } from './workspace-agents.js';
 import { WorkspaceNotes } from './workspace-notes.js';
 import { McpServerStore } from './mcp-servers.js';
+import { PluginStore } from './plugins.js';
 import { McpTrust } from './mcp-trust.js';
 import { ModelStore } from './models.js';
 import { SettingsStore } from './settings.js';
@@ -62,6 +63,8 @@ export class Store {
   readonly settings: SettingsStore;
   /** MCP servers, set up once for every workspace (each turns them on in `mcp(workspace)`). */
   readonly mcpServers: McpServerStore;
+  /** Tool plugins made in the Tools tab (plugins/ in the app home), each also one of `mcpServers`. */
+  readonly plugins: PluginStore;
 
   /** `appHome`: the folder for the app's own settings files (default ~/.hamro-ai). */
   constructor({ appHome = DEFAULT_APP_HOME }: { appHome?: string } = {}) {
@@ -71,6 +74,7 @@ export class Store {
     this.models = new ModelStore(appHomeFile(appHome, 'models'));
     this.settings = new SettingsStore(appHomeFile(appHome, 'agentSettings'));
     this.mcpServers = new McpServerStore(appHomeFile(appHome, 'mcpServers'));
+    this.plugins = new PluginStore(appHome, this.mcpServers);
   }
 
   // ---------- Workspaces ----------

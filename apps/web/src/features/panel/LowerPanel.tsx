@@ -1,12 +1,21 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { Memory, Skill } from '@app/shared';
 import { IconButton } from '../../components/IconButton';
-import { BrainIcon, ChevronDownIcon, ServerIcon, SkillIcon, WrenchIcon } from '../../lib/icons';
+import {
+  BrainIcon,
+  ChevronDownIcon,
+  ServerIcon,
+  SkillIcon,
+  TerminalIcon,
+  WrenchIcon,
+} from '../../lib/icons';
 import type { AsyncResource } from '../../lib/useAsync';
 import { useStoredState } from '../../lib/useStoredState';
 import { AgentsPanel } from '../agents/AgentsPanel';
 import { useAgents } from '../agents/useAgents';
 import { McpPanel } from '../mcp/McpPanel';
+import { PluginsPanel } from '../plugins/PluginsPanel';
+import { usePlugins } from '../plugins/usePlugins';
 import { SkillsPanel } from '../skills/SkillsPanel';
 import { MemoryPanel } from './memory/MemoryPanel';
 import {
@@ -22,6 +31,7 @@ const ICON: Record<LowerPanelTab, ReactNode> = {
   mcp: <ServerIcon size={13} />,
   skills: <SkillIcon size={13} />,
   agents: <WrenchIcon size={13} />,
+  tools: <TerminalIcon size={13} />,
 };
 
 const HEIGHT_DEFAULT = 300;
@@ -34,7 +44,7 @@ const parseHeight = (stored: string | null) => Number(stored) || HEIGHT_DEFAULT;
 const parseFlag = (stored: string | null) => stored === 'true';
 
 /**
- * The bottom of the side panel: Skills, Agents (specialist sub-agents), Memory and MCP servers in their own tabs, under the files or
+ * The bottom of the side panel: Skills, Agents (specialist sub-agents), Tools (AI-written tool plugins), Memory and MCP servers in their own tabs, under the files or
  * the terminal. Drag its top edge to resize it (double-click resets), or fold it to its tabs.
  */
 export function LowerPanel({
@@ -54,7 +64,15 @@ export function LowerPanel({
   const [isDragging, setIsDragging] = useState(false);
   // Loaded here so switching tabs keeps the list; reloaded when the tab is picked.
   const agents = useAgents(workspaceId);
+  const plugins = usePlugins(workspaceId);
   const section = useRef<HTMLElement>(null);
+  // The agent can save tool plugins from the chat: show them once its run ends.
+  const wasBusy = useRef(isBusy);
+  const { reload: reloadPlugins } = plugins;
+  useEffect(() => {
+    if (wasBusy.current && !isBusy) reloadPlugins();
+    wasBusy.current = isBusy;
+  }, [isBusy, reloadPlugins]);
 
   useEffect(() => {
     if (!isDragging) return;
@@ -75,6 +93,7 @@ export function LowerPanel({
     if (next === 'memory') memories.reload();
     if (next === 'skills') skills.reload();
     if (next === 'agents') agents.reload();
+    if (next === 'tools') plugins.reload();
   };
 
   return (
@@ -171,6 +190,9 @@ export function LowerPanel({
           {tab === 'mcp' && <McpPanel workspaceId={workspaceId} isBusy={isBusy} />}
           {tab === 'skills' && <SkillsPanel workspaceId={workspaceId} skills={skills} />}
           {tab === 'agents' && <AgentsPanel workspaceId={workspaceId} agents={agents} />}
+          {tab === 'tools' && (
+            <PluginsPanel workspaceId={workspaceId} plugins={plugins} isBusy={isBusy} />
+          )}
         </div>
       )}
     </section>

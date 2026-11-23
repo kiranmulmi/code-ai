@@ -24,6 +24,7 @@ import { loadMcpTools } from './load-mcp-tools.js';
 import { fetchPage } from './fetch-page.js';
 import { DELEGATE_TOOL_NAME, makeDelegateTask } from './delegate.js';
 import { postNote, readNotes } from './notes.js';
+import { PLUGIN_BUILD_TOOLS, listToolPlugins, saveToolPlugin, testToolPlugin } from './plugins.js';
 import { BUILT_IN_SPECIALISTS, type Specialist } from '../team/specialists.js';
 
 const TOOLS: readonly AnyTool[] = [
@@ -90,6 +91,11 @@ export const ATTACHMENT_TOOLS: readonly string[] = [
   viewImage.name,
   saveAttachment.name,
 ];
+/** The tools that build tool plugins from the chat (with `plugins`). */
+const PLUGIN_TOOLS: readonly AnyTool[] = [listToolPlugins, testToolPlugin, saveToolPlugin];
+/** test_tool_plugin and save_tool_plugin: sent once list_tool_plugins was called. */
+export { PLUGIN_BUILD_TOOLS };
+
 export const SKILL_TOOLS: readonly string[] = [
   useSkill.name,
   readSkillFile.name,
@@ -143,6 +149,7 @@ export function buildToolset(
     notes = subagents,
     readOnly = false,
     specialists = BUILT_IN_SPECIALISTS,
+    plugins = false,
   }: {
     /** offer delegate_task (the main agent, with sub-agents on) */
     subagents?: boolean;
@@ -152,13 +159,17 @@ export function buildToolset(
     readOnly?: boolean;
     /** the specialists delegate_task offers */
     specialists?: readonly Specialist[];
+    /** offer the tools that build tool plugins (the app keeps plugins) */
+    plugins?: boolean;
   } = {},
 ): Toolset {
   const base = readOnly
     ? TOOLS.filter((t) => !t.needsApproval && !QUIET_WRITES.has(t.name))
     : [...TOOLS];
+  const pluginTools = plugins ? PLUGIN_TOOLS.filter((t) => !readOnly || !t.needsApproval) : [];
   const own = [
     ...base,
+    ...pluginTools,
     ...(notes ? [postNote, readNotes] : []),
     ...(subagents ? [makeDelegateTask(specialists)] : []),
   ];
@@ -169,7 +180,12 @@ export function buildToolset(
     const group = GROUP_OF[t.name];
     return group !== undefined && disabledGroups.includes(group);
   };
-  const onDemand = new Set([...ATTACHMENT_TOOLS, ...SKILL_TOOLS, ...mcp.map((t) => t.name)]);
+  const onDemand = new Set([
+    ...ATTACHMENT_TOOLS,
+    ...SKILL_TOOLS,
+    ...PLUGIN_BUILD_TOOLS,
+    ...mcp.map((t) => t.name),
+  ]);
   const usable = tools.filter((t) => !isOff(t));
   const line = (t: AnyTool) => `- ${t.name}: ${firstSentence(t)}`;
   return {

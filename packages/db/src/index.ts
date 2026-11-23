@@ -5,6 +5,8 @@ export { InputError } from './errors.js';
 export { Store, type Chat } from './store.js';
 export { ModelStore, type ResolvedModel } from './models.js';
 export { McpServerStore } from './mcp-servers.js';
+export { PluginStore, PluginExistsError, isPluginServer, type PluginSave } from './plugins.js';
+export { pluginWorkshop } from './plugin-workshop.js';
 export { SettingsStore } from './settings.js';
 export { DEFAULT_APP_HOME, APP_HOME_FILES } from './app-home.js';
 export {

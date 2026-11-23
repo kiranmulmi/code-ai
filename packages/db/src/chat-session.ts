@@ -25,6 +25,7 @@ import {
 } from '@app/shared';
 import type { Chat, Store } from './store.js';
 import type { RunRecord } from './workspace-data.js';
+import { pluginWorkshop } from './plugin-workshop.js';
 import { runnableMcpServers } from './workspace-mcp.js';
 
 export interface RunInChatArgs {
@@ -89,6 +90,8 @@ export async function runInChat({
     specialists: agentOptions.config?.subagents ? await workspaceSpecialists(store, workspace) : [],
     extraTools: mcp ? await mcpTools(store, workspace, mcp, agentOptions) : [],
     tasks: tasks?.forWorkspace(workspace.id, chat.id),
+    // Tool plugins can be written, tested and saved from the chat.
+    plugins: pluginWorkshop(store, workspace, mcp),
   });
 
   const fromSeq = rows.length;

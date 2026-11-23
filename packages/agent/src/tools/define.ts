@@ -5,6 +5,7 @@ import type { AttachmentStore } from '../attachments.js';
 import type { MemoryStore } from '../memory/long-term.js';
 import type { WorkspaceTasks } from '../background-tasks.js';
 import type { Board } from '../team/board.js';
+import type { PluginWorkshop } from './plugins.js';
 
 /** Asks the user a question mid-run and resolves with their answer (or that they skipped it). */
 export type AskUserFn = (question: UserQuestion) => Promise<QuestionAnswer>;
@@ -50,6 +51,8 @@ export interface ToolContext {
   askUser: AskUserFn | null;
   /** view_image: show this attached image to the model with the next message */
   showImage: (attachmentId: string) => void;
+  /** tool plugins (list/test/save_tool_plugin); null when the app keeps none */
+  plugins?: PluginWorkshop | null;
   /** aborted when the user stops the run: long tools (run_command) stop early */
   signal?: AbortSignal;
   /** delegate_task: runs a sub-agent; null when sub-agents are off (and inside a sub-agent) */

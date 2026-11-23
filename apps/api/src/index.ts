@@ -23,6 +23,8 @@ async function start(): Promise<void> {
   settings = await AppSettings.load(store);
   // MCP servers used to be set per workspace folder; move any old ones to the app's list.
   for (const note of await store.importLegacyMcp()) logger.info(note);
+  // Tool plugins: their server file and start command, up to date with this app and its Node.
+  await store.plugins.refresh();
 
   const mcp = new McpHub({ logger: agentLogger });
   const tasks = new BackgroundTasks();
