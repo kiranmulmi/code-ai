@@ -2,11 +2,13 @@ import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import type { AppInfo, ChatSummary, Workspace } from '@app/shared';
 import { IconButton } from '../../components/IconButton';
 import { Brand } from '../../layout/Brand';
+import { Link, useLocation } from 'react-router-dom';
 import {
   ChevronRightIcon,
   ComposeIcon,
   CrossIcon,
   FolderTintIcon,
+  GearIcon,
   PanelIcon,
   SearchIcon,
 } from '../../lib/icons';
@@ -61,6 +63,51 @@ function WorkspacePath({ path }: { path: string }) {
         <span className="font-medium text-ink-2">{name}</span>
       </div>
     </div>
+  );
+}
+
+/**
+ * Workspace settings link for desktop (xl) - sits at the bottom of the chats sidebar.
+ */
+function WorkspaceSettingsRow({
+  workspace,
+  isBusy,
+}: {
+  workspace: Workspace;
+  isBusy: boolean;
+}) {
+  const isSettings = useLocation().pathname.startsWith(`/workspaces/${workspace.id}/settings`);
+
+  if (isBusy && !isSettings) {
+    return (
+      <span
+        title="Wait for the agent to finish"
+        className="flex h-9 items-center gap-2.5 rounded-xl px-3 text-[13px] font-medium text-ink-2 cursor-not-allowed opacity-50"
+      >
+        <span className="grid h-6 w-6 shrink-0 place-items-center rounded-lg bg-accent-soft text-accent-2">
+          <GearIcon size={12} />
+        </span>
+        <span className="min-w-0 truncate">Workspace settings</span>
+      </span>
+    );
+  }
+  return (
+    <Link
+      to={isSettings ? `/workspaces/${workspace.id}` : `/workspaces/${workspace.id}/settings`}
+      aria-label={isSettings ? 'Close workspace settings' : 'Workspace settings'}
+      aria-current={isSettings ? 'page' : undefined}
+      title={isSettings ? 'Back to the chat' : 'Workspace settings'}
+      className={`flex h-9 items-center gap-2.5 rounded-xl px-3 text-[13px] font-medium transition-colors ${
+        isSettings
+          ? 'bg-accent-soft text-accent'
+          : 'text-ink-2 hover:bg-subtle hover:text-ink'
+      }`}
+    >
+      <span className="grid h-6 w-6 shrink-0 place-items-center rounded-lg bg-accent-soft text-accent-2">
+        <GearIcon size={12} />
+      </span>
+      <span className="min-w-0 truncate">Workspace settings</span>
+    </Link>
   );
 }
 
@@ -217,7 +264,15 @@ export function ChatSidebar({
           onDeleted={onDeleted}
         />
 
-        {/* The drawer has every link; at xl Workspace settings is the gear in the chat header and the rest is in the workspace sidebar. */}
+        {/* Workspace settings at the bottom of the chats sidebar on desktop (xl) */}
+        <div className="hidden shrink-0 xl:block px-3 pb-2">
+          <span className="block px-3 pb-1.5 text-[10.5px] font-bold uppercase tracking-[0.14em] text-ink-4">
+            Settings
+          </span>
+          {workspace && <WorkspaceSettingsRow workspace={workspace} isBusy={isBusy} />}
+        </div>
+
+        {/* The drawer has every link; at xl Workspace settings is now in the chats sidebar and the rest is in the workspace sidebar. */}
         <div className="shrink-0 xl:hidden">
           <SidebarLinks info={info} error={infoError} workspaceId={workspaceId} isBusy={isBusy} />
         </div>

@@ -81,10 +81,14 @@ function PreferencesRow({ approval }: { approval: AppInfo['approval'] | null }) 
 }
 
 /**
- * The sidebar links: the open workspace's settings, New workspace, Preferences (the app-wide
- * settings), and Install app while Chrome offers it (all at the bottom of the chats drawer;
- * split between the two sidebars at `xl`). A warning takes the top when the server can't be
- * reached. Who is signed in, and Sign out, are in `AccountMenu` below the workspace switcher.
+ * The sidebar links for the chats drawer (mobile): the open workspace's settings,
+ * New workspace, Preferences (the app-wide settings), and Install app while Chrome offers it.
+ * A warning takes the top when the server can't be reached. Who is signed in, and Sign out,
+ * are in `AccountMenu` below the workspace switcher.
+ *
+ * At `xl` these links are not used: Workspace settings sits at the bottom of the chats sidebar
+ * (see `WorkspaceSettingsRow` in `ChatSidebar`), and the app links (New workspace, Preferences,
+ * Install app) are in the workspace sidebar.
  */
 export function SidebarLinks({
   info,
@@ -98,9 +102,9 @@ export function SidebarLinks({
   workspaceId?: string;
   isBusy: boolean;
   /**
-   * At `xl` the links are split: `workspace` (Workspace settings, under the chats) and `app`
-   * (the offline warning, New workspace, Preferences, Install app, in the workspace sidebar).
-   * Unset shows all.
+   * At `xl` the links are split: `workspace` (Workspace settings, for the chats drawer on mobile)
+   * and `app` (the offline warning, New workspace, Preferences, Install app, in the workspace
+   * sidebar). Unset shows all (used for the chats drawer on mobile).
    */
   only?: 'workspace' | 'app';
 }) {

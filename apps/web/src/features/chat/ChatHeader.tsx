@@ -1,7 +1,6 @@
 import type { Workspace } from '@app/shared';
 import { Badge } from '../../components/Badge';
 import { IconButton } from '../../components/IconButton';
-import { WorkspaceSettingsLink } from '../../layout/WorkspaceSettingsLink';
 import { ConversationIcon, PanelIcon } from '../../lib/icons';
 
 /**
@@ -18,7 +17,7 @@ export function ChatHeader({
   workspace,
 }: {
   title: string;
-  /** The open workspace: its settings gear sits at the end (wide screens; narrower ones have it in the app bar). */
+  /** The open workspace (no longer used for settings link; kept for potential future use). */
   workspace?: Workspace | null;
   isBusy: boolean;
   isPanelShown: boolean;
@@ -60,11 +59,6 @@ export function ChatHeader({
         )}
       </div>
       <div className="flex shrink-0 items-center gap-1">
-        {workspace && (
-          <span className="hidden xl:contents">
-            <WorkspaceSettingsLink workspace={workspace} isBusy={isBusy} />
-          </span>
-        )}
         {/* While the panel is open its own header has the button that hides it. */}
         {!isPanelShown && (
           <IconButton

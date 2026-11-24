@@ -6,7 +6,7 @@ import { PageLoader } from '../../components/PageLoader';
 import { TopbarActions, usePageHeader } from '../../layout/pageHeader';
 import { errorMessage } from '../../lib/api';
 import { APP_NAME } from '../../lib/brand';
-import { PlusIcon, ServerIcon } from '../../lib/icons';
+import { EditIcon, PlusIcon, ServerIcon } from '../../lib/icons';
 import { fromPath } from '../../lib/routerState';
 import { useAsync } from '../../lib/useAsync';
 import { SettingsTabs } from '../settings/SettingsTabs';
@@ -72,14 +72,14 @@ export function McpServersPage() {
           </Button>
         </div>
       ) : (
-        <ul className="grid gap-1.5 sm:grid-cols-2 xl:grid-cols-3">
+        <ul className="divide-y divide-line-2">
           {list.map((entry) => {
             const transport = mcpTransportOf(entry.server);
             const autoApproved = entry.server.autoApprove?.length ?? 0;
             return (
               <li
                 key={entry.name}
-                className="flex min-w-0 items-center gap-x-2 rounded-lg border border-line bg-surface px-2 py-1 transition-colors hover:border-line-strong"
+                className="group flex min-w-0 items-center gap-x-2 px-3 py-2.5 text-[13px] text-ink transition-colors hover:bg-subtle"
               >
                 <span className="grid h-6 w-6 shrink-0 place-items-center rounded-md bg-surface-2 text-ink-3">
                   <ServerIcon size={12} />
@@ -108,9 +108,9 @@ export function McpServersPage() {
                 <Link
                   to={`${LIST_PATH}/${encodeURIComponent(entry.name)}/edit`}
                   state={{ from: LIST_PATH }}
-                  className="ml-auto inline-flex h-6 shrink-0 items-center rounded-md border border-line bg-surface px-2 text-[11.5px] font-medium text-ink transition-colors hover:border-line-strong hover:bg-subtle"
+                  className="ml-auto grid h-6 w-6 shrink-0 place-items-center rounded-md transition-colors hover:bg-subtle hover:text-ink text-ink-3"
                 >
-                  Edit
+                  <EditIcon size={13} />
                 </Link>
               </li>
             );

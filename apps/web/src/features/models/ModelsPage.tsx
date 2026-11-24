@@ -120,11 +120,11 @@ export function ModelsPage() {
           </Button>
         </div>
       ) : (
-        <ul className="grid gap-1.5 sm:grid-cols-2 xl:grid-cols-3">
+        <ul className="divide-y divide-line-2">
           {list.map((model) => (
             <li
               key={model.id}
-              className="flex min-w-0 items-center gap-x-2 rounded-lg border border-line bg-surface px-2 py-1 transition-colors hover:border-line-strong"
+              className="group flex min-w-0 items-center gap-x-2 px-3 py-2.5 text-[13px] text-ink transition-colors hover:bg-subtle"
             >
               <span
                 className={`grid h-6 w-6 shrink-0 place-items-center rounded-md ${
