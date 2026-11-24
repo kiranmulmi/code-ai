@@ -55,7 +55,7 @@ function SettingsModalFrame({ onClose }: { onClose: () => void }) {
         <div ref={setFooterNode} className="flex flex-1 flex-wrap items-center justify-end gap-2" />
       }
     >
-      <div className="px-6 pb-6 pt-4">
+      <div className="px-4 pb-4 pt-3">
         {isAppSettings ? (
           <SettingsSideTabs>
             <Topbar inModal />

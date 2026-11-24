@@ -18,8 +18,10 @@ export function Topbar({ inModal = false }: { inModal?: boolean }) {
 
   if (inModal) {
     return (
-      <div className="flex min-h-9 flex-wrap items-center justify-between gap-x-4 gap-y-2 pb-4">
-        <p className="min-w-0 flex-1 basis-60 text-[13px] text-ink-3">{header?.subtitle}</p>
+      <div className="flex min-h-8 flex-wrap items-center justify-between gap-x-3 gap-y-1.5 pb-2.5">
+        <p className="min-w-0 flex-1 basis-60 text-[12px] leading-snug text-ink-3">
+          {header?.subtitle}
+        </p>
         <div ref={actionsRef} className="flex shrink-0 flex-wrap items-center gap-2" />
       </div>
     );

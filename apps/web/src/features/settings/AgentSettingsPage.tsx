@@ -14,7 +14,7 @@ import {
   type ReviewMode,
 } from '@app/shared';
 import { Button } from '../../components/Button';
-import { ERROR, HINT, INPUT, INPUT_ERROR, INPUT_OK, LABEL, SECTION } from '../../components/form';
+import { ERROR_SM as ERROR, INPUT_ERROR, INPUT_OK } from '../../components/form';
 import { PageLoader } from '../../components/PageLoader';
 import { Spinner } from '../../components/Spinner';
 import { Switch } from '../../components/Switch';
@@ -27,6 +27,7 @@ import { useModels } from '../models/useModels';
 import { fetchSettings, saveSettings } from './api';
 import { SettingsTabs } from './SettingsTabs';
 import { APP_NAME } from '../../lib/brand';
+import { InfoTip } from '../../components/InfoTip';
 
 /** The form keeps numbers as typed text, so a half-typed value isn't snapped to a number. */
 type NumberKey = 'maxSteps' | 'maxTotalTokens' | 'maxInputChars' | 'maxParallelSubagents';
@@ -183,47 +184,40 @@ export function AgentSettingsPage() {
     key: NumberKey,
     label: string,
     unit: string,
-    hint: ReactNode,
+    hint: string,
     isCompact = false,
   ) => {
     const { min, max } = SETTINGS_LIMITS[key];
     const id = `setting-${key}`;
-    const error = errors[key];
     const show = isCompact ? compactNumber : fmt;
     const typed = toNumber(draft[key]);
     return (
-      <div className="min-w-0">
-        <label htmlFor={id} className={LABEL}>
-          {label}
-        </label>
-        <div className="relative max-w-[22ch]">
+      <Row
+        label={label}
+        htmlFor={id}
+        hint={`${hint} ${show(min)}–${show(max)}, default ${show(DEFAULT_AGENT_SETTINGS[key])}.`}
+        error={errors[key]}
+      >
+        {isCompact && Number.isFinite(typed) && (
+          <span aria-live="polite" className="text-[11px] font-medium text-ink-3 tabular-nums">
+            = {compactNumber(typed)}
+          </span>
+        )}
+        <div className="relative">
           <input
             id={id}
             inputMode="numeric"
             autoComplete="off"
             value={draft[key]}
-            aria-invalid={error ? true : undefined}
+            aria-invalid={errors[key] ? true : undefined}
             onChange={(event) => set(key, event.target.value.replace(/[^\d]/g, ''))}
-            className={`${INPUT} ${error ? INPUT_ERROR : INPUT_OK} pr-16 tabular-nums`}
+            className={`${CONTROL} ${errors[key] ? INPUT_ERROR : INPUT_OK} w-36 pr-12 text-right tabular-nums`}
           />
-          <span className="pointer-events-none absolute bottom-2 right-3 text-[12px] text-ink-3">
+          <span className="pointer-events-none absolute inset-y-0 right-2 flex items-center text-[10.5px] text-ink-3">
             {unit}
           </span>
         </div>
-        {isCompact && Number.isFinite(typed) && (
-          <p aria-live="polite" className="mt-1 text-[13px] font-medium text-ink-2 tabular-nums">
-            = {compactNumber(typed)} {unit}
-          </p>
-        )}
-        {error && (
-          <p role="alert" className={ERROR}>
-            {error}
-          </p>
-        )}
-        <p className={HINT}>
-          {hint} {show(min)}–{show(max)}, default {show(DEFAULT_AGENT_SETTINGS[key])}.
-        </p>
-      </div>
+      </Row>
     );
   };
 
@@ -235,291 +229,166 @@ export function AgentSettingsPage() {
         id="settings-form"
         noValidate
         onSubmit={(event) => void submit(event)}
-        className="flex flex-col gap-5"
+        className="grid items-start gap-2.5 lg:grid-cols-2"
       >
-        <section className="panel">
-          <SectionHeader
-            title="Tool approvals"
-            detail="Tools that change things outside the agent. File tools always stay inside the workspace folder."
-          />
-          <div className={SECTION}>
-            <div
-              role="radiogroup"
-              aria-label="Tool approvals"
-              className="grid gap-2 sm:grid-cols-3"
-            >
-              {APPROVAL_MODES.map((mode) => {
-                const isOn = draft.approval === mode;
-                return (
-                  <button
-                    key={mode}
-                    type="button"
-                    role="radio"
-                    aria-checked={isOn}
-                    onClick={() => set('approval', mode)}
-                    className={`flex flex-col gap-1 rounded-lg border px-3.5 py-3 text-left transition-colors ${
-                      isOn
-                        ? 'border-accent bg-accent-soft ring-1 ring-accent'
-                        : 'border-line bg-surface hover:border-line-strong'
-                    }`}
-                  >
-                    <span className="flex items-center gap-2 text-[13.5px] font-medium text-ink">
-                      <span
-                        aria-hidden
-                        className={`grid h-3.5 w-3.5 place-items-center rounded-full border ${
-                          isOn ? 'border-accent' : 'border-line-strong'
-                        }`}
-                      >
-                        {isOn && <span className="h-1.5 w-1.5 rounded-full bg-accent" />}
-                      </span>
-                      {APPROVALS[mode].title}
-                    </span>
-                    <span className="text-[12px] leading-snug text-ink-3">
-                      {APPROVALS[mode].detail}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-            {draft.approval === 'auto' && (
-              <p className="mt-3 border border-l-[3px] border-line border-l-warn-line bg-warn-bg px-3.5 py-2.5 text-[13px] leading-relaxed text-warn">
-                The agent will write files and run commands without asking. A few catastrophic
-                commands (sudo, deleting your home folder, …) are still refused, but a command runs
-                with your user&apos;s permissions.
-              </p>
+        <Card
+          title="Approvals and limits"
+          hint="Tools that change things outside the agent, and guardrails for each message. File tools always stay inside the workspace folder."
+        >
+          <Row
+            label="Tool approvals"
+            hint={APPROVAL_MODES.map((m) => `${APPROVALS[m].title}: ${APPROVALS[m].detail}`).join(
+              ' ',
             )}
-          </div>
-        </section>
-
-        <section className="panel">
-          <SectionHeader
-            title="Planning and limits"
-            detail="Guardrails for each message you send."
-          />
-          <div className="flex flex-col divide-y divide-line-2">
-            <div className={`${SECTION} flex items-start justify-between gap-4`}>
-              <div>
-                <p className={LABEL}>Planning step before every message</p>
-                <p className={HINT}>
-                  Off (the default): the agent answers simple messages directly and makes a plan
-                  itself when a task has several steps. On: an extra model call before every message
-                  decides whether to plan first; steadier with smaller models, but slower.
-                </p>
-              </div>
-              <Switch
-                isOn={draft.planning === 'auto'}
-                onChange={(isOn) => set('planning', isOn ? 'auto' : 'off')}
-                label="Planning step before every message"
-              />
-            </div>
-            <div className={`${SECTION} grid gap-5 md:grid-cols-3`}>
-              {numberField(
-                'maxSteps',
-                'Max steps',
-                'steps',
-                "Working steps per message (planning and summaries don't count). Research with a plan can take 20+.",
-              )}
-              {numberField(
-                'maxTotalTokens',
-                'Token budget',
-                'tokens',
-                'Input + output tokens per message. Input the server read from its cache counts at a tenth.',
-                true,
-              )}
-              {numberField(
-                'maxInputChars',
-                'Longest message',
-                'chars',
-                'Longer messages are rejected.',
-              )}
-            </div>
-          </div>
-        </section>
-
-        <section className="panel">
-          <SectionHeader
-            title="Sub-agents and review"
-            detail="Extra model calls that can make long tasks better, at more tokens and time."
-          />
-          <div className="flex flex-col divide-y divide-line-2">
-            <div className={`${SECTION} flex items-start justify-between gap-4`}>
-              <div>
-                <p className={LABEL}>Sub-agents</p>
-                <p className={HINT}>
-                  Lets the agent hand self-contained parts of a task to specialist sub-agents (
-                  <span className="font-mono">delegate_task</span>): a researcher, coder, reviewer,
-                  writer, or your own from the workspace&apos;s{' '}
-                  <span className="font-mono">.hamro-ai/{'<workspace>'}/agents/</span> folder. Each
-                  works in a fresh context with its specialist&apos;s tools, shares findings on the
-                  team notes, and reports back. Several can work at once. They share the
-                  message&apos;s token budget and ask for approval like the agent does.
-                </p>
-              </div>
-              <Switch
-                isOn={draft.subagents}
-                onChange={(isOn) => set('subagents', isOn)}
-                label="Sub-agents"
-              />
-            </div>
-            {draft.subagents && (
-              <ModelPicker
-                id="setting-subagent-model"
-                label="Sub-agent model"
-                hint="A cheaper or faster model often does well on delegated parts."
-                value={draft.subagentModelId}
-                models={models.data}
-                error={errors.subagentModelId}
-                onChange={(id) => set('subagentModelId', id)}
-              />
-            )}
-            {draft.subagents && (
-              <div className={SECTION}>
-                {numberField(
-                  'maxParallelSubagents',
-                  'Parallel sub-agents',
-                  'at once',
-                  'Sub-agents that may work at the same time; more started in one step wait their turn. Higher is faster but uses tokens quicker.',
-                )}
-              </div>
-            )}
-            <div className={SECTION}>
-              <p className={LABEL}>Review answers</p>
-              <div
-                role="radiogroup"
-                aria-label="Review answers"
-                className="mt-2 inline-flex rounded-lg border border-line bg-surface-2 p-0.5"
-              >
-                {REVIEW_MODES.map((mode) => {
-                  const isOn = draft.review === mode;
-                  return (
-                    <button
-                      key={mode}
-                      type="button"
-                      role="radio"
-                      aria-checked={isOn}
-                      onClick={() => set('review', mode)}
-                      className={`h-7 rounded-md px-3 text-[12.5px] font-medium transition-colors ${
-                        isOn
-                          ? 'bg-surface text-ink shadow-[0_0_0_1px_var(--line)]'
-                          : 'text-ink-3 hover:text-ink'
-                      }`}
-                    >
-                      {REVIEWS[mode].title}
-                    </button>
-                  );
-                })}
-              </div>
-              <p className={HINT}>
-                {REVIEWS[draft.review].detail} The reviewer sees the request, the plan, what the
-                tools found and the answer, but not the rest of the chat.
-              </p>
-            </div>
-            {draft.review !== 'off' && (
-              <ModelPicker
-                id="setting-review-model"
-                label="Reviewer model"
-                hint="A different model from the agent's catches more of its blind spots."
-                value={draft.reviewModelId}
-                models={models.data}
-                error={errors.reviewModelId}
-                onChange={(id) => set('reviewModelId', id)}
-              />
-            )}
-          </div>
-        </section>
-
-        <section className="panel">
-          <SectionHeader
-            title="Images"
-            detail="For chat models that can't read images (Reads images turned off in Settings → Models)."
-          />
-          <div className="flex flex-col divide-y divide-line-2">
-            <ModelPicker
-              id="setting-vision-model"
-              label="Image model"
-              hint="When the chat's model can't read images, this model looks at them (view_image) and describes them in text for it. Without one, such a model can't see images at all."
-              emptyLabel="None"
-              value={draft.visionModelId}
-              models={models.data?.filter((m) => m.supportsImages) ?? null}
-              error={errors.visionModelId}
-              onChange={(id) => set('visionModelId', id)}
+          >
+            <Segmented
+              label="Tool approvals"
+              value={draft.approval}
+              options={APPROVAL_MODES.map((m) => ({ value: m, ...APPROVALS[m] }))}
+              onChange={(mode) => set('approval', mode)}
             />
-          </div>
-        </section>
+          </Row>
+          {draft.approval === 'auto' && (
+            <p className="border-l-[3px] border-l-warn-line bg-warn-bg px-3 py-1 text-[11px] leading-snug text-warn">
+              Writes files and runs commands without asking. A few catastrophic commands are still
+              refused, but commands run with your user&apos;s permissions.
+            </p>
+          )}
+          <Row
+            label="Planning step"
+            hint="Off (the default): the agent answers simple messages directly and makes a plan itself when a task has several steps. On: an extra model call before every message decides whether to plan first; steadier with smaller models, but slower."
+          >
+            <Switch
+              isOn={draft.planning === 'auto'}
+              onChange={(isOn) => set('planning', isOn ? 'auto' : 'off')}
+              label="Planning step before every message"
+            />
+          </Row>
+          {numberField(
+            'maxSteps',
+            'Max steps',
+            'steps',
+            "Working steps per message (planning and summaries don't count). Research with a plan can take 20+.",
+          )}
+          {numberField(
+            'maxTotalTokens',
+            'Token budget',
+            'tokens',
+            'Input + output tokens per message. Input the server read from its cache counts at a tenth.',
+            true,
+          )}
+          {numberField(
+            'maxInputChars',
+            'Longest message',
+            'chars',
+            'Longer messages are rejected.',
+          )}
+        </Card>
 
-        <section className="panel">
-          <SectionHeader title="Web search and logging" />
-          <div className="flex flex-col divide-y divide-line-2">
-            <div className={SECTION}>
-              <label htmlFor="setting-searxng" className={LABEL}>
-                SearXNG URL
-              </label>
-              <input
-                id="setting-searxng"
-                value={draft.searxngUrl}
-                autoComplete="off"
-                spellCheck={false}
-                maxLength={SETTINGS_LIMITS.searxngUrl}
-                placeholder={DEFAULT_AGENT_SETTINGS.searxngUrl}
-                aria-invalid={errors.searxngUrl ? true : undefined}
-                onChange={(event) => set('searxngUrl', event.target.value)}
-                className={`${INPUT} ${errors.searxngUrl ? INPUT_ERROR : INPUT_OK} max-w-[56ch] font-mono text-[13px]`}
-              />
-              {errors.searxngUrl && (
-                <p role="alert" className={ERROR}>
-                  {errors.searxngUrl}
-                </p>
-              )}
-              <p className={HINT}>
-                The instance the <span className="font-mono">web_search</span> tool uses, with the
-                JSON format turned on (
-                <span className="font-mono">search.formats: [html, json]</span>
-                ).
-              </p>
-            </div>
-            <div className={SECTION}>
-              <p className={LABEL}>Console log level</p>
-              <div
-                role="radiogroup"
-                aria-label="Console log level"
-                className="mt-2 inline-flex rounded-lg border border-line bg-surface-2 p-0.5"
-              >
-                {LOG_LEVELS.map((level) => {
-                  const isOn = draft.logLevel === level;
-                  return (
-                    <button
-                      key={level}
-                      type="button"
-                      role="radio"
-                      aria-checked={isOn}
-                      onClick={() => set('logLevel', level)}
-                      className={`h-7 rounded-md px-3 text-[12.5px] font-medium capitalize transition-colors ${
-                        isOn
-                          ? 'bg-surface text-ink shadow-[0_0_0_1px_var(--line)]'
-                          : 'text-ink-3 hover:text-ink'
-                      }`}
-                    >
-                      {level}
-                    </button>
-                  );
-                })}
-              </div>
-              <p className={HINT}>
-                {LOG_TEXT[draft.logLevel]} in the server&apos;s terminal. Each run is also written
-                to a JSONL log in <span className="font-mono">~/.hamro-ai/logs</span> (move it with{' '}
-                <span className="font-mono">AGENT_LOG_DIR</span> in .env).
-              </p>
-            </div>
-          </div>
-        </section>
+        <Card
+          title="Sub-agents and review"
+          hint="Extra model calls that can make long tasks better, at more tokens and time."
+        >
+          <Row
+            label="Sub-agents"
+            hint="Lets the agent hand self-contained parts of a task to specialist sub-agents (delegate_task): a researcher, coder, reviewer, writer, or your own from the workspace's .hamro-ai/<workspace>/agents/ folder. Each works in a fresh context, shares findings on the team notes, and reports back. They share the message's token budget and ask for approval like the agent does."
+          >
+            <Switch
+              isOn={draft.subagents}
+              onChange={(isOn) => set('subagents', isOn)}
+              label="Sub-agents"
+            />
+          </Row>
+          {draft.subagents && (
+            <ModelPicker
+              id="setting-subagent-model"
+              label="Sub-agent model"
+              hint="A cheaper or faster model often does well on delegated parts."
+              value={draft.subagentModelId}
+              models={models.data}
+              error={errors.subagentModelId}
+              onChange={(id) => set('subagentModelId', id)}
+            />
+          )}
+          {draft.subagents &&
+            numberField(
+              'maxParallelSubagents',
+              'Parallel sub-agents',
+              'at once',
+              'Sub-agents that may work at the same time; more started in one step wait their turn. Higher is faster but uses tokens quicker.',
+            )}
+          <Row
+            label="Review answers"
+            hint={`${REVIEW_MODES.map((m) => `${REVIEWS[m].title}: ${REVIEWS[m].detail}`).join(' ')} The reviewer sees the request, the plan, what the tools found and the answer, but not the rest of the chat.`}
+          >
+            <Segmented
+              label="Review answers"
+              value={draft.review}
+              options={REVIEW_MODES.map((m) => ({ value: m, ...REVIEWS[m] }))}
+              onChange={(mode) => set('review', mode)}
+            />
+          </Row>
+          {draft.review !== 'off' && (
+            <ModelPicker
+              id="setting-review-model"
+              label="Reviewer model"
+              hint="A different model from the agent's catches more of its blind spots."
+              value={draft.reviewModelId}
+              models={models.data}
+              error={errors.reviewModelId}
+              onChange={(id) => set('reviewModelId', id)}
+            />
+          )}
+        </Card>
 
-        <p className="text-[12.5px] leading-relaxed text-ink-3">
-          Still in <span className="font-mono">.env</span>, because the server needs them when it
-          starts: <span className="font-mono">PORT</span>,{' '}
-          <span className="font-mono">CORS_ORIGIN</span>,{' '}
-          <span className="font-mono">LOG_LEVEL</span> (HTTP logs) and{' '}
-          <span className="font-mono">AGENT_LOG_DIR</span>.
-        </p>
+        <Card
+          title="Images, web search and logging"
+          hint="Still in .env, because the server needs them when it starts: PORT, CORS_ORIGIN, LOG_LEVEL (HTTP logs) and AGENT_LOG_DIR."
+        >
+          <ModelPicker
+            id="setting-vision-model"
+            label="Image model"
+            hint="For chat models that can't read images (Reads images turned off in Models): this model looks at images (view_image) and describes them in text. Without one, such a model can't see images at all."
+            emptyLabel="None"
+            value={draft.visionModelId}
+            models={models.data?.filter((m) => m.supportsImages) ?? null}
+            error={errors.visionModelId}
+            onChange={(id) => set('visionModelId', id)}
+          />
+          <Row
+            label="SearXNG URL"
+            htmlFor="setting-searxng"
+            hint="The instance the web_search tool uses, with the JSON format turned on (search.formats: [html, json])."
+            error={errors.searxngUrl}
+          >
+            <input
+              id="setting-searxng"
+              value={draft.searxngUrl}
+              autoComplete="off"
+              spellCheck={false}
+              maxLength={SETTINGS_LIMITS.searxngUrl}
+              placeholder={DEFAULT_AGENT_SETTINGS.searxngUrl}
+              aria-invalid={errors.searxngUrl ? true : undefined}
+              onChange={(event) => set('searxngUrl', event.target.value)}
+              className={`${CONTROL} ${errors.searxngUrl ? INPUT_ERROR : INPUT_OK} w-56 font-mono text-[11.5px]`}
+            />
+          </Row>
+          <Row
+            label="Console log level"
+            hint={`${LOG_TEXT[draft.logLevel]} in the server's terminal. Each run is also written to a JSONL log in ~/.hamro-ai/logs (move it with AGENT_LOG_DIR in .env).`}
+          >
+            <Segmented
+              label="Console log level"
+              value={draft.logLevel}
+              options={LOG_LEVELS.map((level) => ({
+                value: level,
+                title: level.charAt(0).toUpperCase() + level.slice(1),
+                detail: LOG_TEXT[level],
+              }))}
+              onChange={(level) => set('logLevel', level)}
+            />
+          </Row>
+        </Card>
       </form>
 
       <FormActions>
@@ -550,6 +419,104 @@ export function AgentSettingsPage() {
   );
 }
 
+/** A small input, select or text box that sits at the end of a one-line setting row. */
+const CONTROL =
+  'h-7 rounded-md border bg-surface px-2 text-[12px] text-ink outline-none transition-colors placeholder:text-ink-3 focus:border-accent focus:ring-1 focus:ring-accent focus-visible:outline-none';
+
+/** A titled group of one-line setting rows; its explanation sits behind an info icon. */
+function Card({ title, hint, children }: { title: string; hint?: string; children: ReactNode }) {
+  return (
+    <section className="panel">
+      <div className="flex items-center gap-1 border-b border-line bg-subtle px-3 py-1">
+        <h2 className="text-[12px] font-bold text-ink">{title}</h2>
+        {hint && <InfoTip text={hint} />}
+      </div>
+      <div className="flex flex-col divide-y divide-line-2">{children}</div>
+    </section>
+  );
+}
+
+/** One setting on one line: its name (with an info tip) on the left, its control on the right. */
+function Row({
+  label,
+  htmlFor,
+  hint,
+  error,
+  children,
+}: {
+  label: string;
+  /** the control's id, when it's an input or select the label can point at */
+  htmlFor?: string;
+  hint?: string;
+  error?: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className="px-3 py-1">
+      <div className="flex min-h-7 flex-wrap items-center justify-between gap-x-3 gap-y-1">
+        <div className="flex min-w-0 items-center gap-1">
+          {htmlFor ? (
+            <label htmlFor={htmlFor} className="truncate text-[12px] font-medium text-ink">
+              {label}
+            </label>
+          ) : (
+            <span className="truncate text-[12px] font-medium text-ink">{label}</span>
+          )}
+          {hint && <InfoTip text={hint} />}
+        </div>
+        <div className="flex shrink-0 items-center gap-1.5">{children}</div>
+      </div>
+      {error && (
+        <p role="alert" className={`${ERROR} text-right`}>
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
+
+/** A small segmented control: one of a few options, each with its detail as a tooltip. */
+function Segmented<T extends string>({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: T;
+  options: readonly { value: T; title: string; detail: string }[];
+  onChange: (value: T) => void;
+}) {
+  return (
+    <div
+      role="radiogroup"
+      aria-label={label}
+      className="inline-flex rounded-md border border-line bg-surface-2 p-0.5"
+    >
+      {options.map((option) => {
+        const isOn = option.value === value;
+        return (
+          <button
+            key={option.value}
+            type="button"
+            role="radio"
+            aria-checked={isOn}
+            title={option.detail}
+            onClick={() => onChange(option.value)}
+            className={`h-6 whitespace-nowrap rounded px-2 text-[11.5px] font-medium transition-colors ${
+              isOn
+                ? 'bg-surface text-ink shadow-[0_0_0_1px_var(--line)]'
+                : 'text-ink-3 hover:text-ink'
+            }`}
+          >
+            {option.title}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 /** Picks a saved model for sub-agents or the reviewer; empty means the model of the chat. */
 function ModelPicker({
   id,
@@ -574,16 +541,13 @@ function ModelPicker({
   // A model deleted since still shows, so saving doesn't silently change it.
   const isMissing = value !== null && models !== null && !models.some((m) => m.id === value);
   return (
-    <div className={SECTION}>
-      <label htmlFor={id} className={LABEL}>
-        {label}
-      </label>
+    <Row label={label} htmlFor={id} hint={hint} error={error}>
       <select
         id={id}
         value={value ?? ''}
         aria-invalid={error ? true : undefined}
         onChange={(event) => onChange(event.target.value || null)}
-        className={`${INPUT} ${error ? INPUT_ERROR : INPUT_OK} max-w-[40ch]`}
+        className={`${CONTROL} ${error ? INPUT_ERROR : INPUT_OK} w-56 pr-7`}
       >
         <option value="">{emptyLabel}</option>
         {models?.map((model) => (
@@ -599,21 +563,6 @@ function ModelPicker({
           </option>
         )}
       </select>
-      {error && (
-        <p role="alert" className={ERROR}>
-          {error}
-        </p>
-      )}
-      <p className={HINT}>{hint}</p>
-    </div>
-  );
-}
-
-function SectionHeader({ title, detail }: { title: string; detail?: string }) {
-  return (
-    <div className="border-b border-line bg-subtle px-5 py-3 sm:px-6">
-      <h2 className="text-[15px] font-bold text-ink">{title}</h2>
-      {detail && <p className="text-[13px] text-ink-3">{detail}</p>}
-    </div>
+    </Row>
   );
 }

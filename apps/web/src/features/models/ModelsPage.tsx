@@ -105,7 +105,7 @@ export function ModelsPage() {
       ) : !list ? (
         <PageLoader />
       ) : list.length === 0 ? (
-        <div className="panel flex flex-col items-center px-6 py-14 text-center">
+        <div className="panel flex flex-col items-center px-4 py-8 text-center">
           <span className="mb-4 grid h-12 w-12 place-items-center rounded-xl bg-accent-soft text-accent">
             <SparkIcon size={22} />
           </span>
@@ -120,27 +120,33 @@ export function ModelsPage() {
           </Button>
         </div>
       ) : (
-        <ul className="panel divide-y divide-line-2">
+        <ul className="grid gap-1.5 sm:grid-cols-2 xl:grid-cols-3">
           {list.map((model) => (
-            <li key={model.id} className="flex items-center gap-x-4 px-5 py-4 sm:px-6">
+            <li
+              key={model.id}
+              className="flex min-w-0 items-center gap-x-2 rounded-lg border border-line bg-surface px-2 py-1 transition-colors hover:border-line-strong"
+            >
               <span
-                className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg ${
+                className={`grid h-6 w-6 shrink-0 place-items-center rounded-md ${
                   model.isDefault ? 'bg-accent-soft text-accent' : 'bg-surface-2 text-ink-3'
                 }`}
               >
-                <SparkIcon size={16} />
+                <SparkIcon size={12} />
               </span>
               <div className="min-w-0 flex-1">
-                <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-                  <span className="truncate text-[14px] font-medium text-ink">{model.name}</span>
+                <div className="flex min-w-0 items-center gap-1 overflow-hidden">
+                  <span className="truncate text-[12px] font-medium text-ink">{model.name}</span>
                   {model.isDefault && <Badge tone="blue">default</Badge>}
-                  {model.supportsReasoning && <Badge>reasoning effort</Badge>}
+                  {model.supportsReasoning && <Badge>reasoning</Badge>}
                   {!model.supportsImages && <Badge>text only</Badge>}
                   {!model.hasApiKey && model.baseUrl === null && (
                     <Badge tone="yellow">no API key</Badge>
                   )}
                 </div>
-                <p className="mt-0.5 truncate font-mono text-[12px] text-ink-3">
+                <p
+                  className="truncate font-mono text-[10.5px] leading-tight text-ink-3"
+                  title={`${model.model} · ${serverLabel(model)}`}
+                >
                   {model.model} · {serverLabel(model)}
                 </p>
               </div>
@@ -156,11 +162,11 @@ export function ModelsPage() {
                 aria-haspopup="menu"
                 aria-expanded={menu?.id === model.id}
                 title="Edit, make default, delete…"
-                className={`ml-auto grid h-8 w-8 shrink-0 place-items-center rounded-lg transition-colors hover:bg-subtle hover:text-ink ${
+                className={`ml-auto grid h-6 w-6 shrink-0 place-items-center rounded-md transition-colors hover:bg-subtle hover:text-ink ${
                   menu?.id === model.id ? 'bg-subtle text-ink' : 'text-ink-3'
                 }`}
               >
-                <DotsVerticalIcon size={15} />
+                <DotsVerticalIcon size={13} />
               </button>
               {menu?.id === model.id && (
                 <RowMenu

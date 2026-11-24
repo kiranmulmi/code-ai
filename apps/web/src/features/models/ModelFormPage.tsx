@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { DEFAULT_CONTEXT_WINDOW, LIMITS, modelInputSchema, modelUpdateSchema } from '@app/shared';
 import { Button } from '../../components/Button';
 import { ConfirmDeleteDialog } from '../../components/ConfirmDeleteDialog';
-import { ERROR, INPUT_ERROR, INPUT_OK } from '../../components/form';
+import { InfoTip } from '../../components/InfoTip';
+import { ERROR_SM as ERROR, INPUT_ERROR, INPUT_OK } from '../../components/form';
 import { PageLoader } from '../../components/PageLoader';
 import { Spinner } from '../../components/Spinner';
 import { Switch } from '../../components/Switch';
@@ -35,15 +36,14 @@ const isField = (value: unknown): value is Field =>
   typeof value === 'string' && FIELDS.includes(value);
 
 const PRESET =
-  'h-7 rounded-md border px-2.5 text-[12px] font-medium transition-colors disabled:opacity-50';
+  'h-6 rounded-md border px-2 text-[11.5px] font-medium transition-colors disabled:opacity-50';
 
 // A denser take on the shared form styles: this form opens in the settings popup.
-const LABEL = 'block text-[13px] font-semibold text-ink';
+const LABEL = 'block text-[12.5px] font-semibold text-ink';
 const OPTIONAL = 'font-normal text-ink-3';
 const FIELD_BOX =
-  'h-9 rounded-lg border bg-surface px-3 text-[13px] text-ink outline-none transition-colors placeholder:text-ink-3 focus:border-accent focus:ring-1 focus:ring-accent focus-visible:outline-none';
+  'h-8 rounded-lg border bg-surface px-2.5 text-[12.5px] text-ink outline-none transition-colors placeholder:text-ink-3 focus:border-accent focus:ring-1 focus:ring-accent focus-visible:outline-none';
 const FIELD = `${FIELD_BOX} mt-1 w-full`;
-const TIP = 'mt-1 text-[12px] leading-snug text-ink-3';
 
 /**
  * Add or edit one model: `/settings/models/new` and `/settings/models/:modelId/edit`.
@@ -189,14 +189,17 @@ export function ModelFormPage() {
         id="model-form"
         noValidate
         onSubmit={(event) => void submit(event)}
-        className="panel flex flex-col gap-4 px-5 py-4 sm:px-6"
+        className="panel grid gap-x-3 gap-y-2 px-3 py-2.5 sm:grid-cols-6"
       >
-        <div>
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <label htmlFor="model-url" className={LABEL}>
-              Server
-            </label>
-            <div className="flex flex-wrap gap-1.5">
+        <div className="min-w-0 sm:col-span-6">
+          <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
+            <span className="flex items-center gap-1">
+              <label htmlFor="model-url" className={LABEL}>
+                Server
+              </label>
+              <InfoTip text="OpenAI-compatible base URL, usually ending in /v1. Empty uses api.openai.com." />
+            </span>
+            <div className="flex flex-wrap gap-1">
               {SERVER_PRESETS.map((preset) => {
                 const isOn = baseUrl.trim().replace(/\/+$/, '') === preset.baseUrl;
                 return (
@@ -239,80 +242,87 @@ export function ModelFormPage() {
               {errors.baseUrl}
             </p>
           )}
-          <p className={TIP}>
-            OpenAI-compatible base URL, usually ending in <span className="font-mono">/v1</span>.
-            Empty uses api.openai.com.
-          </p>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="min-w-0">
+        <div className="min-w-0 sm:col-span-3">
+          <span className="flex items-center gap-1">
             <label htmlFor="model-id" className={LABEL}>
               Model name
             </label>
-            <input
-              id="model-id"
-              value={model}
-              autoFocus={!isEdit}
-              autoComplete="off"
-              spellCheck={false}
-              maxLength={LIMITS.modelId}
-              placeholder="gpt-4.1, llama3.1:8b, …"
-              aria-invalid={errors.model ? true : undefined}
-              onChange={(event) => {
-                setModel(event.target.value);
-                clearError('model');
-              }}
-              className={`${FIELD} ${errors.model ? INPUT_ERROR : INPUT_OK} font-mono`}
-            />
-            {errors.model ? (
-              <p role="alert" className={ERROR}>
-                {errors.model}
-              </p>
-            ) : (
-              <p className={TIP}>Exactly as the server lists it.</p>
-            )}
-          </div>
-          <div className="min-w-0">
+            <InfoTip text="Exactly as the server lists it." />
+          </span>
+          <input
+            id="model-id"
+            value={model}
+            autoFocus={!isEdit}
+            autoComplete="off"
+            spellCheck={false}
+            maxLength={LIMITS.modelId}
+            placeholder="gpt-4.1, llama3.1:8b, …"
+            aria-invalid={errors.model ? true : undefined}
+            onChange={(event) => {
+              setModel(event.target.value);
+              clearError('model');
+            }}
+            className={`${FIELD} ${errors.model ? INPUT_ERROR : INPUT_OK} font-mono`}
+          />
+          {errors.model && (
+            <p role="alert" className={ERROR}>
+              {errors.model}
+            </p>
+          )}
+        </div>
+        <div className="min-w-0 sm:col-span-3">
+          <span className="flex items-center gap-1">
             <label htmlFor="model-name" className={LABEL}>
               Display name <span className={OPTIONAL}>· optional</span>
             </label>
-            <input
-              id="model-name"
-              value={name}
-              autoComplete="off"
-              maxLength={LIMITS.modelName}
-              placeholder={model.trim() || 'GPT-4.1'}
-              aria-invalid={errors.name ? true : undefined}
-              onChange={(event) => {
-                setName(event.target.value);
-                clearError('name');
-              }}
-              className={`${FIELD} ${errors.name ? INPUT_ERROR : INPUT_OK}`}
-            />
-            {errors.name ? (
-              <p role="alert" className={ERROR}>
-                {errors.name}
-              </p>
-            ) : (
-              <p className={TIP}>Shown in the model picker.</p>
-            )}
-          </div>
+            <InfoTip text="Shown in the model picker." />
+          </span>
+          <input
+            id="model-name"
+            value={name}
+            autoComplete="off"
+            maxLength={LIMITS.modelName}
+            placeholder={model.trim() || 'GPT-4.1'}
+            aria-invalid={errors.name ? true : undefined}
+            onChange={(event) => {
+              setName(event.target.value);
+              clearError('name');
+            }}
+            className={`${FIELD} ${errors.name ? INPUT_ERROR : INPUT_OK}`}
+          />
+          {errors.name && (
+            <p role="alert" className={ERROR}>
+              {errors.name}
+            </p>
+          )}
         </div>
 
-        <div>
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <label htmlFor="model-key" className={LABEL}>
-              API key <span className={OPTIONAL}>· not needed for Ollama or LM Studio</span>
-            </label>
+        <div className="min-w-0 sm:col-span-3">
+          <div className="flex items-center justify-between gap-2">
+            <span className="flex min-w-0 items-center gap-1">
+              <label htmlFor="model-key" className={`${LABEL} truncate`}>
+                API key <span className={OPTIONAL}>· optional</span>
+              </label>
+              <InfoTip
+                text={
+                  isKeyRemoved
+                    ? 'The saved key is removed when you save.'
+                    : 'Not needed for Ollama or LM Studio. Kept in ~/.hamro-ai/models.json, readable only by you, sent only to this server, and never shown again.'
+                }
+              />
+            </span>
             {hasSavedKey && !apiKey && (
-              <Button
-                size="sm"
-                variant={isKeyRemoved ? 'plain' : 'danger-ghost'}
+              <button
+                type="button"
                 onClick={() => setIsKeyRemoved(!isKeyRemoved)}
+                className={`shrink-0 text-[11px] font-medium ${
+                  isKeyRemoved ? 'text-ink-2 hover:text-ink' : 'text-danger hover:underline'
+                }`}
               >
-                {isKeyRemoved ? 'Keep the saved key' : 'Remove saved key'}
-              </Button>
+                {isKeyRemoved ? 'Keep saved key' : 'Remove saved key'}
+              </button>
             )}
           </div>
           <input
@@ -335,130 +345,119 @@ export function ModelFormPage() {
               {errors.apiKey}
             </p>
           )}
-          <p className={TIP}>
-            {isKeyRemoved
-              ? 'The saved key is removed when you save.'
-              : 'Kept in ~/.hamro-ai/models.json, readable only by you, sent only to this server, and never shown again.'}
-          </p>
         </div>
-
-        <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
-          <div className="min-w-0">
+        <div className="min-w-0 sm:col-span-3">
+          <span className="flex items-center gap-1">
             <label htmlFor="model-max-tokens" className={LABEL}>
               Max output tokens <span className={OPTIONAL}>· optional</span>
             </label>
-            <input
-              id="model-max-tokens"
-              inputMode="numeric"
-              value={maxTokens}
-              autoComplete="off"
-              placeholder="Server default"
-              aria-invalid={errors.maxTokens ? true : undefined}
-              onChange={(event) => {
-                setMaxTokens(event.target.value.replace(/[^\d]/g, ''));
-                clearError('maxTokens');
-              }}
-              className={`${FIELD} ${errors.maxTokens ? INPUT_ERROR : INPUT_OK} tabular-nums`}
-            />
-            {errors.maxTokens && (
-              <p role="alert" className={ERROR}>
-                {errors.maxTokens}
-              </p>
-            )}
-          </div>
-          <div className="min-w-0">
+            <InfoTip text="Empty uses the server's default." />
+          </span>
+          <input
+            id="model-max-tokens"
+            inputMode="numeric"
+            value={maxTokens}
+            autoComplete="off"
+            placeholder="Server default"
+            aria-invalid={errors.maxTokens ? true : undefined}
+            onChange={(event) => {
+              setMaxTokens(event.target.value.replace(/[^\d]/g, ''));
+              clearError('maxTokens');
+            }}
+            className={`${FIELD} ${errors.maxTokens ? INPUT_ERROR : INPUT_OK} tabular-nums`}
+          />
+          {errors.maxTokens && (
+            <p role="alert" className={ERROR}>
+              {errors.maxTokens}
+            </p>
+          )}
+        </div>
+
+        <div className="min-w-0 sm:col-span-6">
+          <span className="flex items-center gap-1">
             <label htmlFor="model-context-window" className={LABEL}>
               Context window <span className={OPTIONAL}>· tokens, optional</span>
             </label>
-            <div className="mt-1 flex flex-wrap items-center gap-1.5">
-              <input
-                id="model-context-window"
-                inputMode="numeric"
-                value={contextWindow}
-                autoComplete="off"
-                placeholder={`${DEFAULT_CONTEXT_WINDOW.toLocaleString('en')} (default)`}
-                aria-invalid={errors.contextWindow ? true : undefined}
-                onChange={(event) => {
-                  setContextWindow(event.target.value.replace(/[^\d]/g, ''));
-                  clearError('contextWindow');
-                }}
-                className={`${FIELD_BOX} ${errors.contextWindow ? INPUT_ERROR : INPUT_OK} min-w-0 flex-1 basis-[16ch] tabular-nums`}
-              />
-              {WINDOW_PRESETS.map((preset) => {
-                const isOn = contextWindow === String(preset);
-                return (
-                  <button
-                    key={preset}
-                    type="button"
-                    onClick={() => {
-                      setContextWindow(String(preset));
-                      clearError('contextWindow');
-                    }}
-                    aria-pressed={isOn}
-                    className={`${PRESET} tabular-nums ${
-                      isOn
-                        ? 'border-accent bg-accent-soft text-accent-2'
-                        : 'border-line bg-surface text-ink-2 hover:border-line-strong hover:text-ink'
-                    }`}
-                  >
-                    {windowLabel(preset)}
-                  </button>
-                );
-              })}
-            </div>
-            {errors.contextWindow ? (
-              <p role="alert" className={ERROR}>
-                {errors.contextWindow}
-              </p>
-            ) : (
-              <p className={TIP}>
-                Input and output together; long chats are summarized near it. Empty assumes{' '}
-                {windowLabel(DEFAULT_CONTEXT_WINDOW)}.
-              </p>
-            )}
+            <InfoTip
+              text={`Input and output together; long chats are summarized near it. Empty assumes ${windowLabel(DEFAULT_CONTEXT_WINDOW)}.`}
+            />
+          </span>
+          <div className="mt-1 flex flex-wrap items-center gap-1">
+            <input
+              id="model-context-window"
+              inputMode="numeric"
+              value={contextWindow}
+              autoComplete="off"
+              placeholder={`${DEFAULT_CONTEXT_WINDOW.toLocaleString('en')} (default)`}
+              aria-invalid={errors.contextWindow ? true : undefined}
+              onChange={(event) => {
+                setContextWindow(event.target.value.replace(/[^\d]/g, ''));
+                clearError('contextWindow');
+              }}
+              className={`${FIELD_BOX} ${errors.contextWindow ? INPUT_ERROR : INPUT_OK} min-w-0 flex-1 basis-[16ch] tabular-nums`}
+            />
+            {WINDOW_PRESETS.map((preset) => {
+              const isOn = contextWindow === String(preset);
+              return (
+                <button
+                  key={preset}
+                  type="button"
+                  onClick={() => {
+                    setContextWindow(String(preset));
+                    clearError('contextWindow');
+                  }}
+                  aria-pressed={isOn}
+                  className={`${PRESET} tabular-nums ${
+                    isOn
+                      ? 'border-accent bg-accent-soft text-accent-2'
+                      : 'border-line bg-surface text-ink-2 hover:border-line-strong hover:text-ink'
+                  }`}
+                >
+                  {windowLabel(preset)}
+                </button>
+              );
+            })}
           </div>
+          {errors.contextWindow && (
+            <p role="alert" className={ERROR}>
+              {errors.contextWindow}
+            </p>
+          )}
         </div>
 
-        <div className="grid gap-4 border-t border-line-2 pt-4 sm:grid-cols-2">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <p className={LABEL}>Reasoning effort</p>
-              <p className={TIP}>
-                Offers Low, Medium or High per message (o-series, GPT-5, DeepSeek R1, …).
-              </p>
-            </div>
+        <div className="grid gap-x-3 gap-y-1 border-t border-line-2 pt-2 sm:col-span-6 sm:grid-cols-3">
+          <ToggleRow
+            label="Reasoning effort"
+            hint="Offers Low, Medium or High per message (o-series, GPT-5, DeepSeek R1, …)."
+          >
             <Switch
               isOn={supportsReasoning}
               onChange={setSupportsReasoning}
               label="Supports reasoning effort"
             />
-          </div>
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <p className={LABEL}>Reads images</p>
-              <p className={TIP}>
-                Turn off for text-only models: images then go to the image model set in Settings →
-                Agent, which describes them in text.
-              </p>
-            </div>
+          </ToggleRow>
+          <ToggleRow
+            label="Reads images"
+            hint="Turn off for text-only models: images then go to the image model set in Settings → Agent, which describes them in text."
+          >
             <Switch isOn={supportsImages} onChange={setSupportsImages} label="Reads images" />
-          </div>
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <p className={LABEL}>Default model</p>
-              <p className={TIP}>
-                {wasDefault
-                  ? 'This is the default. Make another model the default to change it.'
-                  : 'Used when no model is picked, and by the terminal chat.'}
-              </p>
-            </div>
+          </ToggleRow>
+          <ToggleRow
+            label="Default model"
+            align="end"
+            hint={
+              wasDefault
+                ? 'This is the default. Make another model the default to change it.'
+                : 'Used when no model is picked, and by the terminal chat.'
+            }
+          >
             <Switch
               isOn={isDefault}
               onChange={setIsDefault}
               disabled={wasDefault}
               label="Default model"
             />
-          </div>
+          </ToggleRow>
         </div>
       </form>
 
@@ -496,6 +495,30 @@ export function ModelFormPage() {
           onConfirm={() => void confirmDelete()}
         />
       )}
+    </div>
+  );
+}
+
+/** A label with its info tip, and an on/off switch beside it on the same line. */
+function ToggleRow({
+  label,
+  hint,
+  align,
+  children,
+}: {
+  label: string;
+  hint: string;
+  /** where the info tip opens; `end` for the right-most toggle */
+  align?: 'start' | 'end';
+  children: ReactNode;
+}) {
+  return (
+    <div className="flex h-7 items-center justify-between gap-2">
+      <span className="flex min-w-0 items-center gap-1">
+        <span className={`${LABEL} truncate`}>{label}</span>
+        <InfoTip text={hint} align={align} />
+      </span>
+      {children}
     </div>
   );
 }

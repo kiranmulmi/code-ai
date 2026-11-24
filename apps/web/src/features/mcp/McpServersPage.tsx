@@ -58,7 +58,7 @@ export function McpServersPage() {
       ) : !list ? (
         <PageLoader />
       ) : list.length === 0 ? (
-        <div className="panel flex flex-col items-center px-6 py-14 text-center">
+        <div className="panel flex flex-col items-center px-4 py-8 text-center">
           <span className="mb-4 grid h-12 w-12 place-items-center rounded-xl bg-accent-soft text-accent">
             <ServerIcon size={22} />
           </span>
@@ -72,32 +72,34 @@ export function McpServersPage() {
           </Button>
         </div>
       ) : (
-        <ul className="panel divide-y divide-line-2">
+        <ul className="grid gap-1.5 sm:grid-cols-2 xl:grid-cols-3">
           {list.map((entry) => {
             const transport = mcpTransportOf(entry.server);
             const autoApproved = entry.server.autoApprove?.length ?? 0;
             return (
               <li
                 key={entry.name}
-                className="flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-4 sm:flex-nowrap sm:px-6"
+                className="flex min-w-0 items-center gap-x-2 rounded-lg border border-line bg-surface px-2 py-1 transition-colors hover:border-line-strong"
               >
-                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-surface-2 text-ink-3">
-                  <ServerIcon size={16} />
+                <span className="grid h-6 w-6 shrink-0 place-items-center rounded-md bg-surface-2 text-ink-3">
+                  <ServerIcon size={12} />
                 </span>
                 <div className="min-w-0 flex-1">
-                  <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-                    <span className="truncate font-mono text-[14px] font-medium text-ink">
+                  <div className="flex min-w-0 items-center gap-1 overflow-hidden">
+                    <span className="truncate font-mono text-[12px] font-medium text-ink">
                       {entry.name}
                     </span>
                     <Badge>{transport === 'stdio' ? 'local' : transport}</Badge>
                     {autoApproved > 0 && (
-                      <Badge tone="yellow">
-                        {autoApproved} tool{autoApproved === 1 ? '' : 's'} always allowed
-                      </Badge>
+                      <span
+                        title={`${autoApproved} tool${autoApproved === 1 ? '' : 's'} always allowed`}
+                      >
+                        <Badge tone="yellow">{autoApproved} auto</Badge>
+                      </span>
                     )}
                   </div>
                   <p
-                    className="mt-0.5 truncate font-mono text-[12px] text-ink-3"
+                    className="truncate font-mono text-[10.5px] leading-tight text-ink-3"
                     title={target(entry)}
                   >
                     {target(entry)}
@@ -106,7 +108,7 @@ export function McpServersPage() {
                 <Link
                   to={`${LIST_PATH}/${encodeURIComponent(entry.name)}/edit`}
                   state={{ from: LIST_PATH }}
-                  className="ml-auto inline-flex h-7 shrink-0 items-center rounded-lg border border-line bg-surface px-2.5 text-[12px] font-medium text-ink transition-colors hover:border-line-strong hover:bg-subtle"
+                  className="ml-auto inline-flex h-6 shrink-0 items-center rounded-md border border-line bg-surface px-2 text-[11.5px] font-medium text-ink transition-colors hover:border-line-strong hover:bg-subtle"
                 >
                   Edit
                 </Link>

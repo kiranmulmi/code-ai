@@ -4,7 +4,18 @@ import { mcpServerInputSchema } from '@app/shared';
 import { Button } from '../../components/Button';
 import { CodeText } from '../../components/CodeText';
 import { ConfirmDeleteDialog } from '../../components/ConfirmDeleteDialog';
-import { ERROR, HINT, INPUT, INPUT_ERROR, INPUT_OK, LABEL, SECTION } from '../../components/form';
+// Dense styles (this form opens in the settings popup); the JSON box keeps INPUT, which its
+// highlighted copy is lined up with.
+import {
+  ERROR_SM as ERROR,
+  HINT_SM as HINT,
+  INPUT,
+  INPUT_ERROR,
+  INPUT_OK,
+  INPUT_SM,
+  LABEL_SM as LABEL,
+  SECTION_SM as SECTION,
+} from '../../components/form';
 import { PageLoader } from '../../components/PageLoader';
 import { Spinner } from '../../components/Spinner';
 import { FormActions, usePageHeader } from '../../layout/pageHeader';
@@ -152,16 +163,14 @@ export function McpServerFormPage() {
 
   return (
     <div className="w-full">
-      <form id="mcp-form" noValidate onSubmit={(event) => void submit(event)} className="panel">
-        <div className="border-b border-line bg-subtle px-5 py-3 sm:px-6">
-          <h2 className="text-[15px] font-bold text-ink">Server</h2>
-          <p className="text-[13px] text-ink-3">
-            Saved in this workspace&apos;s{' '}
-            <span className="font-mono">.hamro-ai/{'<workspace>'}/mcp.json</span>, in the format
-            other MCP apps use.
-          </p>
-        </div>
-
+      {/* Two columns: the name and the notes on the left, the JSON editor (the bulk of the
+          form) beside them, so the whole form fits without scrolling. */}
+      <form
+        id="mcp-form"
+        noValidate
+        onSubmit={(event) => void submit(event)}
+        className="panel grid md:grid-cols-[minmax(0,16rem)_minmax(0,1fr)] md:divide-x md:divide-line-2"
+      >
         <div className="flex flex-col divide-y divide-line-2">
           <div className={SECTION}>
             <label htmlFor="mcp-name" className={LABEL}>
@@ -180,7 +189,7 @@ export function McpServerFormPage() {
                 setName(event.target.value);
                 setNameError(null);
               }}
-              className={`${INPUT} ${nameError ? INPUT_ERROR : INPUT_OK} max-w-[32ch] font-mono text-[13px]`}
+              className={`${INPUT_SM} ${nameError ? INPUT_ERROR : INPUT_OK} font-mono`}
             />
             {nameError && (
               <p role="alert" className={ERROR}>
@@ -189,10 +198,35 @@ export function McpServerFormPage() {
             )}
             <p className={HINT}>
               Letters, digits, - and _. Its tools show up as{' '}
-              <span className="font-mono">mcp__{name.trim() || 'name'}__tool</span>.
+              <span className="font-mono break-all">mcp__{name.trim() || 'name'}__tool</span>.
             </p>
           </div>
+          <div id="mcp-json-hint" className={`${SECTION} ${HINT} !mt-0 grid gap-1.5`}>
+            <p>
+              Paste a server&apos;s <span className="font-mono">mcpServers</span> snippet from its
+              README as it is: it&apos;s unwrapped to this server, with its name.
+            </p>
+            <p>
+              Local: <span className="font-mono">command</span>,{' '}
+              <span className="font-mono">args</span>, <span className="font-mono">env</span>.
+              Remote: <span className="font-mono">url</span>,{' '}
+              <span className="font-mono">headers</span> (and{' '}
+              <span className="font-mono">&quot;type&quot;: &quot;sse&quot;</span> for older
+              servers). Optional: <span className="font-mono">autoApprove</span> (tool names that
+              run without asking).
+            </p>
+          </div>
+          <div className={`${SECTION} flex-1 bg-subtle`}>
+            <p className="text-[11px] leading-snug text-ink-3">
+              A local server runs its command in the folder of each workspace that turns it on, with
+              only the variables in <span className="font-mono">env</span> plus basics like PATH and
+              HOME, never this app&apos;s own keys. Keys and tokens in it are saved in
+              ~/.hamro-ai/mcp-servers.json, readable only by you, not in your project folders.
+            </p>
+          </div>
+        </div>
 
+        <div className="flex flex-col divide-y divide-line-2">
           <div className={SECTION}>
             <div className="flex flex-wrap items-end justify-between gap-2">
               <label htmlFor="mcp-json" className={LABEL}>
@@ -230,7 +264,7 @@ export function McpServerFormPage() {
               </pre>
               <textarea
                 id="mcp-json"
-                rows={14}
+                rows={16}
                 value={json}
                 spellCheck={false}
                 autoCapitalize="off"
@@ -258,7 +292,7 @@ export function McpServerFormPage() {
                   highlight.scrollTop = event.currentTarget.scrollTop;
                   highlight.scrollLeft = event.currentTarget.scrollLeft;
                 }}
-                className={`${INPUT} ${jsonError ? INPUT_ERROR : INPUT_OK} ${JSON_EDITOR} relative min-h-[220px] resize-y caret-ink !bg-transparent !text-[13px] ${
+                className={`${INPUT} ${jsonError ? INPUT_ERROR : INPUT_OK} ${JSON_EDITOR} relative min-h-[240px] resize-y caret-ink !bg-transparent !text-[13px] ${
                   json ? '[-webkit-text-fill-color:transparent]' : ''
                 }`}
               />
@@ -268,30 +302,6 @@ export function McpServerFormPage() {
                 {jsonError}
               </p>
             )}
-            <div id="mcp-json-hint" className={`${HINT} grid gap-1`}>
-              <p>
-                Paste a server&apos;s <span className="font-mono">mcpServers</span> snippet from its
-                README as it is: it&apos;s unwrapped to this server, with its name.
-              </p>
-              <p>
-                Local: <span className="font-mono">command</span>,{' '}
-                <span className="font-mono">args</span>, <span className="font-mono">env</span>.
-                Remote: <span className="font-mono">url</span>,{' '}
-                <span className="font-mono">headers</span> (and{' '}
-                <span className="font-mono">&quot;type&quot;: &quot;sse&quot;</span> for older
-                servers). Optional: <span className="font-mono">autoApprove</span> (tool names that
-                run without asking).
-              </p>
-            </div>
-          </div>
-
-          <div className={`${SECTION} bg-subtle`}>
-            <p className="text-[13px] leading-relaxed text-ink-3">
-              A local server runs its command in the folder of each workspace that turns it on, with
-              only the variables in <span className="font-mono">env</span> plus basics like PATH and
-              HOME, never this app&apos;s own keys. Keys and tokens in it are saved in
-              ~/.hamro-ai/mcp-servers.json, readable only by you, not in your project folders.
-            </p>
           </div>
         </div>
       </form>

@@ -4,9 +4,9 @@ import { GearIcon, ServerIcon, SparkIcon } from '../../lib/icons';
 import { fromPath } from '../../lib/routerState';
 
 const TABS = [
-  { to: '/settings/models', label: 'Models', icon: <SparkIcon size={13} /> },
-  { to: '/settings/mcp', label: 'MCP servers', icon: <ServerIcon size={13} /> },
-  { to: '/settings/agent', label: 'Agent settings', icon: <GearIcon size={13} /> },
+  { to: '/settings/models', label: 'Models', icon: <SparkIcon size={11} /> },
+  { to: '/settings/mcp', label: 'MCP servers', icon: <ServerIcon size={11} /> },
+  { to: '/settings/agent', label: 'Agent settings', icon: <GearIcon size={11} /> },
 ] as const;
 
 /** Set inside the Preferences popup, whose side tabs replace each page's own tabs. */
@@ -51,10 +51,10 @@ export function SettingsSideTabs({ children }: { children: ReactNode }) {
   const from = fromPath(location.state);
 
   return (
-    <div className="flex min-h-full flex-col gap-4 md:flex-row md:gap-6">
+    <div className="flex min-h-full flex-col gap-3 md:flex-row md:gap-4">
       <nav
         aria-label="Settings"
-        className="-mx-1 flex shrink-0 gap-1 overflow-x-auto border-b border-line pb-2 md:mx-0 md:w-48 md:flex-col md:overflow-visible md:border-b-0 md:border-r md:pb-0 md:pr-4"
+        className="-mx-1 flex shrink-0 gap-1 overflow-x-auto border-b border-line pb-2 md:mx-0 md:w-40 md:flex-col md:gap-0.5 md:overflow-visible md:border-b-0 md:border-r md:pb-0 md:pr-3"
       >
         {TABS.map((tab) => (
           <NavLink
@@ -62,7 +62,7 @@ export function SettingsSideTabs({ children }: { children: ReactNode }) {
             to={tab.to}
             state={from ? { from } : undefined}
             className={({ isActive }) =>
-              `flex h-9 shrink-0 items-center gap-2.5 rounded-xl px-3 text-[13px] font-medium transition-colors ${
+              `flex h-7 shrink-0 items-center gap-2 rounded-lg px-2 text-[12.5px] font-medium transition-colors ${
                 isActive ? 'bg-accent-soft text-ink' : 'text-ink-2 hover:bg-subtle hover:text-ink'
               }`
             }
@@ -70,7 +70,7 @@ export function SettingsSideTabs({ children }: { children: ReactNode }) {
             {({ isActive }) => (
               <>
                 <span
-                  className={`grid h-6 w-6 shrink-0 place-items-center rounded-lg transition-[background-color,color,transform] duration-200 ${
+                  className={`grid h-5 w-5 shrink-0 place-items-center rounded-md transition-[background-color,color,transform] duration-200 ${
                     isActive ? 'scale-105 bg-accent text-on-accent' : 'bg-accent-soft text-accent-2'
                   }`}
                 >
