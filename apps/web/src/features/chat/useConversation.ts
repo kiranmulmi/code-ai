@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type {
   Attachment,
   ChatDetail,
@@ -7,39 +7,47 @@ import type {
   ReasoningEffort,
 } from '@app/shared';
 import { errorMessage, isNotFound } from '../../lib/api';
-import { parseStreamEvent, readEventData } from '../../lib/sse';
 import {
-  decideApproval,
   answerQuestion,
+  decideApproval,
   fetchChat,
   setRunAutoApprove,
-  startRun,
   steerRun,
   stopRun as requestStop,
 } from './api';
-import { conversationReducer, initialConversation } from './conversation';
+import {
+  conversationReducer,
+  initialConversation,
+  type ConversationAction,
+  type ConversationState,
+} from './conversation';
+import {
+  attachToRun,
+  dispatchToRun,
+  hasRunFor,
+  isLive,
+  queueOf,
+  startLiveRun,
+  takeReturned,
+  updateQueue,
+  useLiveRuns,
+  wasRead,
+  type QueuedMessage,
+  type ReplyStreamEvent,
+} from './liveRuns';
+
+export type { QueuedMessage, ReplyStreamEvent } from './liveRuns';
 
 type Options = {
   workspaceId: string;
   /** The chat in the URL, or null for a new chat. */
   chatId: string | null;
-  /** The stream's first event: the chat the message went to. `isNew` when it was just made. */
+  /** The shown run's first event: the chat the message went to. `isNew` when it was just made. */
   onChat: (chat: ChatSummary, isNew: boolean) => void;
-  /** The agent decided to plan, so the plan panel is worth showing. */
-  /** A run ended (finished, failed or was cut off): lists elsewhere may have changed. */
-  onRunEnd: () => void;
   onLoaded: (detail: ChatDetail) => void;
   onLoadError: (cause: unknown) => void;
   /** Messages sent during a run came back to the message box unread; `reason` says why. */
   onMessagesReturned: (reason: string) => void;
-};
-
-/** A message sent while the agent works, shown until the agent reads it. */
-export type QueuedMessage = {
-  key: number;
-  /** Null until the server accepts it. */
-  id: string | null;
-  text: string;
 };
 
 /** Text going back into the message box; a new `key` each time. */
@@ -57,55 +65,42 @@ export type SendOptions = {
   skills?: string[];
 };
 
-/**
- * The reply as it streams, for reading it aloud (voice mode): `text` pieces, and `break` when
- * something else happened (a tool call, an approval), so a sentence cut there is said as is.
- */
-export type ReplyStreamEvent = { type: 'text'; text: string } | { type: 'break' };
 type ReplyListener = (event: ReplyStreamEvent) => void;
 
-type Run = {
-  controller: AbortController;
-  workspaceId: string;
-  /** Null until the stream says which chat a new conversation went to. */
-  chatId: string | null;
-};
-
 /**
- * The open chat: loads its history when the URL changes, sends messages through
- * `POST /v1/runs` and folds the event stream into the conversation as it arrives.
- * Leaving the chat while a run streams closes the connection; the server then denies
- * any approval still waiting, as it does when the tab closes.
+ * The open chat: loads its history when the URL changes, and sends messages through
+ * `POST /v1/runs`. The run itself lives in `liveRuns`, so it keeps streaming when the user
+ * opens another chat or workspace; this hook shows it while its chat is the open one.
  */
 export function useConversation(options: Options) {
   const { workspaceId, chatId } = options;
-  const [state, dispatch] = useReducer(conversationReducer, initialConversation);
-  const [isBusy, setIsBusy] = useState(false);
+  // The chat as loaded (or as its last run here ended); a live run's own state wins over it.
+  const [loaded, setLoaded] = useState<ConversationState>(initialConversation);
+  const dispatchLoaded = useCallback(
+    (action: ConversationAction) => setLoaded((state) => conversationReducer(state, action)),
+    [],
+  );
   const [isLoading, setIsLoading] = useState(false);
   const [isRunningElsewhere, setIsRunningElsewhere] = useState(false);
   const [reloadToken, setReloadToken] = useState(0);
-  const runRef = useRef<Run | null>(null);
-  // Messages sent during this tab's run that the agent hasn't read yet.
-  const [queued, setQueued] = useState<QueuedMessage[]>([]);
-  const queuedRef = useRef<QueuedMessage[]>([]);
-  // The ids of those the agent read, in case that happens before their POST answers.
-  const readIds = useRef(new Set<string>());
-  const queueKey = useRef(0);
   const [returned, setReturned] = useState<ReturnedDraft | null>(null);
   const callbacks = useRef(options);
   const replyListeners = useRef(new Set<ReplyListener>());
-  const tellListeners = (event: ReplyStreamEvent) => {
-    for (const listener of replyListeners.current) listener(event);
-  };
 
   useEffect(() => {
     callbacks.current = options;
   });
 
-  const setQueue = useCallback((next: QueuedMessage[]) => {
-    queuedRef.current = next;
-    setQueued(next);
-  }, []);
+  // This tab's run for the open chat (a new chat's, until the stream names its chat).
+  const runs = useLiveRuns();
+  const run = runs.find((item) => item.workspaceId === workspaceId && item.chatId === chatId);
+  const runKey = run?.key ?? null;
+  const runChatId = run?.chatId ?? null;
+  const isBusy = run !== undefined;
+  const state = run?.state ?? loaded;
+  const queued = run?.queued ?? NO_QUEUE;
+  const isBusyRef = useRef(isBusy);
+  isBusyRef.current = isBusy;
 
   /** Puts unread messages back in the message box, so nothing typed is lost. */
   const giveBack = useCallback((texts: string[], reason: string) => {
@@ -114,39 +109,52 @@ export function useConversation(options: Options) {
     callbacks.current.onMessagesReturned(reason);
   }, []);
 
-  const stopRun = useCallback(() => {
-    const run = runRef.current;
-    runRef.current = null;
-    if (run) {
-      run.controller.abort();
-      setIsBusy(false);
-    }
-  }, []);
-
-  // Leaving the screen ends the stream.
-  useEffect(() => stopRun, [stopRun]);
+  // While its chat is open, the run tells this view about its chat, reply and end.
+  useEffect(() => {
+    if (runKey === null) return;
+    return attachToRun(runKey, {
+      onChat: (chat, isNew) => callbacks.current.onChat(chat, isNew),
+      onReply: (event) => {
+        for (const listener of replyListeners.current) listener(event);
+      },
+      onEnd: (final) => {
+        setLoaded(final);
+        setIsRunningElsewhere(false);
+      },
+      onMessagesReturned: giveBack,
+    });
+  }, [runKey, giveBack]);
 
   useEffect(() => {
-    const run = runRef.current;
-    // The live run owns this view, including the moment a new chat gets its id.
-    if (run && run.workspaceId === workspaceId && run.chatId === chatId) return;
-    stopRun();
     setIsRunningElsewhere(false);
-    // Already sent: the run reads them whether or not this chat stays open.
-    setQueue([]);
-
-    if (!chatId) {
-      dispatch({ type: 'reset' });
+    // The live run owns this view, including the moment a new chat gets its id (and coming
+    // back to a chat whose run kept going while another one was open).
+    if (isBusyRef.current) {
       setIsLoading(false);
       return;
+    }
+
+    if (!chatId) {
+      setLoaded(initialConversation);
+      setIsLoading(false);
+      return;
+    }
+    // Messages a run gave back while this chat was closed.
+    const unread = takeReturned(chatId);
+    if (unread.length) {
+      giveBack(
+        unread,
+        "The agent finished before it read your last messages, so they're back in the message box.",
+      );
     }
 
     let isCurrent = true;
     setIsLoading(true);
     fetchChat(chatId)
       .then((detail) => {
-        if (!isCurrent) return;
-        dispatch({ type: 'load', detail });
+        // This tab's own run shows the chat; the saved copy is behind it.
+        if (!isCurrent || hasRunFor(workspaceId, chatId)) return;
+        setLoaded(conversationReducer(initialConversation, { type: 'load', detail }));
         setIsRunningElsewhere(detail.chat.isRunning);
         callbacks.current.onLoaded(detail);
       })
@@ -159,7 +167,7 @@ export function useConversation(options: Options) {
     return () => {
       isCurrent = false;
     };
-  }, [workspaceId, chatId, reloadToken, stopRun, setQueue]);
+  }, [workspaceId, chatId, reloadToken, giveBack]);
 
   const send = useCallback(
     async (
@@ -167,119 +175,58 @@ export function useConversation(options: Options) {
       { modelId, reasoningEffort, attachments = [], autoApprove, skills = [] }: SendOptions = {},
     ) => {
       const message = text.trim();
-      if ((!message && !attachments.length) || runRef.current) return;
-
-      const run: Run = { controller: new AbortController(), workspaceId, chatId };
-      runRef.current = run;
-      const isCurrent = () => runRef.current === run;
-      readIds.current = new Set();
-      setIsBusy(true);
+      if ((!message && !attachments.length) || isBusyRef.current) return;
       setIsRunningElsewhere(false);
-      dispatch({ type: 'send', text: message, attachments, skills, at: Date.now() });
-
-      // Text deltas are merged and applied at most once per frame.
-      let pending = '';
-      let frame = 0;
-      const flush = () => {
-        if (frame) cancelAnimationFrame(frame);
-        frame = 0;
-        if (pending && isCurrent()) {
-          dispatch({ type: 'event', event: { type: 'text_delta', text: pending }, at: Date.now() });
-        }
-        pending = '';
-      };
-
-      try {
-        const body = await startRun(
-          {
-            workspaceId,
-            chatId: chatId ?? undefined,
-            message,
-            attachmentIds: attachments.length ? attachments.map((a) => a.id) : undefined,
-            modelId,
-            reasoningEffort,
-            autoApprove: autoApprove || undefined,
-            skills: skills.length ? skills : undefined,
-          },
-          run.controller.signal,
-        );
-        for await (const data of readEventData(body)) {
-          if (!isCurrent()) break;
-          const event = parseStreamEvent(data);
-          if (!event) continue;
-          if (event.type === 'text_delta') {
-            tellListeners({ type: 'text', text: event.text });
-            pending += event.text;
-            if (!frame) frame = requestAnimationFrame(flush);
-            continue;
-          }
-          flush();
-          tellListeners({ type: 'break' });
-          if (event.type === 'chat') {
-            const isNew = run.chatId === null;
-            run.chatId = event.chat.id;
-            callbacks.current.onChat(event.chat, isNew);
-            continue;
-          }
-          if (event.type === 'steer') {
-            readIds.current.add(event.id);
-            setQueue(queuedRef.current.filter((message) => message.id !== event.id));
-          }
-          dispatch({ type: 'event', event, at: Date.now() });
-        }
-        flush();
-      } catch (cause) {
-        flush();
-        if (isCurrent()) dispatch({ type: 'fail', message: errorMessage(cause) });
-      } finally {
-        if (frame) cancelAnimationFrame(frame);
-        if (isCurrent()) {
-          runRef.current = null;
-          dispatch({ type: 'finish', at: Date.now() });
-          setIsBusy(false);
-          const unread = queuedRef.current.map((message) => message.text);
-          setQueue([]);
-          giveBack(
-            unread,
-            unread.length === 1
-              ? "The agent finished before it read your last message, so it's back in the message box."
-              : "The agent finished before it read your last messages, so they're back in the message box.",
-          );
-        }
-        callbacks.current.onRunEnd();
-      }
+      const shown = conversationReducer(loaded, {
+        type: 'send',
+        text: message,
+        attachments,
+        skills,
+        at: Date.now(),
+      });
+      startLiveRun(
+        {
+          workspaceId,
+          chatId: chatId ?? undefined,
+          message,
+          attachmentIds: attachments.length ? attachments.map((a) => a.id) : undefined,
+          modelId,
+          reasoningEffort,
+          autoApprove: autoApprove || undefined,
+          skills: skills.length ? skills : undefined,
+        },
+        shown,
+      );
     },
-    [workspaceId, chatId, setQueue, giveBack],
+    [workspaceId, chatId, loaded],
   );
 
   /**
-   * Sends a message to this tab's run in progress: it waits (shown in `queued`) until the agent
-   * reads it before its next step. One the run can't take goes back to the message box.
+   * Sends a message to the open chat's run in progress: it waits (shown in `queued`) until the
+   * agent reads it before its next step. One the run can't take goes back to the message box.
    */
   const steer = useCallback(
     async (text: string) => {
       const message = text.trim();
-      const run = runRef.current;
-      if (!message || !run) return;
-      if (!run.chatId) {
+      if (!message || runKey === null) return;
+      if (!runChatId) {
         giveBack([message], 'The chat is still starting. Send it again in a moment.');
         return;
       }
-      queueKey.current += 1;
-      const key = queueKey.current;
-      setQueue([...queuedRef.current, { key, id: null, text: message }]);
-      const isWaiting = () => queuedRef.current.some((item) => item.key === key);
+      const key = nextQueueKey++;
+      updateQueue(runKey, (list) => [...list, { key, id: null, text: message }]);
+      const isWaiting = () => queueOf(runKey).some((item) => item.key === key);
       try {
-        const { id } = await steerRun(run.chatId, message);
+        const { id } = await steerRun(runChatId, message);
         if (!isWaiting()) return; // the run ended meanwhile and gave it back
-        setQueue(
-          readIds.current.has(id)
-            ? queuedRef.current.filter((item) => item.key !== key)
-            : queuedRef.current.map((item) => (item.key === key ? { ...item, id } : item)),
+        updateQueue(runKey, (list) =>
+          wasRead(runKey, id)
+            ? list.filter((item) => item.key !== key)
+            : list.map((item) => (item.key === key ? { ...item, id } : item)),
         );
       } catch (cause) {
         if (!isWaiting()) return;
-        setQueue(queuedRef.current.filter((item) => item.key !== key));
+        updateQueue(runKey, (list) => list.filter((item) => item.key !== key));
         giveBack(
           [message],
           isNotFound(cause)
@@ -288,29 +235,44 @@ export function useConversation(options: Options) {
         );
       }
     },
-    [setQueue, giveBack],
+    [runKey, runChatId, giveBack],
   );
 
-  const decide = useCallback(async (approvalId: string, allow: boolean) => {
-    dispatch({ type: 'approval_sending', approvalId });
-    try {
-      const { allowed } = await decideApproval(approvalId, allow);
-      dispatch({ type: 'approval_decided', approvalId, allowed });
-    } catch (cause) {
-      dispatch({ type: 'approval_failed', approvalId, message: errorMessage(cause) });
-    }
-  }, []);
+  /** Applies a change to whatever the view shows: the live run, or the loaded chat. */
+  const dispatch = useCallback(
+    (action: ConversationAction) => {
+      if (runKey !== null && isLive(runKey)) dispatchToRun(runKey, action);
+      else dispatchLoaded(action);
+    },
+    [runKey, dispatchLoaded],
+  );
+
+  const decide = useCallback(
+    async (approvalId: string, allow: boolean) => {
+      dispatch({ type: 'approval_sending', approvalId });
+      try {
+        const { allowed } = await decideApproval(approvalId, allow);
+        dispatch({ type: 'approval_decided', approvalId, allowed });
+      } catch (cause) {
+        dispatch({ type: 'approval_failed', approvalId, message: errorMessage(cause) });
+      }
+    },
+    [dispatch],
+  );
 
   /** Answers the question the agent is waiting on; it closes when the stream says so. */
-  const answer = useCallback(async (questionId: string, reply: QuestionAnswer) => {
-    dispatch({ type: 'question_sending', questionId });
-    try {
-      await answerQuestion(questionId, reply);
-      dispatch({ type: 'question_answered', questionId });
-    } catch (cause) {
-      dispatch({ type: 'question_failed', questionId, message: errorMessage(cause) });
-    }
-  }, []);
+  const answer = useCallback(
+    async (questionId: string, reply: QuestionAnswer) => {
+      dispatch({ type: 'question_sending', questionId });
+      try {
+        await answerQuestion(questionId, reply);
+        dispatch({ type: 'question_answered', questionId });
+      } catch (cause) {
+        dispatch({ type: 'question_failed', questionId, message: errorMessage(cause) });
+      }
+    },
+    [dispatch],
+  );
 
   /**
    * Applies an Auto-approve change to the chat's run in progress (this tab's, or one running
@@ -318,7 +280,7 @@ export function useConversation(options: Options) {
    */
   const changeAutoApprove = useCallback(
     async (autoApprove: boolean) => {
-      const target = runRef.current?.chatId ?? (isRunningElsewhere ? chatId : null);
+      const target = runChatId ?? (isRunningElsewhere ? chatId : null);
       if (!target) return;
       try {
         await setRunAutoApprove(target, autoApprove);
@@ -326,12 +288,12 @@ export function useConversation(options: Options) {
         if (!isNotFound(cause)) throw cause; // it finished meanwhile: the next message uses it
       }
     },
-    [chatId, isRunningElsewhere],
+    [runChatId, chatId, isRunningElsewhere],
   );
 
   /** Clears the view for a new chat (when the URL is already the new-chat one). */
   const reset = useCallback(() => {
-    if (!runRef.current) dispatch({ type: 'reset' });
+    if (!isBusyRef.current) setLoaded(initialConversation);
   }, []);
 
   const reload = useCallback(() => setReloadToken((value) => value + 1), []);
@@ -351,8 +313,9 @@ export function useConversation(options: Options) {
    */
   const [isStopping, setIsStopping] = useState(false);
   const stop = useCallback(async () => {
-    const target = runRef.current?.chatId ?? chatId;
+    const target = runChatId ?? chatId;
     if (!target) return;
+    const isOurs = runKey !== null;
     setIsStopping(true);
     dispatch({ type: 'stopping' });
     try {
@@ -362,9 +325,9 @@ export function useConversation(options: Options) {
     } finally {
       setIsStopping(false);
       // Stopped from here while it ran in another tab: show what it saved once it's done.
-      if (!runRef.current) window.setTimeout(reload, 1200);
+      if (!isOurs) window.setTimeout(reload, 1200);
     }
-  }, [chatId, reload]);
+  }, [runChatId, runKey, chatId, dispatch, reload]);
 
   return {
     state,
@@ -385,3 +348,7 @@ export function useConversation(options: Options) {
     subscribeReply,
   };
 }
+
+const NO_QUEUE: QueuedMessage[] = [];
+/** Keys for queued messages, unique across runs. */
+let nextQueueKey = 1;

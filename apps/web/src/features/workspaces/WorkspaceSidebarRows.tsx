@@ -1,7 +1,8 @@
-import { useState, type DragEvent, type MouseEvent } from 'react';
+import { useState, type DragEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { LIMITS, type Workspace, type WorkspaceGroup } from '@app/shared';
 import { RowMenu, type RowMenuItem } from '../../components/RowMenu';
+import { Spinner } from '../../components/Spinner';
 import {
   ChevronRightIcon,
   DotsIcon,
@@ -86,6 +87,7 @@ export function FolderNameInput({
 export function FolderRow({
   group,
   count,
+  isRunning,
   isOpen,
   isDropTarget,
   onToggle,
@@ -97,6 +99,8 @@ export function FolderRow({
 }: {
   group: WorkspaceGroup;
   count: number;
+  /** The agent is working in one of its workspaces. */
+  isRunning: boolean;
   isOpen: boolean;
   isDropTarget: boolean;
   onToggle: () => void;
@@ -132,6 +136,7 @@ export function FolderRow({
         />
         <Icon size={14} className="shrink-0 text-ft-folder" />
         <span className="min-w-0 flex-1 truncate">{group.name}</span>
+        {isRunning && <RunningMark className="group-focus-within:hidden group-hover:hidden" />}
         <span className="shrink-0 text-[10.5px] tabular-nums text-ink-4 group-focus-within:invisible group-hover:invisible [@media(hover:none)]:invisible">
           {count}
         </span>
@@ -156,7 +161,7 @@ export function FolderRow({
 export function WorkspaceRow({
   workspace,
   isCurrent,
-  isBusy,
+  isRunning,
   isCollapsed,
   isIndented,
   moveItems,
@@ -165,7 +170,8 @@ export function WorkspaceRow({
 }: {
   workspace: Workspace;
   isCurrent: boolean;
-  isBusy: boolean;
+  /** The agent is working here (a run this tab started): a spinner shows it. */
+  isRunning: boolean;
   isCollapsed: boolean;
   isIndented: boolean;
   /** "Move to …" choices; none (no folders yet) hides the ⋯ button. */
@@ -173,48 +179,57 @@ export function WorkspaceRow({
   onDragStart: (event: DragEvent) => void;
   onDragEnd: () => void;
 }) {
-  const isLocked = isBusy && !isCurrent;
-  const title = isLocked ? 'Wait for the agent to finish' : workspace.path;
-  const blockWhileBusy = (event: MouseEvent) => {
-    if (isBusy) event.preventDefault();
-  };
+  const title = isRunning ? `${workspace.path}\nThe agent is working here` : workspace.path;
 
   return (
     <li className="group relative animate-slide-in-left">
       <Link
         to={`/workspaces/${workspace.id}`}
-        onClick={blockWhileBusy}
         draggable={!isCollapsed}
         onDragStart={onDragStart}
         onDragEnd={onDragEnd}
         aria-current={isCurrent ? 'page' : undefined}
-        aria-disabled={isLocked}
         aria-label={isCollapsed ? workspace.name : undefined}
         title={isCollapsed ? `${workspace.name}\n${title}` : title}
         className={
           isCollapsed
             ? `relative grid h-10 w-10 place-items-center rounded-xl transition-colors ${
                 isCurrent ? 'bg-accent-soft ring-1 ring-accent' : 'hover:bg-surface-2'
-              } ${isLocked ? 'cursor-not-allowed opacity-60' : ''}`
+              }`
             : `flex h-[22px] items-center gap-1.5 rounded pr-7 font-explorer text-[13px] leading-[18px] transition-colors ${
                 isIndented ? 'pl-[44px]' : 'pl-2.5'
               } ${
                 isCurrent
                   ? 'bg-accent-soft font-medium text-accent-2'
                   : 'text-ink-2 hover:bg-surface-2 hover:text-ink'
-              } ${isLocked ? 'cursor-not-allowed opacity-60' : ''}`
+              }`
         }
       >
         <WorkspaceAvatar id={workspace.id} name={workspace.name} size={isCollapsed ? 'md' : 'xs'} />
         {!isCollapsed && (
           <>
             <span className="min-w-0 flex-1 truncate">{workspace.name}</span>
+            {isRunning && <RunningMark />}
           </>
+        )}
+        {isCollapsed && isRunning && (
+          <span className="absolute -right-0.5 -top-0.5 grid h-4 w-4 place-items-center rounded-full bg-surface text-accent shadow-sm">
+            <Spinner size={10} label="The agent is working here" />
+          </span>
         )}
       </Link>
       {!isCollapsed && moveItems.length > 0 && (
         <RowActions label={`Move ${workspace.name}`} items={moveItems} />
       )}
     </li>
+  );
+}
+
+/** The spinner on a workspace (or its folder) where the agent is working. */
+function RunningMark({ className = '' }: { className?: string }) {
+  return (
+    <span className={`grid shrink-0 place-items-center text-accent ${className}`}>
+      <Spinner size={11} label="The agent is working here" />
+    </span>
   );
 }

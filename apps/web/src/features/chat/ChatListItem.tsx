@@ -13,7 +13,6 @@ export function ChatListItem({
   workspaceId,
   isActive,
   isRunning,
-  isLocked,
   onRename,
   onDelete,
 }: {
@@ -21,8 +20,6 @@ export function ChatListItem({
   workspaceId: string;
   isActive: boolean;
   isRunning: boolean;
-  /** Another chat is running in this tab, so this one can't be opened yet. */
-  isLocked: boolean;
   onRename: (chat: ChatSummary, title: string) => Promise<void>;
   onDelete: (chat: ChatSummary) => void;
 }) {
@@ -87,27 +84,18 @@ export function ChatListItem({
           : 'text-ink-2 hover:bg-subtle hover:text-ink'
       }`}
     >
-      {isLocked && !isActive ? (
-        <span
-          title="Wait for the agent to finish"
-          className={`${rowClass} cursor-not-allowed opacity-55`}
-        >
-          {content}
-        </span>
-      ) : (
-        <Link
-          to={`/workspaces/${workspaceId}/chats/${chat.id}`}
-          title={chat.title}
-          aria-current={isActive ? 'page' : undefined}
-          onDoubleClick={(event) => {
-            event.preventDefault();
-            setDraft(chat.title);
-          }}
-          className={rowClass}
-        >
-          {content}
-        </Link>
-      )}
+      <Link
+        to={`/workspaces/${workspaceId}/chats/${chat.id}`}
+        title={chat.title}
+        aria-current={isActive ? 'page' : undefined}
+        onDoubleClick={(event) => {
+          event.preventDefault();
+          setDraft(chat.title);
+        }}
+        className={rowClass}
+      >
+        {content}
+      </Link>
       <span className="hidden shrink-0 gap-0.5 pr-1 group-focus-within:flex group-hover:flex [@media(hover:none)]:flex">
         <button
           type="button"

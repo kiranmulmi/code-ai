@@ -9,6 +9,7 @@ import {
   SearchIcon,
   SwitchIcon,
 } from '../../lib/icons';
+import { Spinner } from '../../components/Spinner';
 import { usePopover } from '../../lib/usePopover';
 import { WorkspaceAvatar } from './WorkspaceAvatar';
 
@@ -30,10 +31,12 @@ function byRecentActivity(workspaces: Workspace[]): Workspace[] {
 function WorkspaceOptions({
   current,
   workspaces,
+  runningWorkspaceIds,
   onPick,
 }: {
   current: Workspace | null;
   workspaces: Workspace[];
+  runningWorkspaceIds?: ReadonlySet<string>;
   onPick: () => void;
 }) {
   const [query, setQuery] = useState('');
@@ -83,6 +86,7 @@ function WorkspaceOptions({
         )}
         {matches.map((workspace) => {
           const isCurrent = workspace.id === current?.id;
+          const isRunning = runningWorkspaceIds?.has(workspace.id) ?? false;
           return (
             <Link
               key={workspace.id}
@@ -95,6 +99,11 @@ function WorkspaceOptions({
             >
               <WorkspaceAvatar id={workspace.id} name={workspace.name} size="sm" />
               <span className="min-w-0 flex-1 truncate">{workspace.name}</span>
+              {isRunning && (
+                <span className="shrink-0 text-accent" title="The agent is working here">
+                  <Spinner size={12} label="The agent is working here" />
+                </span>
+              )}
               {isCurrent ? (
                 <CheckIcon size={14} className="shrink-0 text-accent" aria-label="Current" />
               ) : workspace.chatCount ? (
@@ -122,14 +131,15 @@ function WorkspaceOptions({
 export function WorkspaceSwitcher({
   current,
   workspaces,
-  disabled,
+  runningWorkspaceIds,
   onOpen,
   variant = 'breadcrumb',
   opensUp = false,
 }: {
   current: Workspace | null;
   workspaces: Workspace[];
-  disabled: boolean;
+  /** Workspaces with a run in progress in this tab: they show a spinner in the menu. */
+  runningWorkspaceIds?: ReadonlySet<string>;
   onOpen: () => void;
   variant?: 'breadcrumb' | 'sidebar';
   /** the menu opens above the button (it sits at the bottom of the screen) */
@@ -156,17 +166,14 @@ export function WorkspaceSwitcher({
     <div ref={ref} className="relative min-w-0">
       <button
         type="button"
-        disabled={disabled}
-        title={
-          disabled ? 'Wait for the agent to finish' : isSidebar ? current?.name : current?.path
-        }
+        title={isSidebar ? current?.name : current?.path}
         aria-haspopup="menu"
         aria-expanded={isOpen}
         onClick={() => {
           if (!isOpen) onOpen();
           setIsOpen(!isOpen);
         }}
-        className={`flex min-w-0 items-center text-left transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
+        className={`flex min-w-0 items-center text-left transition-colors ${
           isSidebar
             ? // Edge to edge across the sidebar's foot, with no border of its own.
               `h-14 w-full gap-2.5 px-4 ${isOpen ? 'bg-subtle' : 'hover:bg-subtle'}`
@@ -216,6 +223,7 @@ export function WorkspaceSwitcher({
           <WorkspaceOptions
             current={current}
             workspaces={workspaces}
+            runningWorkspaceIds={runningWorkspaceIds}
             onPick={() => setIsOpen(false)}
           />
           {/* The sidebar has these in its Settings section; the top bar's menu keeps them. */}

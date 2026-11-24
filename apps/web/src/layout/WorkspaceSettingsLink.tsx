@@ -2,30 +2,13 @@ import { Link, useLocation, useMatch } from 'react-router-dom';
 import type { Workspace } from '@app/shared';
 import { GearIcon } from '../lib/icons';
 
-const BASE =
-  'grid h-8 w-8 shrink-0 place-items-center rounded-lg transition-colors disabled:cursor-not-allowed';
+const BASE = 'grid h-8 w-8 shrink-0 place-items-center rounded-lg transition-colors';
 
 /** The gear that opens the workspace's settings, or closes them when they're open. */
-export function WorkspaceSettingsLink({
-  workspace,
-  isBusy,
-}: {
-  workspace: Workspace;
-  isBusy: boolean;
-}) {
+export function WorkspaceSettingsLink({ workspace }: { workspace: Workspace }) {
   const isSettings = useMatch('/workspaces/:workspaceId/settings') !== null;
   const { pathname } = useLocation();
 
-  if (isBusy && !isSettings) {
-    return (
-      <span
-        title="Wait for the agent to finish"
-        className={`${BASE} cursor-not-allowed text-ink-2 opacity-50`}
-      >
-        <GearIcon size={16} />
-      </span>
-    );
-  }
   return (
     <Link
       to={isSettings ? `/workspaces/${workspace.id}` : `/workspaces/${workspace.id}/settings`}

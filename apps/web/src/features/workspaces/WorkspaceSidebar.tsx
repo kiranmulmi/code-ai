@@ -67,13 +67,14 @@ type DropTarget = string | 'top' | null;
  * only; narrower ones switch from the chats drawer). Expanded it lists the folders the user made
  * (open or closed, each with its workspaces) and the workspaces in none, with a search box;
  * collapsed it is a rail of avatars. A workspace moves into or out of a folder from its ⋯ menu
- * or by dragging it. Switching is off while the agent works.
+ * or by dragging it. A workspace where the agent is working shows a spinner (and so does its
+ * folder); switching stays open, and the run keeps going.
  */
 export function WorkspaceSidebar({
   current,
   workspaces,
   groups,
-  isBusy,
+  runningWorkspaceIds,
   isCollapsed,
   width,
   info,
@@ -86,7 +87,8 @@ export function WorkspaceSidebar({
   workspaces: Workspace[];
   /** The sidebar folders. */
   groups: WorkspaceGroup[];
-  isBusy: boolean;
+  /** Workspaces with a run in progress in this tab. */
+  runningWorkspaceIds: ReadonlySet<string>;
   /** The server's info, for the footer's offline warning. */
   info: AppInfo | null;
   infoError: unknown;
@@ -221,7 +223,7 @@ export function WorkspaceSidebar({
       key={workspace.id}
       workspace={workspace}
       isCurrent={workspace.id === current?.id}
-      isBusy={isBusy}
+      isRunning={runningWorkspaceIds.has(workspace.id)}
       isCollapsed={isCollapsed}
       isIndented={isIndented}
       moveItems={moveItems(workspace)}
@@ -295,7 +297,7 @@ export function WorkspaceSidebar({
               onChange={(event) => setQuery(event.target.value)}
               onKeyDown={(event) => {
                 if (event.key === 'Escape') setQuery('');
-                if (event.key !== 'Enter' || !firstMatch || isBusy) return;
+                if (event.key !== 'Enter' || !firstMatch) return;
                 event.preventDefault();
                 navigate(`/workspaces/${firstMatch.id}`);
               }}
@@ -364,6 +366,7 @@ export function WorkspaceSidebar({
                       <FolderRow
                         group={group}
                         count={inside.length}
+                        isRunning={inside.some((w) => runningWorkspaceIds.has(w.id))}
                         isOpen={isOpen}
                         isDropTarget={dropTarget === group.id && dragged?.groupId !== group.id}
                         onToggle={() => setOpen(group.id, !isOpen)}
@@ -411,7 +414,6 @@ export function WorkspaceSidebar({
             to="/workspaces/new"
             from={current ? `/workspaces/${current.id}` : '/'}
             label="New workspace"
-            isBusy={isBusy}
           >
             <PlusIcon size={12} />
           </RailLink>
@@ -419,7 +421,6 @@ export function WorkspaceSidebar({
             to="/settings/models"
             from={current ? `/workspaces/${current.id}` : '/'}
             label="Preferences"
-            isBusy={false}
           >
             <GearIcon size={12} />
           </RailLink>
@@ -427,7 +428,7 @@ export function WorkspaceSidebar({
         </div>
       ) : (
         <div className="shrink-0 border-t border-line" style={{ minWidth: EXPANDED_MIN_WIDTH }}>
-          <SidebarLinks info={info} error={infoError} isBusy={isBusy} only="app" />
+          <SidebarLinks info={info} error={infoError} only="app" />
           <AccountMenu />
         </div>
       )}
@@ -444,18 +445,16 @@ export function WorkspaceSidebar({
   );
 }
 
-/** An icon-only link in the collapsed rail's footer, greyed while the agent works. */
+/** An icon-only link in the collapsed rail's footer. */
 function RailLink({
   to,
   from,
   label,
-  isBusy,
   children,
 }: {
   to: string;
   from: string;
   label: string;
-  isBusy: boolean;
   children: ReactNode;
 }) {
   const icon = (
@@ -463,17 +462,6 @@ function RailLink({
       {children}
     </span>
   );
-  if (isBusy) {
-    return (
-      <span
-        aria-label={label}
-        title="Wait for the agent to finish"
-        className="grid h-10 w-10 cursor-not-allowed place-items-center rounded-xl opacity-50"
-      >
-        {icon}
-      </span>
-    );
-  }
   return (
     <Link
       to={to}

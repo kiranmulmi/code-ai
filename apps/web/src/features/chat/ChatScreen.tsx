@@ -32,6 +32,7 @@ import { AutoApproveToggle } from './AutoApproveToggle';
 import { ModelControls } from './ModelControls';
 import { useAppInfo } from './useAppInfo';
 import { useChats } from './useChats';
+import { onRunNews, useLiveRuns } from './liveRuns';
 import { useConversation } from './useConversation';
 import { useModelChoice } from './useModelChoice';
 import { useSidebarWidth } from './useSidebarWidth';
@@ -110,14 +111,7 @@ export function ChatScreen({
     workspaceId,
     chatId,
     onChat: (chat, isNew) => {
-      upsertChat({ ...chat, isRunning: true });
       if (isNew) navigate(`${workspacePath}/chats/${chat.id}`, { replace: true });
-    },
-    onRunEnd: () => {
-      reloadChats();
-      reloadMemories();
-      reloadFiles();
-      reloadWorkspaces();
     },
     onLoaded: (detail) => {
       // Each chat brings back the settings it last used; one that never saved any keeps the
@@ -145,6 +139,34 @@ export function ChatScreen({
     },
   });
   const { isBusy } = conversation;
+
+  // Runs keep going while another workspace or chat is open (liveRuns): this screen follows
+  // the ones in its workspace, and any run's end may change the workspace list.
+  const liveRuns = useLiveRuns();
+  const isWorkspaceBusy = liveRuns.some((run) => run.workspaceId === workspaceId);
+  const runningChatIds = useMemo(
+    () => new Set(liveRuns.flatMap((run) => (run.chatId ? [run.chatId] : []))),
+    [liveRuns],
+  );
+  const runningWorkspaceIds = useMemo(
+    () => new Set(liveRuns.map((run) => run.workspaceId)),
+    [liveRuns],
+  );
+  useEffect(
+    () =>
+      onRunNews((news) => {
+        if (news.type === 'end') reloadWorkspaces();
+        if (news.workspaceId !== workspaceId) return;
+        if (news.type === 'chat') {
+          upsertChat({ ...news.chat, isRunning: true });
+          return;
+        }
+        reloadChats();
+        reloadMemories();
+        reloadFiles();
+      }),
+    [workspaceId, upsertChat, reloadChats, reloadMemories, reloadFiles, reloadWorkspaces],
+  );
 
   /**
    * A change in the composer's settings, saved with the open chat (a new chat saves them with
@@ -216,7 +238,6 @@ export function ChatScreen({
 
   const { reset } = conversation;
   const startNewChat = () => {
-    if (isBusy) return;
     setIsSidebarOpen(false);
     if (chatId) navigate(workspacePath);
     else reset();
@@ -255,7 +276,7 @@ export function ChatScreen({
           onOpenWorkspaces={reloadWorkspaces}
           info={info.data}
           infoError={info.error}
-          isBusy={isBusy}
+          runningWorkspaceIds={runningWorkspaceIds}
           hasSidebar
           chatsToggle={{
             isOpen: isSidebarOpen,
@@ -270,7 +291,7 @@ export function ChatScreen({
           <WorkspaceSidebar
             current={workspace.data}
             workspaces={workspaceList}
-            isBusy={isBusy}
+            runningWorkspaceIds={runningWorkspaceIds}
             info={info.data}
             infoError={info.error}
             groups={workspaceGroups.data ?? []}
@@ -302,7 +323,8 @@ export function ChatScreen({
             chats={chats.data}
             chatsError={chats.error}
             activeChatId={chatId}
-            isBusy={isBusy}
+            runningChatIds={runningChatIds}
+            runningWorkspaceIds={runningWorkspaceIds}
             onNewChat={startNewChat}
             onRenamed={onRenamed}
             onDeleted={onDeleted}
@@ -405,7 +427,7 @@ export function ChatScreen({
             width={panelWidth}
             isDrawerOpen={isPanelDrawerOpen}
             isCollapsed={isPanelCollapsed}
-            isBusy={isBusy}
+            isBusy={isWorkspaceBusy}
             onCloseDrawer={() => setIsPanelDrawerOpen(false)}
             onHide={togglePanel}
           />

@@ -18,7 +18,7 @@ export function AppNav({
   onOpenWorkspaces,
   info,
   infoError,
-  isBusy = false,
+  runningWorkspaceIds,
   chatsToggle,
   hasSidebar = false,
 }: {
@@ -27,7 +27,8 @@ export function AppNav({
   onOpenWorkspaces: () => void;
   info: AppInfo | null;
   infoError: unknown;
-  isBusy?: boolean;
+  /** Workspaces with a run in progress in this tab, marked in the switcher. */
+  runningWorkspaceIds?: ReadonlySet<string>;
   /** The chat screen's drawer button, shown where the chat list isn't a column. */
   chatsToggle?: { isOpen: boolean; onToggle: () => void };
   /**
@@ -64,7 +65,7 @@ export function AppNav({
         <WorkspaceSwitcher
           current={workspace}
           workspaces={workspaces}
-          disabled={isBusy}
+          runningWorkspaceIds={runningWorkspaceIds}
           onOpen={onOpenWorkspaces}
         />
       </div>
@@ -73,7 +74,7 @@ export function AppNav({
         <ConnectionMenu info={info} error={infoError} workspace={workspace} />
         <span aria-hidden className="mx-1 hidden h-5 w-px bg-line sm:block" />
         <ThemeToggle />
-        {workspace && <WorkspaceSettingsLink workspace={workspace} isBusy={isBusy} />}
+        {workspace && <WorkspaceSettingsLink workspace={workspace} />}
       </div>
     </header>
   );

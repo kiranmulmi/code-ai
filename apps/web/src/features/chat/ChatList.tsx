@@ -21,7 +21,7 @@ export function ChatList({
   query,
   error,
   activeChatId,
-  isBusy,
+  runningChatIds,
   onRenamed,
   onDeleted,
 }: {
@@ -30,7 +30,8 @@ export function ChatList({
   query: string;
   error: unknown;
   activeChatId: string | null;
-  isBusy: boolean;
+  /** Chats with a run in progress in this tab (the server's `isRunning` covers other tabs). */
+  runningChatIds: ReadonlySet<string>;
   onRenamed: (chat: ChatSummary) => void;
   onDeleted: (chatId: string) => void;
 }) {
@@ -144,8 +145,7 @@ export function ChatList({
                     chat={chat}
                     workspaceId={workspaceId}
                     isActive={isActive}
-                    isRunning={chat.isRunning || (isBusy && isActive)}
-                    isLocked={isBusy}
+                    isRunning={chat.isRunning || runningChatIds.has(chat.id)}
                     onRename={rename}
                     onDelete={setPendingDelete}
                   />

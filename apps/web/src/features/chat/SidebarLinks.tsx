@@ -10,32 +10,13 @@ import { useToast } from '../../lib/toast';
 
 const ROW = 'flex h-9 items-center gap-2.5 rounded-xl px-3 text-[13px] font-medium text-ink-2';
 
-function SidebarLink({
-  to,
-  icon,
-  label,
-  isBusy,
-}: {
-  to: string;
-  icon: ReactNode;
-  label: string;
-  /** the agent is working: the page waits until it's done */
-  isBusy: boolean;
-}) {
+function SidebarLink({ to, icon, label }: { to: string; icon: ReactNode; label: string }) {
   const { pathname } = useLocation();
   const iconBox = (
     <span className="grid h-6 w-6 shrink-0 place-items-center rounded-lg bg-accent-soft text-accent-2">
       {icon}
     </span>
   );
-  if (isBusy) {
-    return (
-      <span title="Wait for the agent to finish" className={`${ROW} cursor-not-allowed opacity-50`}>
-        {iconBox}
-        <span className="min-w-0 truncate">{label}</span>
-      </span>
-    );
-  }
   return (
     <Link
       to={to}
@@ -94,13 +75,11 @@ export function SidebarLinks({
   info,
   error,
   workspaceId,
-  isBusy,
   only,
 }: {
   info: AppInfo | null;
   error: unknown;
   workspaceId?: string;
-  isBusy: boolean;
   /**
    * At `xl` the links are split: `workspace` (Workspace settings, for the chats drawer on mobile)
    * and `app` (the offline warning, New workspace, Preferences, Install app, in the workspace
@@ -134,17 +113,11 @@ export function SidebarLinks({
             to={`/workspaces/${workspaceId}/settings`}
             icon={<GearIcon size={12} />}
             label="Workspace settings"
-            isBusy={isBusy}
           />
         </>
       )}
       {hasApp && (
-        <SidebarLink
-          to="/workspaces/new"
-          icon={<PlusIcon size={12} />}
-          label="New workspace"
-          isBusy={isBusy}
-        />
+        <SidebarLink to="/workspaces/new" icon={<PlusIcon size={12} />} label="New workspace" />
       )}
       {hasApp && <PreferencesRow approval={info?.approval ?? null} />}
       {/* Only while Chrome offers it: gone once installed, and inside the installed app. */}

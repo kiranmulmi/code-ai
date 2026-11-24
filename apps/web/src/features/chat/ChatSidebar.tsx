@@ -69,28 +69,9 @@ function WorkspacePath({ path }: { path: string }) {
 /**
  * Workspace settings link for desktop (xl) - sits at the bottom of the chats sidebar.
  */
-function WorkspaceSettingsRow({
-  workspace,
-  isBusy,
-}: {
-  workspace: Workspace;
-  isBusy: boolean;
-}) {
+function WorkspaceSettingsRow({ workspace }: { workspace: Workspace }) {
   const isSettings = useLocation().pathname.startsWith(`/workspaces/${workspace.id}/settings`);
 
-  if (isBusy && !isSettings) {
-    return (
-      <span
-        title="Wait for the agent to finish"
-        className="flex h-9 items-center gap-2.5 rounded-xl px-3 text-[13px] font-medium text-ink-2 cursor-not-allowed opacity-50"
-      >
-        <span className="grid h-6 w-6 shrink-0 place-items-center rounded-lg bg-accent-soft text-accent-2">
-          <GearIcon size={12} />
-        </span>
-        <span className="min-w-0 truncate">Workspace settings</span>
-      </span>
-    );
-  }
   return (
     <Link
       to={isSettings ? `/workspaces/${workspace.id}` : `/workspaces/${workspace.id}/settings`}
@@ -98,9 +79,7 @@ function WorkspaceSettingsRow({
       aria-current={isSettings ? 'page' : undefined}
       title={isSettings ? 'Back to the chat' : 'Workspace settings'}
       className={`flex h-9 items-center gap-2.5 rounded-xl px-3 text-[13px] font-medium transition-colors ${
-        isSettings
-          ? 'bg-accent-soft text-accent'
-          : 'text-ink-2 hover:bg-subtle hover:text-ink'
+        isSettings ? 'bg-accent-soft text-accent' : 'text-ink-2 hover:bg-subtle hover:text-ink'
       }`}
     >
       <span className="grid h-6 w-6 shrink-0 place-items-center rounded-lg bg-accent-soft text-accent-2">
@@ -131,7 +110,8 @@ export function ChatSidebar({
   chats,
   chatsError,
   activeChatId,
-  isBusy,
+  runningChatIds,
+  runningWorkspaceIds,
   onNewChat,
   onRenamed,
   onDeleted,
@@ -151,7 +131,10 @@ export function ChatSidebar({
   chats: ChatSummary[] | null;
   chatsError: unknown;
   activeChatId: string | null;
-  isBusy: boolean;
+  /** Chats with a run in progress in this tab. */
+  runningChatIds: ReadonlySet<string>;
+  /** Workspaces with a run in progress in this tab, marked in the switcher. */
+  runningWorkspaceIds: ReadonlySet<string>;
   onNewChat: () => void;
   onRenamed: (chat: ChatSummary) => void;
   onDeleted: (chatId: string) => void;
@@ -212,9 +195,8 @@ export function ChatSidebar({
           <button
             type="button"
             onClick={onNewChat}
-            disabled={isBusy}
-            title={isBusy ? 'Wait for the agent to finish' : 'Start a new chat'}
-            className="flex h-7 w-full items-center gap-1.5 rounded-md bg-accent-soft px-2.5 text-[13px] font-semibold text-accent-2 transition-colors hover:bg-accent-bg disabled:cursor-not-allowed disabled:opacity-60"
+            title="Start a new chat"
+            className="flex h-7 w-full items-center gap-1.5 rounded-md bg-accent-soft px-2.5 text-[13px] font-semibold text-accent-2 transition-colors hover:bg-accent-bg"
           >
             <ComposeIcon size={13} />
             New chat
@@ -259,7 +241,7 @@ export function ChatSidebar({
           query={query}
           error={chatsError}
           activeChatId={activeChatId}
-          isBusy={isBusy}
+          runningChatIds={runningChatIds}
           onRenamed={onRenamed}
           onDeleted={onDeleted}
         />
@@ -269,12 +251,12 @@ export function ChatSidebar({
           <span className="block px-3 pb-1.5 text-[10.5px] font-bold uppercase tracking-[0.14em] text-ink-4">
             Settings
           </span>
-          {workspace && <WorkspaceSettingsRow workspace={workspace} isBusy={isBusy} />}
+          {workspace && <WorkspaceSettingsRow workspace={workspace} />}
         </div>
 
         {/* The drawer has every link; at xl Workspace settings is now in the chats sidebar and the rest is in the workspace sidebar. */}
         <div className="shrink-0 xl:hidden">
-          <SidebarLinks info={info} error={infoError} workspaceId={workspaceId} isBusy={isBusy} />
+          <SidebarLinks info={info} error={infoError} workspaceId={workspaceId} />
         </div>
 
         {/* At xl the workspace sidebar switches workspaces; the drawer keeps this button. */}
@@ -284,7 +266,7 @@ export function ChatSidebar({
             opensUp
             current={workspace}
             workspaces={workspaces}
-            disabled={isBusy}
+            runningWorkspaceIds={runningWorkspaceIds}
             onOpen={onOpenWorkspaces}
           />
         </div>
