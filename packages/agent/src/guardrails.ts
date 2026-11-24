@@ -6,7 +6,7 @@ import path from 'node:path';
 import dns from 'node:dns/promises';
 import net from 'node:net';
 import os from 'node:os';
-import type { ApprovalMode, ModelCallUsage, Usage } from '@app/shared';
+import { GUARDRAILS, type ApprovalMode, type ModelCallUsage, type Usage } from '@app/shared';
 import type { AgentConfig } from './config.js';
 import { oneAtATime } from './one-at-a-time.js';
 import { errorCode } from './errors.js';
@@ -134,7 +134,8 @@ export class Budget {
 /**
  * Each workspace folder keeps the app's own data (chats, memory, settings) in this
  * subfolder. File tools can't read or change it: the history and memory are only
- * reachable through the app, so the model can't rewrite or wipe them.
+ * reachable through the app, so the model can't rewrite or wipe them. That refusal is
+ * switched by GUARDRAILS.protectAppData (@app/shared constants); listings always leave it out.
  */
 export const APP_DATA_FOLDER = '.hamro-ai';
 
@@ -174,7 +175,7 @@ export async function resolveInWorkspace(dir: string, requestedPath: string): Pr
       `That path is outside the workspace folder (${root}), which is the only place file tools can reach.`,
     );
   }
-  if (isInAppData(path.relative(root, target))) {
+  if (GUARDRAILS.protectAppData && isInAppData(path.relative(root, target))) {
     throw new Error(
       `${APP_DATA_FOLDER}/ holds this app's own chats, memory and settings; file tools can't reach it. Use the memory tools for memories.`,
     );
@@ -373,9 +374,11 @@ export function assertNotSecretFile(shownPath: string): void {
  * name this app's data folders are refused. ~/.hamro-ai/ holds every model API key and MCP
  * token in plain JSON. A backstop like refuseCommand, not a sandbox: a command
  * that builds the path at run time gets through, and redactSecrets catches what it prints.
+ * Off when GUARDRAILS.protectAppData (@app/shared constants) is false.
  * @returns why the command is refused, or null when it may run
  */
 export function refuseSecretAccess(command: string): string | null {
+  if (!GUARDRAILS.protectAppData) return null;
   const lower = command.toLowerCase();
   for (const folder of [APP_DATA_FOLDER, ...LEGACY_APP_DATA_FOLDERS]) {
     if (lower.includes(folder)) {

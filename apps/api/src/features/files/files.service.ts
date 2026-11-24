@@ -12,6 +12,7 @@ import {
 } from '@app/agent';
 import {
   FILES_PANEL,
+  GUARDRAILS,
   LIMITS,
   type CreatedEntry,
   type FileContent,
@@ -88,7 +89,9 @@ async function entryAt(folder: string, requested: string): Promise<string> {
   if (!name || name === '.' || name === '..' || nodePath.isAbsolute(normal)) {
     throw new ValidationError('Use a path inside the workspace folder.');
   }
-  if (isInAppData(name)) throw new ValidationError(APP_DATA_MESSAGE);
+  if (GUARDRAILS.protectAppData && isInAppData(name)) {
+    throw new ValidationError(APP_DATA_MESSAGE);
+  }
   const parent = await resolve(folder, nodePath.dirname(normal));
   const entry = nodePath.join(parent, name);
   try {

@@ -81,6 +81,20 @@ export const CONTEXT = {
   limitSummaryTotalChars: 60_000,
 };
 
+// ---------- Guardrails ----------
+
+export const GUARDRAILS = {
+  /**
+   * Keep the agent and the Files panel out of the app's data folders (APP_DATA_FOLDER in
+   * @app/agent's guardrails: the one in the home folder and the one in each workspace, which
+   * hold model API keys, MCP tokens, chats and memory). When true, the file tools and the
+   * Files panel refuse paths inside them, and run_command refuses commands that name them.
+   * When false, those refusals are off. The folders still stay out of file listings,
+   * searches and the workspace overview, and secrets in tool output are still masked.
+   */
+  protectAppData: false,
+} as const;
+
 // ---------- Planning ----------
 
 /** Spotting a run that is stuck: steps in a row where every tool call failed or repeated. */

@@ -141,7 +141,7 @@ test('delegate_task lists the specialists and refuses unknown ones', async () =>
 
 // ---------- Specialists and the team notes ----------
 
-test('a specialist gets its role and only its tools, and shares notes with the next one', async () => {
+test('a specialist gets its role and the main agent tools, and shares notes with the next one', async () => {
   const setup = await tempSetup();
   const parent = scriptedModel([
     calls([
@@ -175,11 +175,14 @@ test('a specialist gets its role and only its tools, and shares notes with the n
   // Roles in the system prompt.
   assert.match(systemOf(researcher), /Your role \(researcher\)/);
   assert.match(systemOf(writer), /Your role \(writer\)/);
-  // Tools: the researcher reads and searches but can't write or delegate; the writer has no web.
+  // Tools: built-in specialists get the main agent's tool groups; read-only ones can't write,
+  // and no sub-agent can delegate.
   const rTools = toolNames(researcher);
   assert.ok(rTools.includes('web_search') && rTools.includes('post_note'));
   assert.ok(!rTools.includes('write_file') && !rTools.includes('delegate_task'));
-  assert.ok(!toolNames(writer).includes('web_search'));
+  const wTools = toolNames(writer);
+  assert.ok(wTools.includes('web_search') && wTools.includes('create_plan'));
+  assert.ok(!wTools.includes('write_file') && !wTools.includes('delegate_task'));
   // The writer read the researcher's note, by its label.
   const writerSaw = child.requests
     .filter((r) => taskOf(r).includes('TASK-W'))

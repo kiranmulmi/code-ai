@@ -628,8 +628,8 @@ export function createAgent(options: AgentOptions): Agent {
       skills: skills.map((skill) => skill.name),
     });
     skillList = await readSkills();
-    // A sub-agent gets its task from the lead, which already knows the project.
-    const overview = isSubagent || !filesDir ? '' : await workspaceOverview(filesDir);
+    // Sub-agents get the snapshot too: knowing the project up front saves exploration steps.
+    const overview = filesDir ? await workspaceOverview(filesDir) : '';
     const hasAttachments = attachments.length > 0 || conversation.hasAttachments();
     systemSections = systemPromptSections(
       instructions,
@@ -1142,9 +1142,11 @@ export function createAgent(options: AgentOptions): Agent {
         ...options,
         ...ownModel,
         role: 'subagent',
+        // The same agent and settings as this one (planning included). Only what a sub-agent
+        // must not do is turned off: start its own sub-agents, or send its report to a reviewer
+        // (the lead checks it).
         config: {
           ...config,
-          planning: 'off',
           review: 'off',
           subagents: false,
           maxTotalTokens: tokensLeft,
