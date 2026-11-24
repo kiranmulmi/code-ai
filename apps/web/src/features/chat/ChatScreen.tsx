@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { useNavigate } from 'react-router-dom';
-import type { ChatSummary } from '@app/shared';
+import type { ChatSettings, ChatSummary } from '@app/shared';
 import { AppNav } from '../../layout/AppNav';
 import { errorMessage, isNotFound } from '../../lib/api';
 import { useToast } from '../../lib/toast';
@@ -24,7 +24,7 @@ import {
 } from '../workspaces/WorkspaceSidebar';
 import { onWorkspaceSaved } from '../workspaces/workspaceEvents';
 import { rememberLastWorkspace } from '../workspaces/lastWorkspace';
-import { improvePrompt } from './api';
+import { improvePrompt, saveChatSettings } from './api';
 import { ChatHeader } from './ChatHeader';
 import { ChatSidebar } from './ChatSidebar';
 import { ChatView } from './ChatView';
@@ -120,6 +120,13 @@ export function ChatScreen({
       reloadWorkspaces();
     },
     onLoaded: (detail) => {
+      // Each chat brings back the settings it last used; one that never saved any keeps the
+      // current ones (they become its own with its next message or change).
+      if (detail.settings) {
+        chooseModel(detail.settings.modelId ?? '');
+        chooseEffort(detail.settings.reasoningEffort);
+        setAutoApprove(detail.settings.autoApprove);
+      }
       // A chat link from another workspace: show it where it belongs.
       if (detail.chat.workspaceId !== workspaceId) {
         navigate(`/workspaces/${detail.chat.workspaceId}/chats/${detail.chat.id}`, {
@@ -138,6 +145,25 @@ export function ChatScreen({
     },
   });
   const { isBusy } = conversation;
+
+  /**
+   * A change in the composer's settings, saved with the open chat (a new chat saves them with
+   * its first message). The choice also stays as the default for the next new chat.
+   */
+  const saveSettings = (changes: Partial<ChatSettings>) => {
+    if (!chatId) return;
+    const settings: ChatSettings = {
+      modelId: choice.model?.id ?? null,
+      reasoningEffort: choice.effort,
+      autoApprove,
+      ...changes,
+    };
+    saveChatSettings(chatId, settings).catch((cause: unknown) => {
+      if (!isNotFound(cause)) {
+        toast(errorMessage(cause, "Couldn't save this chat's settings."), 'error');
+      }
+    });
+  };
 
   // Opened fine: this is the workspace to come back to on the next launch.
   const loadedWorkspaceId = workspace.data?.id;
@@ -309,8 +335,14 @@ export function ChatScreen({
                     models={models.data}
                     choice={choice}
                     disabled={isBusy}
-                    onChooseModel={chooseModel}
-                    onChooseEffort={chooseEffort}
+                    onChooseModel={(id) => {
+                      chooseModel(id);
+                      saveSettings({ modelId: id });
+                    }}
+                    onChooseEffort={(effort) => {
+                      chooseEffort(effort);
+                      saveSettings({ reasoningEffort: effort });
+                    }}
                   />
                   {/* Only when the agent asks first (Settings → Agent: approvals "ask"). */}
                   {info.data?.approval === 'ask' && (
@@ -318,6 +350,7 @@ export function ChatScreen({
                       isOn={autoApprove}
                       onChange={(isOn) => {
                         setAutoApprove(isOn);
+                        saveSettings({ autoApprove: isOn });
                         conversation
                           .changeAutoApprove(isOn)
                           .catch((cause: unknown) =>

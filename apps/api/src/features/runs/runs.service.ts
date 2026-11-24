@@ -76,6 +76,18 @@ export function createRunsService(
       const isTitleDue =
         !chat.isTitleCustom && (asked.length <= TITLE_MESSAGES || hasFirstLineTitle);
       const signal = runs.start(chat.id, workspace.id, autoApprove);
+      // The chat keeps what this message used, so opening it again brings the same settings.
+      await store
+        .setChatSettings(chat.id, {
+          modelId: modelId ?? null,
+          reasoningEffort: reasoningEffort ?? null,
+          autoApprove,
+        })
+        .catch((error: unknown) => {
+          agentLogger.warn(
+            `Couldn't save the chat's settings: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        });
 
       return async function stream({ send, onClose }: RunStream): Promise<void> {
         const approver = runs.createApprover(chat.id, config.approval, send);

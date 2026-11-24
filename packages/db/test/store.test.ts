@@ -600,3 +600,33 @@ test('sidebar folders collect workspaces and give them back when deleted', async
   assert.equal(kept?.groupId, null, 'its workspaces stay, at the top level');
   assert.equal(await store.deleteWorkspaceGroup(work.id), false);
 });
+
+test('a chat keeps its own settings, through a request and apart from other chats', async () => {
+  const store = db();
+  const ws = await store.createWorkspace({ name: 'Settings', path: folder('chat-settings') });
+  const first = await store.createChat(ws.id, 'First');
+  const second = await store.createChat(ws.id, 'Second');
+  assert.equal(first.settings, null);
+
+  const settings = {
+    modelId: '3f1c2b0a-1d2e-4f5a-8b9c-0d1e2f3a4b5c',
+    reasoningEffort: 'high',
+    autoApprove: true,
+  } as const;
+  const updated = await store.setChatSettings(first.id, settings);
+  assert.deepEqual(updated?.settings, settings);
+  // Saving settings isn't activity: the chat keeps its place in the list.
+  assert.equal(updated?.updatedAt, first.updatedAt);
+
+  const { callModel } = scriptedModel([answer('ok')]);
+  await runInChat({
+    store,
+    workspace: ws,
+    chat: first,
+    prompt: 'hi',
+    agentOptions: agentOptions(callModel),
+  });
+  assert.deepEqual((await store.getChat(first.id))?.settings, settings);
+  assert.equal((await store.getChat(second.id))?.settings, null);
+  assert.equal(await store.setChatSettings('3f1c2b0a-0000-4000-8000-000000000000', settings), null);
+});

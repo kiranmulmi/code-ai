@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { TOOL_RESULT_PREVIEW_CHARS } from './constants.js';
 import type { Attachment } from './attachment.js';
+import { REASONING_EFFORTS } from './model.js';
 import type { Plan } from './plan.js';
 import type { ModelCallUsage, RunStatus } from './run.js';
 
@@ -62,7 +63,24 @@ export interface ChatDetail {
   plan: Plan | null;
   /** The chat's earlier plans, oldest first: each new plan moves the current one here. */
   earlierPlans: Plan[];
+  /** The composer settings this chat last used; null for a chat that never saved any. */
+  settings: ChatSettings | null;
 }
+
+/**
+ * A chat's own composer settings (model, reasoning effort, Auto-approve), saved with the chat
+ * so opening it again brings them back. `PUT /v1/chats/:id/settings`; each message sent
+ * saves them too.
+ */
+export const chatSettingsSchema = z.object({
+  /** Null: the default model. */
+  modelId: z.string().uuid('Pick a model.').nullable(),
+  /** Null: the server's default. */
+  reasoningEffort: z.enum(REASONING_EFFORTS).nullable(),
+  autoApprove: z.boolean(),
+});
+
+export type ChatSettings = z.infer<typeof chatSettingsSchema>;
 
 export const chatRenameSchema = z.object({
   title: z.string().trim().min(1, 'Give the chat a title.'),

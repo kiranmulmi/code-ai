@@ -34,8 +34,10 @@ import {
   TOOL_GROUPS,
   WORKSPACE_PLANNING,
   workspaceSlug,
+  chatSettingsSchema,
   mcpConfigSchema,
   mcpWorkspaceSchema,
+  type ChatSettings,
   type McpConfig,
   type McpWorkspaceConfig,
   type ModelCallUsage,
@@ -67,6 +69,8 @@ export interface ChatRecord {
   earlierPlans: Plan[];
   /** the memory list the model last saw in this chat */
   memoryShown: string | null;
+  /** the composer settings it last used (model, effort, Auto-approve), null if never saved */
+  settings: ChatSettings | null;
   createdAt: string | null;
   updatedAt: string | null;
 }
@@ -171,6 +175,8 @@ const chatSchema = z.object({
   plan: planSchema.nullable().default(null),
   earlierPlans: z.array(planSchema).default([]),
   memoryShown: z.string().nullable().default(null),
+  // A hand-edited value the app doesn't understand just loses the chat's settings.
+  settings: chatSettingsSchema.nullable().catch(null).default(null),
   createdAt: z.string().nullable().default(null),
   updatedAt: z.string().nullable().default(null),
 });
@@ -421,6 +427,7 @@ export class WorkspaceData {
       plan: null,
       earlierPlans: [],
       memoryShown: null,
+      settings: null,
       createdAt: now,
       updatedAt: now,
     };

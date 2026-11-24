@@ -1,5 +1,5 @@
 import { earlierPlansOf, historyForUi, type Chat } from '@app/db';
-import type { ChatDetail, ChatSummary } from '@app/shared';
+import type { ChatDetail, ChatSettings, ChatSummary } from '@app/shared';
 import type { AppContext } from '../../context.js';
 import { ConflictError, NotFoundError } from '../../lib/errors.js';
 import type { WorkspacesService } from '../workspaces/workspaces.service.js';
@@ -40,7 +40,15 @@ export function createChatsService({ store, runs }: AppContext, workspaces: Work
         history: historyForUi(rows, runRecords),
         plan: chat.plan,
         earlierPlans: earlierPlansOf(chat, rows),
+        settings: chat.settings,
       };
+    },
+
+    async setSettings(id: string, settings: ChatSettings): Promise<ChatSettings> {
+      await require(id);
+      const updated = await store.setChatSettings(id, settings);
+      if (!updated) throw new NotFoundError("That chat doesn't exist.");
+      return settings;
     },
 
     async rename(id: string, title: string): Promise<ChatSummary> {

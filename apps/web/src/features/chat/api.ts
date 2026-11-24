@@ -2,6 +2,7 @@ import type {
   AppInfo,
   Attachment,
   ChatDetail,
+  ChatSettings,
   ChatSummary,
   ImprovePromptRequest,
   ImprovedPrompt,
@@ -29,6 +30,11 @@ export function fetchChat(chatId: string): Promise<ChatDetail> {
 
 export function renameChat(chatId: string, title: string): Promise<ChatSummary> {
   return request<ChatSummary>(chatPath(chatId), jsonBody('PATCH', { title }));
+}
+
+/** Saves the chat's composer settings, so opening it again brings them back. */
+export function saveChatSettings(chatId: string, settings: ChatSettings): Promise<ChatSettings> {
+  return request<ChatSettings>(`${chatPath(chatId)}/settings`, jsonBody('PUT', settings));
 }
 
 export function deleteChat(chatId: string): Promise<void> {

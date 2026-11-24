@@ -9,6 +9,7 @@ import nodePath from 'node:path';
 import {
   DEFAULT_DISABLED_TOOLS,
   LIMITS,
+  type ChatSettings,
   type McpConfig,
   type McpServerConfig,
   type ToolGroup,
@@ -347,6 +348,17 @@ export class Store {
     const chat = await found.data.readChat(id);
     if (!chat || chat.isTitleCustom || chat.title === title) return null;
     const updated = await found.data.updateChat(id, { title: checkTitle(title) });
+    return updated ? { ...updated, workspaceId: found.workspaceId } : null;
+  }
+
+  /**
+   * The chat's own composer settings (model, effort, Auto-approve), restored when it's opened
+   * again. Doesn't count as activity, so the chat keeps its place in the list.
+   */
+  async setChatSettings(id: string, settings: ChatSettings): Promise<Chat | null> {
+    const found = await this.#locateChat(id);
+    if (!found) return null;
+    const updated = await found.data.updateChat(id, { settings });
     return updated ? { ...updated, workspaceId: found.workspaceId } : null;
   }
 

@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { chatRenameSchema } from '@app/shared';
+import { chatRenameSchema, chatSettingsSchema } from '@app/shared';
 import { asyncHandler } from '../../lib/async-handler.js';
 import { param } from '../../lib/params.js';
 import { parse } from '../../lib/validate.js';
@@ -27,6 +27,15 @@ export function chatsRouter(chats: ChatsService): Router {
     asyncHandler(async (req, res) => {
       const { title } = parse(chatRenameSchema, req.body);
       res.json({ data: await chats.rename(param(req, 'chatId'), title) });
+    }),
+  );
+
+  // The chat's composer settings (model, effort, Auto-approve), restored when it's opened again.
+  router.put(
+    '/chats/:chatId/settings',
+    asyncHandler(async (req, res) => {
+      const settings = parse(chatSettingsSchema, req.body);
+      res.json({ data: await chats.setSettings(param(req, 'chatId'), settings) });
     }),
   );
 

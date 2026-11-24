@@ -98,9 +98,11 @@ export {
 
 export {
   chatRenameSchema,
+  chatSettingsSchema,
   toolResultPreview,
   type ChatDetail,
   type ChatRename,
+  type ChatSettings,
   type ChatSummary,
   type HistoryItem,
 } from './chat.js';

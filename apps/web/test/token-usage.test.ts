@@ -86,6 +86,7 @@ test('a saved chat shows each reply once, a steered message joining the run it w
     ],
     plan: null,
     earlierPlans: [],
+    settings: null,
   };
   const state = conversationReducer(initialConversation, { type: 'load', detail });
   const rows = messageUsages(state.turns);
