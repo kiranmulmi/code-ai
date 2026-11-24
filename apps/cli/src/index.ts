@@ -303,7 +303,11 @@ async function main(): Promise<void> {
         } else if (command === '/models') {
           for (const m of await store.models.list()) {
             const mark = m.id === model.id ? '*' : ' ';
-            const tags = [m.isDefault && 'default', m.supportsReasoning && 'reasoning']
+            const tags = [
+              m.isDefault && 'default',
+              m.supportsReasoning && 'reasoning',
+              !m.supportsImages && 'text only',
+            ]
               .filter(Boolean)
               .join(', ');
             console.log(`${mark} ${m.name}  \x1b[2m${m.model}${tags ? `  (${tags})` : ''}\x1b[0m`);

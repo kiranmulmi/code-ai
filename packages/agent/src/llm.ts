@@ -31,6 +31,11 @@ export interface ModelSettings {
   contextWindow: number | null;
   /** only for reasoning models that support it; null = the server's default */
   reasoningEffort: string | null;
+  /**
+   * Whether the model can read images; undefined = it can. When false no image is ever sent:
+   * each is replaced by a short note, and view_image asks the image model instead.
+   */
+  supportsImages?: boolean;
 }
 
 export interface ModelRequest {
@@ -103,7 +108,9 @@ export function createModelCaller(config: ModelSettings): CallModel {
       model: config.model,
       messages: [
         { role: 'system', content: system },
-        ...messages.map((m) => toApiMessage(m, images)),
+        ...messages.map((m) =>
+          toApiMessage(m, config.supportsImages === false ? undefined : images),
+        ),
       ],
       stream: true,
       stream_options: { include_usage: true }, // token counts arrive in the last chunk
@@ -258,7 +265,16 @@ function toApiMessage(
   if (message.role !== 'user') return message;
   const { images: ids = [], content } = message;
   const urls = ids.flatMap((id) => images.get(id) ?? []);
-  if (!urls.length) return { role: 'user', content };
+  if (!urls.length) {
+    // Images left out (a model that can't read them, or files gone): say so, so the model
+    // doesn't think it is looking at them.
+    if (!ids.length) return { role: 'user', content };
+    const count = ids.length === 1 ? 'The image' : `The ${ids.length} images`;
+    return {
+      role: 'user',
+      content: `${content}\n[${count} can't be shown to this model. Call view_image again to have them described.]`,
+    };
+  }
   const parts: ChatCompletionContentPart[] = [
     { type: 'text', text: content },
     ...urls.map((url): ChatCompletionContentPart => ({ type: 'image_url', image_url: { url } })),
@@ -318,7 +334,7 @@ function describeApiError(error: unknown, config: ModelSettings, hasImages: bool
   }
   if (error instanceof OpenAI.BadRequestError) {
     const hint = hasImages
-      ? ` If "${config.label}" can't read images, switch to a vision model for this chat.`
+      ? ` If "${config.label}" can't read images, turn off "Reads images" for it in Settings → Models and pick an image model in Settings → Agent, or switch to a vision model for this chat.`
       : '';
     return new Error(`The model server rejected the request: ${error.message}${hint}`, {
       cause: error,

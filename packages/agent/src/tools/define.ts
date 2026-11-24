@@ -51,6 +51,13 @@ export interface ToolContext {
   askUser: AskUserFn | null;
   /** view_image: show this attached image to the model with the next message */
   showImage: (attachmentId: string) => void;
+  /** view_image: false when the run's model can't read images; undefined = it can */
+  seesImages?: boolean;
+  /**
+   * view_image for a model that can't read images: the image model (Settings → Agent) looks at
+   * the image and answers the question in text. Null when no image model is set.
+   */
+  describeImage?: ((attachmentId: string, question: string) => Promise<string>) | null;
   /** tool plugins (list/test/save_tool_plugin); null when the app keeps none */
   plugins?: PluginWorkshop | null;
   /** aborted when the user stops the run: long tools (run_command) stop early */

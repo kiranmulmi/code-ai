@@ -41,6 +41,11 @@ export interface ModelProfile {
   contextWindow: number | null;
   /** Whether the composer offers a reasoning effort for this model. */
   supportsReasoning: boolean;
+  /**
+   * Whether the model can read images. When it can't, images are never sent to it: view_image
+   * has the image model (Settings → Agent) describe them instead.
+   */
+  supportsImages: boolean;
   /** Used when no model is chosen, e.g. by the CLI. Exactly one model is the default. */
   isDefault: boolean;
   createdAt: string | null;
@@ -103,6 +108,7 @@ export const modelInputSchema = z.object({
   maxTokens: maxTokens.default(null),
   contextWindow: contextWindow.default(null),
   supportsReasoning: z.boolean().default(false),
+  supportsImages: z.boolean().default(true),
   isDefault: z.boolean().default(false),
 });
 

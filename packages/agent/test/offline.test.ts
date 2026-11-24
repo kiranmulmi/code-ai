@@ -2939,3 +2939,67 @@ test('a failed run leaves a hidden note and closes open tool calls', async () =>
     'the tool call and its closing result stay, the note is hidden',
   );
 });
+
+const TEXT_ONLY_MODEL = {
+  label: 'Lite',
+  apiKey: '',
+  model: 'lite',
+  maxTokens: null,
+  contextWindow: null,
+  reasoningEffort: null,
+  supportsImages: false,
+};
+
+test('view_image on a text-only model asks the image model and returns its text', async () => {
+  const setup = await tempSetup();
+  const { store, attachments } = attachmentStore([{ name: 'screen.png', bytes: PNG }]);
+  const id = nth(attachments, 0).id;
+  const { callModel, requests } = scriptedModel([
+    callTools(toolCall('t1', 'view_image', { attachment_id: id, question: 'What color?' })),
+    answer('It is red.'),
+  ]);
+  const vision = scriptedModel([answer('A single red pixel.')]);
+  const agent = createAgent({
+    ...setup,
+    attachments: store,
+    model: TEXT_ONLY_MODEL,
+    callModel,
+    visionCallModel: vision.callModel,
+    logger: silentLogger,
+    config: { planning: 'off', review: 'off' },
+  });
+  const result = await agent.run('', { attachments });
+  assert.equal(result.status, 'done');
+
+  // The image model got the image and the question.
+  const asked = nth(vision.requests, 0);
+  const sent = nth(asked.messages, 0);
+  assert.ok(sent.role === 'user');
+  assert.equal(sent.content, 'What color?');
+  assert.deepEqual(sent.images, [id]);
+  assert.match(asked.images?.get(id) ?? '', /^data:image\/png;base64,/);
+
+  // The chat model got text only: the description as the tool result, no image message.
+  const second = nth(requests, 1);
+  const last = nth(second.messages, -1);
+  assert.ok(last.role === 'tool');
+  assert.match(last.content, /A single red pixel\./);
+  assert.ok(second.messages.every((m) => m.role !== 'user' || !m.images?.length));
+  assert.ok(result.calls.some((c) => c.kind === 'vision'));
+});
+
+test('view_image on a text-only model without an image model says how to fix it', async () => {
+  const { store, attachments } = attachmentStore([{ name: 'screen.png', bytes: PNG }]);
+  const shown: string[] = [];
+  const ctx = toolContext({
+    attachments: store,
+    showImage: (id) => shown.push(id),
+    seesImages: false,
+    describeImage: null,
+  });
+  await assert.rejects(
+    viewImage.run({ attachment_id: nth(attachments, 0).id }, ctx),
+    /can't read images and no image model is set/,
+  );
+  assert.deepEqual(shown, []);
+});

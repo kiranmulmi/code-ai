@@ -66,6 +66,7 @@ export function ModelFormPage() {
   const [maxTokens, setMaxTokens] = useState('');
   const [contextWindow, setContextWindow] = useState('');
   const [supportsReasoning, setSupportsReasoning] = useState(false);
+  const [supportsImages, setSupportsImages] = useState(true);
   const [isDefault, setIsDefault] = useState(false);
   const [wasDefault, setWasDefault] = useState(false);
   const [errors, setErrors] = useState<FieldErrors>({});
@@ -99,6 +100,7 @@ export function ModelFormPage() {
         setMaxTokens(saved.maxTokens === null ? '' : String(saved.maxTokens));
         setContextWindow(saved.contextWindow === null ? '' : String(saved.contextWindow));
         setSupportsReasoning(saved.supportsReasoning);
+        setSupportsImages(saved.supportsImages);
         setIsDefault(saved.isDefault);
         setWasDefault(saved.isDefault);
       })
@@ -130,6 +132,7 @@ export function ModelFormPage() {
       maxTokens: tokens === '' ? null : Number(tokens),
       contextWindow: window === '' ? null : Number(window),
       supportsReasoning,
+      supportsImages,
       isDefault,
     };
     // Editing: an untouched key field keeps the saved key.
@@ -429,6 +432,16 @@ export function ModelFormPage() {
               onChange={setSupportsReasoning}
               label="Supports reasoning effort"
             />
+          </div>
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className={LABEL}>Reads images</p>
+              <p className={TIP}>
+                Turn off for text-only models: images then go to the image model set in Settings →
+                Agent, which describes them in text.
+              </p>
+            </div>
+            <Switch isOn={supportsImages} onChange={setSupportsImages} label="Reads images" />
           </div>
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">

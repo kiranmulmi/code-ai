@@ -400,6 +400,12 @@ export const LIMIT_SUMMARY_PROMPT = `You are an AI agent that has reached its st
 Write the best final answer you can from these findings alone. Don't invent anything that isn't in them. Cite source links that appear in the findings. End with a short "Not finished" section saying what is still missing, so the user can ask you to continue.`;
 
 /** The tool-free call that summarizes older messages when a chat nears the context window. */
+/** The image model's instructions, when it looks at an image for a model that can't (view_image). */
+export const IMAGE_DESCRIPTION_PROMPT = `You look at an image for an AI agent whose model cannot see images. The agent reads only your text, so answer its question about the attached image precisely and completely.
+- Transcribe visible text exactly (code, error messages, labels, numbers), in code blocks where it helps.
+- Describe only what is actually in the image. If something is unreadable or cut off, say so rather than guessing.
+- Be factual and dense: no greetings, no advice, no commentary beyond the question.`;
+
 export const COMPACTION_PROMPT = `You summarize the earlier part of a conversation between a user and an AI agent that uses tools, so the agent can keep working after those messages are taken out of its context window. The agent will read only your summary in their place.
 
 Write a dense, factual summary in plain prose and short lists. Keep everything the agent needs to continue correctly:

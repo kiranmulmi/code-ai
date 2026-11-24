@@ -27,6 +27,7 @@ const savedModelSchema = z.object({
   maxTokens: z.number().int().positive().nullable().default(null),
   contextWindow: z.number().int().positive().nullable().default(null),
   supportsReasoning: z.boolean().default(false),
+  supportsImages: z.boolean().default(true),
   isDefault: z.boolean().default(false),
   createdAt: z.string().nullable().default(null),
   updatedAt: z.string().nullable().default(null),
@@ -89,6 +90,7 @@ export class ModelStore {
         maxTokens: clean.maxTokens,
         contextWindow: clean.contextWindow,
         supportsReasoning: clean.supportsReasoning,
+        supportsImages: clean.supportsImages,
         isDefault: clean.isDefault || models.length === 0,
         createdAt: now,
         updatedAt: now,
@@ -117,6 +119,7 @@ export class ModelStore {
         maxTokens: clean.maxTokens,
         contextWindow: clean.contextWindow,
         supportsReasoning: clean.supportsReasoning,
+        supportsImages: clean.supportsImages,
         isDefault: clean.isDefault || current.isDefault,
         updatedAt: new Date().toISOString(),
       };
@@ -178,30 +181,40 @@ export class ModelStore {
         maxTokens: saved.maxTokens,
         contextWindow: saved.contextWindow,
         reasoningEffort: null,
+        supportsImages: saved.supportsImages,
       },
     };
   }
 
   /**
-   * The models a run's helpers use, from Settings → Agent: sub-agents and the reviewer. One
-   * that isn't set, or was deleted since, is left out: they then use the run's own model.
+   * The models a run's helpers use, from Settings → Agent: sub-agents, the reviewer and the
+   * image model. One that isn't set, or was deleted since, is left out: sub-agents and the
+   * reviewer then use the run's own model, and a model that can't read images gets none.
    */
   async helpersFor({
     subagentModelId,
     reviewModelId,
+    visionModelId = null,
   }: {
     subagentModelId: string | null;
     reviewModelId: string | null;
-  }): Promise<{ subagentModel?: ModelSettings; reviewModel?: ModelSettings }> {
+    visionModelId?: string | null;
+  }): Promise<{
+    subagentModel?: ModelSettings;
+    reviewModel?: ModelSettings;
+    visionModel?: ModelSettings;
+  }> {
     const settingsOf = async (id: string | null) =>
       id ? ((await this.settingsFor(id))?.settings ?? undefined) : undefined;
-    const [subagentModel, reviewModel] = await Promise.all([
+    const [subagentModel, reviewModel, visionModel] = await Promise.all([
       settingsOf(subagentModelId),
       settingsOf(reviewModelId),
+      settingsOf(visionModelId),
     ]);
     return {
       ...(subagentModel ? { subagentModel } : {}),
       ...(reviewModel ? { reviewModel } : {}),
+      ...(visionModel ? { visionModel } : {}),
     };
   }
 
@@ -257,6 +270,7 @@ function toProfile(saved: SavedModel): ModelProfile {
     maxTokens: saved.maxTokens,
     contextWindow: saved.contextWindow,
     supportsReasoning: saved.supportsReasoning,
+    supportsImages: saved.supportsImages,
     isDefault: saved.isDefault,
     createdAt: saved.createdAt,
     updatedAt: saved.updatedAt,

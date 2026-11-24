@@ -429,6 +429,25 @@ export function AgentSettingsPage() {
         </section>
 
         <section className="panel">
+          <SectionHeader
+            title="Images"
+            detail="For chat models that can't read images (Reads images turned off in Settings → Models)."
+          />
+          <div className="flex flex-col divide-y divide-line-2">
+            <ModelPicker
+              id="setting-vision-model"
+              label="Image model"
+              hint="When the chat's model can't read images, this model looks at them (view_image) and describes them in text for it. Without one, such a model can't see images at all."
+              emptyLabel="None"
+              value={draft.visionModelId}
+              models={models.data?.filter((m) => m.supportsImages) ?? null}
+              error={errors.visionModelId}
+              onChange={(id) => set('visionModelId', id)}
+            />
+          </div>
+        </section>
+
+        <section className="panel">
           <SectionHeader title="Web search and logging" />
           <div className="flex flex-col divide-y divide-line-2">
             <div className={SECTION}>
@@ -536,6 +555,7 @@ function ModelPicker({
   id,
   label,
   hint,
+  emptyLabel = 'Same as the chat',
   value,
   models,
   error,
@@ -544,6 +564,8 @@ function ModelPicker({
   id: string;
   label: string;
   hint: string;
+  /** The option for no model of its own. */
+  emptyLabel?: string;
   value: string | null;
   models: readonly ModelProfile[] | null;
   error: string | undefined;
@@ -563,13 +585,19 @@ function ModelPicker({
         onChange={(event) => onChange(event.target.value || null)}
         className={`${INPUT} ${error ? INPUT_ERROR : INPUT_OK} max-w-[40ch]`}
       >
-        <option value="">Same as the chat</option>
+        <option value="">{emptyLabel}</option>
         {models?.map((model) => (
           <option key={model.id} value={model.id}>
             {model.name}
           </option>
         ))}
-        {isMissing && <option value={value}>Deleted model (uses the chat&apos;s)</option>}
+        {isMissing && (
+          <option value={value}>
+            {emptyLabel === 'None'
+              ? 'Unavailable model (not used)'
+              : "Deleted model (uses the chat's)"}
+          </option>
+        )}
       </select>
       {error && (
         <p role="alert" className={ERROR}>

@@ -31,7 +31,8 @@ export interface Usage {
 /**
  * What a model call was for: a step of the agent loop, the planner deciding whether to plan,
  * summarizing older messages to fit the context window, the summary written at a limit, the
- * reviewer checking the final answer, or any call a sub-agent made (delegate_task).
+ * reviewer checking the final answer, any call a sub-agent made (delegate_task), or the image
+ * model describing an image for a chat model that can't read images (view_image).
  */
 export const MODEL_CALL_KINDS = [
   'step',
@@ -40,6 +41,7 @@ export const MODEL_CALL_KINDS = [
   'limit_summary',
   'review',
   'subagent',
+  'vision',
 ] as const;
 
 export type ModelCallKind = (typeof MODEL_CALL_KINDS)[number];

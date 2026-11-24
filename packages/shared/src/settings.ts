@@ -50,6 +50,11 @@ export interface AgentSettings {
   review: ReviewMode;
   /** The model the reviewer runs on (a saved model's id); null: the chat's model. */
   reviewModelId: string | null;
+  /**
+   * The model that looks at images for a chat model that can't (a saved model's id); null:
+   * none, so such a model can't see images at all.
+   */
+  visionModelId: string | null;
 }
 
 export const DEFAULT_AGENT_SETTINGS: AgentSettings = {
@@ -62,6 +67,7 @@ export const DEFAULT_AGENT_SETTINGS: AgentSettings = {
   subagentModelId: null,
   review: 'tasks',
   reviewModelId: null,
+  visionModelId: null,
 };
 
 const wholeNumber = (label: string, { min, max }: { min: number; max: number }) =>
@@ -98,6 +104,7 @@ export const agentSettingsSchema = z.object({
   maxParallelSubagents: wholeNumber('Parallel sub-agents', SETTINGS_LIMITS.maxParallelSubagents),
   review: z.enum(REVIEW_MODES),
   reviewModelId: optionalModelId,
+  visionModelId: optionalModelId,
 });
 
 export type AgentSettingsInput = z.input<typeof agentSettingsSchema>;
@@ -126,5 +133,6 @@ export function readAgentSettings(raw: unknown): AgentSettings {
     maxParallelSubagents: field('maxParallelSubagents'),
     review: field('review'),
     reviewModelId: field('reviewModelId'),
+    visionModelId: field('visionModelId'),
   };
 }

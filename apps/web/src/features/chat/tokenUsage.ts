@@ -27,6 +27,7 @@ export const CALL_KIND_LABELS: Record<ModelCallKind, string> = {
   limit_summary: 'Summary at the limit',
   review: 'Reviewing the answer',
   subagent: 'Sub-agent',
+  vision: 'Describing an image',
 };
 
 export const TOKEN_GROUP_LABELS: Record<TokenGroupId, string> = {

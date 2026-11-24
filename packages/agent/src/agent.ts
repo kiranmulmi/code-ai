@@ -44,6 +44,7 @@ import {
   memoryContext,
   steeringMessage,
   COMPACTION_PROMPT,
+  IMAGE_DESCRIPTION_PROMPT,
   summaryMessage,
 } from './prompt.js';
 import {
@@ -152,6 +153,10 @@ export interface AgentRunOptions {
   reviewModel?: ModelSettings;
   /** replaces the reviewer's API call (tests) */
   reviewCallModel?: CallModel;
+  /** the model that describes images (view_image) when `model` can't read them */
+  visionModel?: ModelSettings;
+  /** replaces the image model's API call (tests) */
+  visionCallModel?: CallModel;
   /** the context window when `model` doesn't give one (tests); else DEFAULT_CONTEXT_WINDOW */
   contextWindow?: number;
   logger?: AgentLogger;
@@ -242,6 +247,17 @@ export function createAgent(options: AgentOptions): Agent {
     if (signal?.aborted) return Promise.reject(new StoppedError());
     return reviewBase({ ...request, signal });
   };
+  /**
+   * Whether the run's model reads images. When it doesn't, view_image asks the image model
+   * (when one is set) and no image is sent to the run's model.
+   */
+  const seesImages = options.model?.supportsImages !== false;
+  const visionBase: CallModel | null = seesImages
+    ? null
+    : (options.visionCallModel ??
+      (options.visionModel && options.visionModel.supportsImages !== false
+        ? createModelCaller(options.visionModel)
+        : null));
   const isStopped = () => signal?.aborted === true;
   const isSubagent = options.role === 'subagent';
   const emit = options.onEvent ?? (() => {});
@@ -414,6 +430,8 @@ export function createAgent(options: AgentOptions): Agent {
     showImage: (id) => {
       if (!imagesToShow.includes(id)) imagesToShow.push(id);
     },
+    seesImages,
+    describeImage: visionBase ? describeImage : null,
   };
   /** The budget of the run in progress, for delegate_task. */
   let currentBudget: Budget | null = null;
@@ -475,6 +493,34 @@ export function createAgent(options: AgentOptions): Agent {
       }
     }
     return imageUrls;
+  }
+
+  /**
+   * view_image for a model that can't read images: one call to the image model with the image
+   * and the question; its answer goes back to the agent as text. Counted on the run's budget.
+   */
+  async function describeImage(id: string, question: string): Promise<string> {
+    const budget = currentBudget;
+    if (!visionBase || !budget) throw new Error('No image model is set.');
+    if (!attachmentStore) throw new Error('This chat keeps no attachments.');
+    const url = await imageDataUrl(attachmentStore, id);
+    if (!url) throw new Error("The image can't be read.");
+    const caller: CallModel = (request) => {
+      if (signal?.aborted) return Promise.reject(new StoppedError());
+      return visionBase({ ...request, signal });
+    };
+    const { message } = await callRecorded(
+      budget,
+      'vision',
+      {
+        system: IMAGE_DESCRIPTION_PROMPT,
+        messages: [{ role: 'user', content: question, images: [id] }],
+        images: new Map([[id, url]]),
+      },
+      undefined,
+      caller,
+    );
+    return message.content ?? '';
   }
 
   /** After a batch of tool calls: the images view_image opened, as one message the model sees. */

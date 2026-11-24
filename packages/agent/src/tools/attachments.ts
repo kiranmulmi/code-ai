@@ -109,22 +109,43 @@ export const readAttachment = defineTool<{
   },
 });
 
-export const viewImage = defineTool<{ attachment_id: string }>({
+/** What the image model is asked when view_image gives no question. */
+export const DEFAULT_IMAGE_QUESTION =
+  'Describe this image in detail for someone who cannot see it. Transcribe all visible text exactly. For a screenshot or UI, describe the layout, controls, values and any errors; for a chart or diagram, its structure and numbers.';
+
+export const viewImage = defineTool<{ attachment_id: string; question?: string }>({
   name: 'view_image',
   description:
-    'Look at an image the user attached to the chat (PNG, JPEG, GIF or WebP): a screenshot, a photo, a diagram, a design. Call this before answering anything about the image. The image is shown to you in the next message. Needs a model that can see images.',
+    "Look at an image the user attached to the chat (PNG, JPEG, GIF or WebP): a screenshot, a photo, a diagram, a design. Call this before answering anything about the image. The image is shown to you in the next message; if your model can't read images, an image model describes it instead, answering `question`. Call it again with a more specific question for details the description left out.",
   properties: {
     attachment_id: { type: 'string', description: "The attachment's id, from the user's message." },
+    question: {
+      type: 'string',
+      description:
+        "Optional: what you need to know about the image (e.g. 'What does the error dialog say?'). Used when an image model describes it for you; leave out for a full description.",
+    },
   },
-  async run({ attachment_id: id }, ctx) {
+  optional: ['question'],
+  async run({ attachment_id: id, question }, ctx) {
     const attachment = await findAttachment(ctx, id);
     if (attachment.kind !== 'image') {
       throw new Error(
         `"${attachment.name}" is not an image; read it with read_attachment instead.`,
       );
     }
-    ctx.showImage(attachment.id);
-    return `"${attachment.name}" (${formatBytes(attachment.size)}) is shown to you in the next message.`;
+    if (ctx.seesImages !== false) {
+      ctx.showImage(attachment.id);
+      return `"${attachment.name}" (${formatBytes(attachment.size)}) is shown to you in the next message.`;
+    }
+    if (!ctx.describeImage) {
+      throw new Error(
+        `The current model can't read images and no image model is set, so "${attachment.name}" can't be viewed. Tell the user to pick an image model in Settings → Agent, or to switch this chat to a model that reads images.`,
+      );
+    }
+    const asked = question?.trim() || DEFAULT_IMAGE_QUESTION;
+    const answer = (await ctx.describeImage(attachment.id, asked)).trim();
+    if (!answer) throw new Error(`The image model gave no description of "${attachment.name}".`);
+    return `[Your model can't read images, so an image model looked at "${attachment.name}" (${formatBytes(attachment.size)}) for you. Asked: ${asked}]\n${answer}`;
   },
 });
 

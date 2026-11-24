@@ -191,6 +191,7 @@ function ModelMenuBody({
               <>
                 {item.isDefault && <Badge>default</Badge>}
                 {item.supportsReasoning && <Badge tone="blue">reasoning</Badge>}
+                {!item.supportsImages && <Badge>text only</Badge>}
               </>
             }
           />
