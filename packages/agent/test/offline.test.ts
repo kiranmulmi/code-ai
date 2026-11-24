@@ -3003,3 +3003,45 @@ test('view_image on a text-only model without an image model says how to fix it'
   );
   assert.deepEqual(shown, []);
 });
+
+test('a model that rejects images is treated as text-only and view_image uses the image model', async () => {
+  const setup = await tempSetup();
+  const { store, attachments } = attachmentStore([{ name: 'screen.png', bytes: PNG }]);
+  const id = nth(attachments, 0).id;
+  const scripted = scriptedModel([
+    callTools(toolCall('t1', 'view_image', { attachment_id: id })),
+    answer('unused'),
+    callTools(toolCall('t2', 'view_image', { attachment_id: id })),
+    answer('It is red.'),
+  ]);
+  let calls = 0;
+  // The second call carries the image: the server turns it down, as OpenRouter does.
+  const callModel: CallModel = async (req) => {
+    calls += 1;
+    if (calls === 2 && req.images?.size) {
+      await scripted.callModel(req);
+      throw new Error('Not found', {
+        cause: new Error('404 No endpoints found that support image input'),
+      });
+    }
+    return scripted.callModel(req);
+  };
+  const vision = scriptedModel([answer('A single red pixel.')]);
+  const agent = createAgent({
+    ...setup,
+    attachments: store,
+    callModel,
+    visionCallModel: vision.callModel,
+    logger: silentLogger,
+    config: { planning: 'off', review: 'off' },
+  });
+  const result = await agent.run('', { attachments });
+  assert.equal(result.status, 'done');
+  assert.equal(result.text, 'It is red.');
+  // The retry sent no images; the second view_image went to the image model.
+  assert.equal(nth(scripted.requests, 2).images?.size ?? 0, 0);
+  assert.equal(vision.requests.length, 1);
+  const last = nth(nth(scripted.requests, 3).messages, -1);
+  assert.ok(last.role === 'tool');
+  assert.match(last.content, /A single red pixel\./);
+});

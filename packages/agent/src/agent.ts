@@ -251,13 +251,12 @@ export function createAgent(options: AgentOptions): Agent {
    * Whether the run's model reads images. When it doesn't, view_image asks the image model
    * (when one is set) and no image is sent to the run's model.
    */
-  const seesImages = options.model?.supportsImages !== false;
-  const visionBase: CallModel | null = seesImages
-    ? null
-    : (options.visionCallModel ??
-      (options.visionModel && options.visionModel.supportsImages !== false
-        ? createModelCaller(options.visionModel)
-        : null));
+  let seesImages = options.model?.supportsImages !== false;
+  const visionBase: CallModel | null =
+    options.visionCallModel ??
+    (options.visionModel && options.visionModel.supportsImages !== false
+      ? createModelCaller(options.visionModel)
+      : null);
   const isStopped = () => signal?.aborted === true;
   const isSubagent = options.role === 'subagent';
   const emit = options.onEvent ?? (() => {});
@@ -432,6 +431,17 @@ export function createAgent(options: AgentOptions): Agent {
     },
     seesImages,
     describeImage: visionBase ? describeImage : null,
+  };
+  /**
+   * The server turned images down (a model marked as reading images that can't): from here on
+   * the run treats its model as text-only, so view_image goes to the image model.
+   */
+  const stopSendingImages = (error: unknown) => {
+    seesImages = false;
+    toolContext.seesImages = false;
+    logger.warn(
+      `The model rejected images, so it is treated as text-only for this run${visionBase ? ' (images go to the image model)' : ''}. Turn off "Reads images" for it in Settings → Models. ${errorMessage(error)}`,
+    );
   };
   /** The budget of the run in progress, for delegate_task. */
   let currentBudget: Budget | null = null;
@@ -758,19 +768,31 @@ export function createAgent(options: AgentOptions): Agent {
         takeSteering();
         emit({ type: 'model_call', step: budget.steps + 1 });
         const sent = await prepareRequest(request, runStart, budget);
-        const { message, finishReason, usage, model } = await callRecorded(
-          budget,
-          'step',
-          {
-            system: systemPrompt,
-            messages: sent.messages,
-            images: await imagesFor(sent.messages),
-            tools: sent.tools,
-            onText: (text) => emit({ type: 'text_delta', text }),
-            onReasoning: reasoningOnce(),
-          },
-          { sections: systemSections, infos: sent.infos },
-        );
+        const callStep = async () =>
+          callRecorded(
+            budget,
+            'step',
+            {
+              system: systemPrompt,
+              messages: sent.messages,
+              // A text-only model gets none: each image becomes a note to use view_image.
+              images: seesImages ? await imagesFor(sent.messages) : new Map(),
+              tools: sent.tools,
+              onText: (text) => emit({ type: 'text_delta', text }),
+              onReasoning: reasoningOnce(),
+            },
+            { sections: systemSections, infos: sent.infos },
+          );
+        const hasImages = sent.messages.some((m) => m.role === 'user' && m.images?.length);
+        let reply: Awaited<ReturnType<typeof callStep>>;
+        try {
+          reply = await callStep();
+        } catch (error) {
+          if (!(seesImages && hasImages && isImageRejection(error))) throw error;
+          stopSendingImages(error);
+          reply = await callStep();
+        }
+        const { message, finishReason, usage, model } = reply;
         meter.calibrate(sent.raw, usage.inputTokens);
         emit({
           type: 'context',
@@ -1363,4 +1385,16 @@ function toolError(message: string): string {
 function summarize(args: string): string {
   const text = typeof args === 'string' ? args : JSON.stringify(args ?? {});
   return text.length > 120 ? `${text.slice(0, 117)}...` : text;
+}
+
+/**
+ * A model server turning down a request because it carries images, e.g. OpenRouter's
+ * "404 No endpoints found that support image input", or a 400 about image content.
+ */
+function isImageRejection(error: unknown): boolean {
+  // The server's own message (the cause): ours adds a hint about images to every 400.
+  const server = error instanceof Error && error.cause ? errorMessage(error.cause) : '';
+  return /image input|support(s|ed)? images?|image_url|image content|vision|multimodal/i.test(
+    server,
+  );
 }

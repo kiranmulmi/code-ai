@@ -320,6 +320,12 @@ function describeApiError(error: unknown, config: ModelSettings, hasImages: bool
       { cause: error },
     );
   }
+  if (error instanceof OpenAI.NotFoundError && hasImages && /image/i.test(error.message)) {
+    return new Error(
+      `"${config.label}" can't read images (${error.message}). Turn off "Reads images" for it in Settings → Models and pick an image model in Settings → Agent, or switch to a vision model for this chat.`,
+      { cause: error },
+    );
+  }
   if (error instanceof OpenAI.NotFoundError) {
     return new Error(
       `Not found at ${where}: check the model name ("${config.model}") and server URL of "${config.label}" in Settings → Models. ${error.message}`,
