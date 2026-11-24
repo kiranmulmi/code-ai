@@ -1191,7 +1191,9 @@ export function createAgent(options: AgentOptions): Agent {
     const release = await subagentSlot();
     try {
       if (isStopped()) throw new StoppedError();
-      const tokensLeft = Math.floor((budget.maxTotalTokens - budget.budgetTokens()) / share);
+      const remainingTokens = budget.maxTotalTokens - budget.budgetTokens();
+      const sharedTokens = Math.floor(remainingTokens / share);
+      const tokensLeft = Math.max(sharedTokens, 100000);
       if (tokensLeft <= 0)
         throw new Error('The token budget is used up. Finish without a sub-agent.');
       const from: ApprovalSource = { subagent: label, specialist: chosen.name };
