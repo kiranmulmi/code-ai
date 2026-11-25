@@ -1,242 +1,146 @@
-import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { parseCommandFiles, type CommandFileChange, type CommandFiles } from '@app/shared';
-import { Badge } from '../../components/Badge';
-import { CodeHighlight } from '../../components/CodeHighlight';
-import { CodeText } from '../../components/CodeText';
-import { Spinner } from '../../components/Spinner';
-import { inlineArgs, prettyJson } from '../../lib/format';
-import { commandFilesSummary, delegateInfo, specialistTitle, stepSummary } from './tools';
-import { ChevronRightIcon, CrossIcon, FileTintIcon } from '../../lib/icons';
-import { fileTint } from '../panel/files/fileTint';
-import { languageForPath } from '../../lib/languages';
+import { useMemo, useState, type CSSProperties } from 'react';
+import { parseCommandFiles } from '@app/shared';
+import { inlineArgs } from '../../lib/format';
+import { ChevronDownIcon, ChevronRightIcon, CrossIcon, FileTintIcon } from '../../lib/icons';
 import type { SubagentActivity, ToolItem } from './conversation';
+import { TimelineEntry } from './Timeline';
 import { toolIcon } from './toolIcon';
-import { ToolInput } from './ToolInput';
+import { FAMILY_COLOR, toolMeta } from './toolMeta';
+import { ToolDetails } from './ToolDetails';
+import { commandFilesSummary, delegateInfo, specialistTitle, stepSummary } from './tools';
 
-/** A call's status: a spinner while it runs, a cross if it failed, else the tool's own icon. */
-function StepIcon({
-  name,
-  state,
-  pop = false,
-}: {
-  name: string;
-  state: ToolItem['state'];
-  /** Pop the icon in: the call just finished while we watched. */
-  pop?: boolean;
-}) {
-  const popClass = pop ? 'animate-pop motion-reduce:animate-none' : '';
-  if (state === 'running') {
-    return (
-      <span className="grid h-5 w-5 place-items-center">
-        <Spinner size={10} label="Running" />
-      </span>
-    );
-  }
-  if (state === 'error') {
-    return (
-      <span className={`grid h-5 w-5 place-items-center text-danger ${popClass}`}>
-        <CrossIcon size={12} />
-      </span>
-    );
-  }
-  const Icon = toolIcon(name);
+/** A tinted square for a tool family: its colour faint behind, full on the glyph. */
+function tint(color: string, strength = 14): CSSProperties {
+  return {
+    color,
+    backgroundColor: `color-mix(in srgb, ${color} ${strength}%, var(--surface))`,
+    borderColor: `color-mix(in srgb, ${color} 28%, transparent)`,
+  };
+}
+
+/** A call's node on the rail: the tool's icon in its family colour, ringed while it runs. */
+function ToolNode({ item, pop }: { item: ToolItem; pop: boolean }) {
+  const { family } = toolMeta(item.name, item.args);
+  const Icon = toolIcon(item.name);
+  const isError = item.state === 'error';
+  const isRunning = item.state === 'running';
+  const color = isError ? 'var(--danger)' : FAMILY_COLOR[family];
   return (
-    <span className={`grid h-5 w-5 place-items-center text-ink-3 ${popClass}`}>
-      <Icon size={13} />
+    <span
+      className={`relative grid h-[22px] w-[22px] place-items-center rounded-[7px] border ${
+        pop ? 'animate-pop motion-reduce:animate-none' : ''
+      }`}
+      style={tint(color)}
+    >
+      {isError ? <CrossIcon size={11} /> : <Icon size={12} />}
+      {isRunning && (
+        <span
+          role="status"
+          aria-label="Running"
+          className="absolute inset-[-3px] animate-spin-fast rounded-[9px] border-[1.5px] border-transparent border-t-accent motion-reduce:animate-none"
+        />
+      )}
     </span>
   );
 }
 
-/** A running call's text: a light sweeping across it, like the "thinking" line. */
+/** A running call's label: a light sweeping across it. */
 const RUNNING_TEXT =
-  'bg-[linear-gradient(90deg,var(--ink-4)_0%,var(--ink)_50%,var(--ink-4)_100%)] bg-[length:200%_100%] bg-clip-text text-transparent animate-shimmer motion-reduce:animate-none';
+  'bg-[linear-gradient(90deg,var(--ink-3)_0%,var(--ink)_50%,var(--ink-3)_100%)] bg-[length:200%_100%] bg-clip-text text-transparent animate-shimmer motion-reduce:animate-none';
 
-/** How close to the end (px) still counts as "at the newest call". */
-const NEAR_END = 24;
+/** Runs longer than this fold their older calls behind a "show more" row. */
+const FOLD_AFTER = 5;
+/** How many of the newest calls stay visible while folded. */
+const KEEP_VISIBLE = 3;
 
 /**
- * A run of consecutive tool calls: a "tool calls (n)" header, then plain rows on
- * the chat background, no card around them. Four rows show at once; the rest scroll inside a
- * capped box that stays on the newest call (unless the reader has scrolled up), with the older
- * calls fading out at the top edge.
+ * A run of consecutive tool calls on the timeline. Long runs show only their newest calls,
+ * with the older ones behind a single row that opens them.
  */
 export function ToolSteps({ items }: { items: readonly ToolItem[] }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const isPinned = useRef(true);
-  const [isFaded, setIsFaded] = useState(false);
-  // Calls already there when the list first shows (e.g. an old chat) don't animate in.
+  const [isUnfolded, setIsUnfolded] = useState(false);
+  // Calls already there when the run first shows (e.g. an old chat) don't animate in.
   const [initialKeys] = useState(() => new Set(items.map((item) => item.key)));
-
-  const update = useCallback(() => {
-    const node = ref.current;
-    if (!node) return;
-    isPinned.current = node.scrollHeight - node.scrollTop - node.clientHeight < NEAR_END;
-    setIsFaded(node.scrollTop > 0);
-  }, []);
-
-  // A new call (not a row opened by the reader): follow it if we were at the end.
-  useLayoutEffect(() => {
-    const node = ref.current;
-    if (node && isPinned.current) node.scrollTop = node.scrollHeight;
-    update();
-  }, [items.length, update]);
-
-  return (
-    <section className="flex flex-col gap-1">
-      <div className="flex items-center px-2.5 text-[11px] font-medium italic text-ink-3">
-        <span>tool calls (</span>
-        <span
-          // A new key each time the count changes, so the count pops again.
-          key={items.length}
-          className={`inline-block tabular-nums ${
-            items.length > initialKeys.size ? 'animate-pop motion-reduce:animate-none' : ''
-          }`}
-        >
-          {items.length}
-        </span>
-        <span>)</span>
-      </div>
-      <div
-        ref={ref}
-        onScroll={update}
-        // Four rows (h-8 each, gap-px) show at once; the rest scroll. While a call is open the
-        // cap (and the fade) lift, so its input and result show in full.
-        className={`flex max-h-[calc(8rem+3px)] flex-col gap-px overflow-y-auto [&:has(details[open])]:max-h-none [&:has(details[open])]:[mask-image:none] [&>*]:shrink-0 ${
-          isFaded ? '[mask-image:linear-gradient(to_bottom,transparent,black_1rem)]' : ''
-        }`}
-      >
-        {items.map((item) => (
-          <ToolStep key={item.key} item={item} isNew={!initialKeys.has(item.key)} />
-        ))}
-      </div>
-    </section>
-  );
-}
-
-/** read_file's header on a partial read: "[path: lines 1-200 of 333. …]". */
-const READ_HEADER = /^\[[^\n]*: lines \d+-\d+ of \d+\.[^\n]*\]\n/;
-
-/** The `path` argument of a call, if it has one. */
-function pathArg(args: string): string | null {
-  try {
-    const parsed: unknown = JSON.parse(args);
-    const path =
-      typeof parsed === 'object' && parsed !== null ? (parsed as { path?: unknown }).path : null;
-    return typeof path === 'string' ? path : null;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * A finished call's result: a file read is coloured as code for its file type (its line-range
- * header stays plain), anything else as before (JSON coloured, other text plain).
- */
-function ResultText({ item }: { item: ToolItem }) {
-  const path = item.name === 'read_file' ? pathArg(item.args) : null;
-  const language = path ? languageForPath(path) : null;
-  if (!language) return <CodeText text={prettyJson(item.result)} />;
-  const header = READ_HEADER.exec(item.result)?.[0] ?? '';
+  const hidden = !isUnfolded && items.length > FOLD_AFTER ? items.length - KEEP_VISIBLE : 0;
+  const shown = hidden ? items.slice(hidden) : items;
   return (
     <>
-      {header && <span className="text-ink-3">{header}</span>}
-      <CodeHighlight code={item.result.slice(header.length)} language={language} />
+      {hidden > 0 && (
+        <TimelineEntry
+          className="py-0.5"
+          node={
+            <span className="grid h-[22px] w-[22px] place-items-center rounded-full border border-dashed border-line-strong bg-surface text-[9.5px] font-bold tabular-nums text-ink-3">
+              {hidden}
+            </span>
+          }
+        >
+          <button
+            type="button"
+            onClick={() => setIsUnfolded(true)}
+            className="flex h-8 items-center gap-1.5 rounded-lg px-2 text-[12px] font-medium text-ink-3 transition-colors hover:bg-subtle hover:text-ink"
+          >
+            Show {hidden} earlier tool {hidden === 1 ? 'call' : 'calls'}
+            <ChevronDownIcon size={10} />
+          </button>
+        </TimelineEntry>
+      )}
+      {shown.map((item) => (
+        <ToolStep key={item.key} item={item} isNew={!initialKeys.has(item.key)} />
+      ))}
     </>
   );
 }
 
-/** delegate_task: the sub-agent's tool calls, as small rows under the step, and what it's doing now. */
+/** delegate_task: the sub-agent's own calls, as a small nested list under the step. */
 function SubagentSteps({ activity }: { activity: SubagentActivity }) {
+  if (!activity.tools.length && !activity.status) return null;
   return (
-    <div className="ml-[30px] flex flex-col gap-px border-l border-line-2 pl-2.5 text-[11px]">
-      {activity.tools.map((tool) => (
-        <div key={tool.id} className="flex h-6 items-center gap-2">
-          <StepIcon name={tool.name} state={tool.state} />
-          <span className="shrink-0 font-mono font-semibold italic text-ink-4">{tool.name}</span>
-          <span className="min-w-0 flex-1 truncate font-mono text-ink-4">
-            {stepSummary(tool.args).text}
-          </span>
+    <div className="mb-1 ml-2 mt-1 flex flex-col gap-0.5 rounded-xl border border-line-2 bg-subtle px-2.5 py-2">
+      {activity.tools.map((tool) => {
+        const meta = toolMeta(tool.name, tool.args);
+        const Icon = toolIcon(tool.name);
+        const color = tool.state === 'error' ? 'var(--danger)' : FAMILY_COLOR[meta.family];
+        return (
+          <div key={tool.id} className="flex h-6 items-center gap-2 text-[11.5px]">
+            <span
+              className="grid h-4 w-4 shrink-0 place-items-center rounded-[5px] border"
+              style={tint(color)}
+            >
+              {tool.state === 'error' ? <CrossIcon size={9} /> : <Icon size={9} />}
+            </span>
+            <span
+              className={`shrink-0 font-semibold ${tool.state === 'running' ? RUNNING_TEXT : 'text-ink-2'}`}
+            >
+              {meta.label}
+            </span>
+            <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-ink-3">
+              {meta.target || stepSummary(tool.args).text}
+            </span>
+          </div>
+        );
+      })}
+      {activity.status && (
+        <div className="flex h-6 items-center gap-2 text-[11.5px] text-ink-3">
+          <span aria-hidden className="live-dot scale-75" />
+          {activity.status}
         </div>
-      ))}
-      {activity.status && <div className="h-6 leading-6 text-ink-3">{activity.status}</div>}
-    </div>
-  );
-}
-
-const CHANGE_LABEL: Record<CommandFileChange, { mark: string; className: string; title: string }> =
-  {
-    added: { mark: 'A', className: 'text-success', title: 'Created' },
-    modified: { mark: 'M', className: 'text-warn', title: 'Changed' },
-    deleted: { mark: 'D', className: 'text-danger', title: 'Deleted' },
-  };
-
-/** A file a command touched: its tinted icon, its path, and how (created, changed, deleted, read). */
-function FileChip({ path, change }: { path: string; change?: CommandFileChange }) {
-  const label = change ? CHANGE_LABEL[change] : null;
-  return (
-    <span
-      title={`${label ? label.title : 'Read'}: ${path}`}
-      className="inline-flex h-6 max-w-full items-center gap-1.5 rounded-md border border-line-2 bg-subtle px-2 font-mono text-[11.5px] text-ink-2"
-    >
-      {label && (
-        <span className={`shrink-0 text-[10.5px] font-bold ${label.className}`}>{label.mark}</span>
       )}
-      <FileTintIcon size={12} className={`shrink-0 ${fileTint(path).icon}`} />
-      <span className={`min-w-0 truncate ${change === 'deleted' ? 'line-through' : ''}`}>
-        {path}
-      </span>
-    </span>
-  );
-}
-
-/** run_command: the files it changed (found by comparing the workspace) and read (guessed). */
-function CommandFileList({ files }: { files: CommandFiles }) {
-  const groups = [
-    {
-      title: 'Changed',
-      chips: files.changed.map((entry) => (
-        <FileChip key={`c:${entry.path}`} path={entry.path} change={entry.change} />
-      )),
-      more: files.moreChanged,
-    },
-    {
-      title: 'Read',
-      chips: files.read.map((file) => <FileChip key={`r:${file}`} path={file} />),
-      more: files.moreRead,
-    },
-  ].filter((group) => group.chips.length > 0);
-  return (
-    <div className="flex flex-col gap-2">
-      {groups.map((group) => (
-        <div key={group.title} className="flex flex-wrap items-center gap-1.5">
-          <span className="w-14 shrink-0 text-[11px] font-medium text-ink-3">{group.title}</span>
-          {group.chips}
-          {group.more > 0 && <span className="text-[11px] text-ink-3">+{group.more} more</span>}
-        </div>
-      ))}
     </div>
   );
 }
 
-/** One tool call. Click it to see the input and result, which open in a card below it. */
+/** One tool call. Click it to open its details (result, input, files touched) underneath. */
 export function ToolStep({ item, isNew = false }: { item: ToolItem; isNew?: boolean }) {
-  // A call that arrives while we watch slides in from above.
-  const enter = isNew ? 'animate-enter motion-reduce:animate-none' : '';
-  if (!item.subagent) return <ToolCall item={item} className={enter} />;
-  return (
-    <div className={`flex flex-col ${enter}`}>
-      <ToolCall item={item} />
-      <SubagentSteps activity={item.subagent} />
-    </div>
-  );
-}
-
-function ToolCall({ item, className = '' }: { item: ToolItem; className?: string }) {
   // Seen running: when it finishes, its icon pops in.
   const [wasRunning] = useState(item.state === 'running');
+  const [isOpen, setIsOpen] = useState(false);
   const isRunning = item.state === 'running';
+  const isError = item.state === 'error';
+  const meta = toolMeta(item.name, item.args);
   const delegated = item.name === 'delegate_task' ? delegateInfo(item.args) : null;
-  const summary = delegated ? { text: delegated.label, isReason: true } : stepSummary(item.args);
+  const summary = stepSummary(item.args);
+  const reason = delegated ? delegated.label : summary.isReason ? summary.text : '';
+  const target = meta.target || (summary.isReason ? '' : summary.text);
   const files = useMemo(
     () =>
       item.name === 'run_command' && item.state !== 'running' && item.state !== 'error'
@@ -245,57 +149,70 @@ function ToolCall({ item, className = '' }: { item: ToolItem; className?: string
     [item.name, item.state, item.result],
   );
   const filesSummary = files ? commandFilesSummary(files) : '';
+  const color = isError ? 'var(--danger)' : FAMILY_COLOR[meta.family];
+
   return (
-    <details className={`group text-[12.5px] ${className}`}>
-      <summary className="flex h-8 cursor-pointer list-none items-center gap-2.5 rounded-lg px-2.5 text-[11px] transition-colors hover:bg-surface group-open:bg-surface [&::-webkit-details-marker]:hidden">
-        <StepIcon name={item.name} state={item.state} pop={wasRunning && !isRunning} />
-        <span className="shrink-0 font-mono font-semibold italic text-ink-4">{item.name}</span>
-        {delegated && (
-          <Badge tone="blue" className="shrink-0">
-            {specialistTitle(delegated.specialist)}
-          </Badge>
-        )}
-        <span
-          title={summary.isReason ? inlineArgs(item.args) : undefined}
-          className={`min-w-0 flex-1 truncate ${
-            summary.isReason ? 'text-[12px] text-ink-3' : 'font-mono text-ink-4'
-          } ${isRunning ? RUNNING_TEXT : ''}`}
-        >
-          {summary.text}
+    <TimelineEntry
+      className={`py-0.5 ${isNew ? 'animate-enter motion-reduce:animate-none' : ''}`}
+      node={<ToolNode item={item} pop={wasRunning && !isRunning} />}
+    >
+      <button
+        type="button"
+        aria-expanded={isOpen}
+        onClick={() => setIsOpen((open) => !open)}
+        title={reason ? inlineArgs(item.args) : undefined}
+        className={`group flex w-full min-w-0 items-start gap-2 rounded-lg px-2 py-[5px] text-left transition-colors hover:bg-subtle ${
+          isOpen ? 'bg-subtle' : ''
+        }`}
+      >
+        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <span className="flex min-w-0 items-center gap-2 text-[12.5px]">
+            <span
+              className={`shrink-0 font-semibold ${isRunning ? RUNNING_TEXT : ''}`}
+              style={isRunning ? undefined : { color }}
+            >
+              {meta.label}
+            </span>
+            {delegated && (
+              <span
+                className="shrink-0 rounded-md border px-1.5 text-[10.5px] font-semibold leading-[18px]"
+                style={tint(FAMILY_COLOR.agent, 10)}
+              >
+                {specialistTitle(delegated.specialist)}
+              </span>
+            )}
+            {target && (
+              <span className="min-w-0 truncate rounded-md bg-surface-2 px-1.5 font-mono text-[11.5px] leading-[19px] text-ink-2">
+                {target}
+              </span>
+            )}
+          </span>
+          {reason && (
+            <span className="truncate text-[12.5px] leading-snug text-ink-3 group-hover:text-ink-2">
+              {reason}
+            </span>
+          )}
         </span>
-        {filesSummary && (
-          <Badge tone="grey" icon={<FileTintIcon size={10} />}>
-            {filesSummary}
-          </Badge>
-        )}
-        {item.state === 'error' && <Badge tone="red">failed</Badge>}
-        <ChevronRightIcon
-          size={10}
-          className="shrink-0 text-ink-4 transition-transform group-open:rotate-90"
-        />
-      </summary>
-      <div className="chat-card mb-2 ml-[30px] mt-1 grid gap-px overflow-hidden bg-line-2 group-open:animate-enter motion-reduce:!animate-none">
-        <div className="bg-surface px-3 py-2.5">
-          <div className="eyebrow mb-1.5">Input</div>
-          <ToolInput tool={item.name} input={item.args} />
-        </div>
-        {files && filesSummary && (
-          <div className="bg-surface px-3 py-2.5">
-            <div className="eyebrow mb-1.5">Files</div>
-            <CommandFileList files={files} />
-          </div>
-        )}
-        <div className="bg-surface px-3 py-2.5">
-          <div className="eyebrow mb-1.5">Result</div>
-          <pre
-            className={`max-h-[260px] overflow-auto whitespace-pre-wrap font-mono text-[12px] [overflow-wrap:anywhere] ${
-              item.state === 'error' ? 'text-danger' : 'text-ink-2'
-            }`}
-          >
-            {item.state === 'error' ? item.result : <ResultText item={item} />}
-          </pre>
-        </div>
-      </div>
-    </details>
+        <span className="flex shrink-0 items-center gap-1.5 pt-[2px]">
+          {filesSummary && (
+            <span className="inline-flex h-5 items-center gap-1 rounded-full bg-surface-2 px-2 text-[10.5px] font-semibold text-ink-2">
+              <FileTintIcon size={10} />
+              {filesSummary}
+            </span>
+          )}
+          {isError && (
+            <span className="inline-flex h-5 items-center rounded-full bg-danger-bg px-2 text-[10.5px] font-semibold text-danger">
+              Failed
+            </span>
+          )}
+          <ChevronRightIcon
+            size={10}
+            className={`text-ink-4 transition-transform group-hover:text-ink-3 ${isOpen ? 'rotate-90' : ''}`}
+          />
+        </span>
+      </button>
+      {item.subagent && <SubagentSteps activity={item.subagent} />}
+      {isOpen && <ToolDetails item={item} color={color} files={filesSummary ? files : null} />}
+    </TimelineEntry>
   );
 }

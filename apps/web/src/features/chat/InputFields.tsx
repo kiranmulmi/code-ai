@@ -35,7 +35,7 @@ function asJson(text: string): unknown {
 
 function JsonBlock({ value }: { value: unknown }) {
   return (
-    <pre className="max-h-[220px] overflow-auto whitespace-pre-wrap rounded-lg border border-line-2 bg-subtle px-2.5 py-2 font-mono text-[12px] leading-relaxed text-ink [overflow-wrap:anywhere]">
+    <pre className="max-h-[220px] overflow-auto whitespace-pre-wrap rounded-lg bg-subtle px-2.5 py-2 font-mono text-[12px] leading-relaxed text-ink [overflow-wrap:anywhere]">
       <CodeText text={prettyJson(JSON.stringify(value) ?? 'null')} />
     </pre>
   );
@@ -43,7 +43,7 @@ function JsonBlock({ value }: { value: unknown }) {
 
 function Chip({ children }: { children: ReactNode }) {
   return (
-    <span className="inline-flex max-w-full items-center truncate rounded-md border border-line-2 bg-subtle px-1.5 py-px font-mono text-[12px] text-ink">
+    <span className="inline-flex max-w-full items-center truncate rounded bg-surface-2 px-1.5 py-px font-mono text-[11.5px] text-ink">
       {children}
     </span>
   );
@@ -60,14 +60,14 @@ function Value({ value }: { value: unknown }) {
     if (json !== undefined) return <JsonBlock value={json} />;
     if (MARKDOWN.test(value)) {
       return (
-        <div className="max-h-[320px] overflow-auto rounded-lg border border-line-2 bg-surface px-3 py-2">
+        <div className="max-h-[320px] overflow-auto rounded-lg bg-subtle px-3 py-2">
           <Markdown text={value} className="text-[13px] leading-relaxed text-ink" />
         </div>
       );
     }
     if (value.length > SHORT_TEXT || value.includes('\n')) {
       return (
-        <p className="max-h-[240px] overflow-auto whitespace-pre-wrap rounded-lg border border-line-2 bg-surface px-3 py-2 leading-relaxed [overflow-wrap:anywhere]">
+        <p className="max-h-[240px] overflow-auto whitespace-pre-wrap rounded-lg bg-subtle px-3 py-2 leading-relaxed [overflow-wrap:anywhere]">
           {value}
         </p>
       );
@@ -99,35 +99,22 @@ export function InputFields({ value }: { value: Record<string, unknown> }) {
   const entries = Object.entries(value).filter(([, item]) => item !== undefined);
 
   return (
-    <div className="overflow-hidden rounded-xl border border-line bg-surface">
-      <div className="flex items-center justify-between border-b border-line-2 bg-subtle px-3 py-1.5">
-        <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-ink-3">
-          {entries.length === 1 ? '1 argument' : `${entries.length} arguments`}
-        </span>
-        <button
-          type="button"
-          onClick={() => setIsRaw((current) => !current)}
-          aria-pressed={isRaw}
-          className="rounded-md px-1.5 py-0.5 text-[11.5px] font-medium text-ink-3 transition-colors hover:bg-surface hover:text-accent-2"
-        >
-          {isRaw ? 'Formatted' : 'Raw JSON'}
-        </button>
-      </div>
+    <div>
       {isRaw ? (
-        <pre className="max-h-[420px] overflow-auto whitespace-pre-wrap px-3 py-2.5 font-mono text-[12px] leading-relaxed text-ink [overflow-wrap:anywhere]">
+        <pre className="max-h-[420px] overflow-auto whitespace-pre-wrap rounded-lg bg-subtle px-3 py-2.5 font-mono text-[12px] leading-relaxed text-ink [overflow-wrap:anywhere]">
           <CodeText text={prettyJson(JSON.stringify(value))} />
         </pre>
       ) : entries.length === 0 ? (
-        <p className="px-3 py-2.5 text-[13px] text-ink-3">No arguments.</p>
+        <p className="py-1 text-[12px] italic text-ink-4">No arguments.</p>
       ) : (
-        <dl className="max-h-[460px] divide-y divide-line-2 overflow-auto">
+        <dl className="max-h-[460px] overflow-auto">
           {entries.map(([key, item]) => (
             <div
               key={key}
-              className="grid gap-x-4 gap-y-1 px-3 py-2 text-[13px] text-ink sm:grid-cols-[132px_minmax(0,1fr)]"
+              className="grid gap-x-4 gap-y-1 py-1 text-[12.5px] text-ink sm:grid-cols-[120px_minmax(0,1fr)]"
             >
-              <dt className="pt-px text-[12.5px] font-medium text-ink-3" title={key}>
-                {labelOf(key)}
+              <dt className="truncate pt-px font-mono text-[11px] text-ink-3" title={labelOf(key)}>
+                {key}
               </dt>
               <dd className="min-w-0">
                 <Value value={item} />
@@ -136,6 +123,18 @@ export function InputFields({ value }: { value: Record<string, unknown> }) {
           ))}
         </dl>
       )}
+      <div className="mt-1.5 flex items-center gap-2 text-[10.5px] text-ink-4">
+        <span>{entries.length === 1 ? '1 argument' : `${entries.length} arguments`}</span>
+        <span aria-hidden>·</span>
+        <button
+          type="button"
+          onClick={() => setIsRaw((current) => !current)}
+          aria-pressed={isRaw}
+          className="font-medium text-ink-3 underline-offset-2 transition-colors hover:text-accent-2 hover:underline"
+        >
+          {isRaw ? 'Show formatted' : 'Show raw JSON'}
+        </button>
+      </div>
     </div>
   );
 }

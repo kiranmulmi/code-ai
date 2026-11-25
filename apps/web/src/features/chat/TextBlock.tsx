@@ -1,9 +1,9 @@
 import { Markdown } from '../../components/Markdown';
-import { BulbIcon } from '../../lib/icons';
+import { AlertCircleIcon } from '../../lib/icons';
 import type { TextItem } from './conversation';
 import { useSmoothText } from './useSmoothText';
 
-/** Agent text: the answer, an interim note on the way to a tool call, or an error. */
+/** Agent text outside the activity cards: the answer, or an error. */
 export function TextBlock({ item }: { item: TextItem }) {
   // Streamed text plays out at a steady pace rather than in the bursts it arrives in.
   const smooth = useSmoothText(item.text, item.isOpen && !item.isError);
@@ -15,26 +15,21 @@ export function TextBlock({ item }: { item: TextItem }) {
     return (
       <div
         role="alert"
-        className="rounded-2xl border border-l-4 border-line border-l-danger-line bg-danger-bg px-4 py-3 text-danger [overflow-wrap:anywhere]"
+        className="flex gap-3 rounded-xl bg-danger-bg px-3.5 py-3 text-[13.5px] text-ink [overflow-wrap:anywhere]"
       >
-        <Markdown text={item.text} />
-      </div>
-    );
-  }
-
-  if (item.isInterim) {
-    return (
-      <div className="flex gap-2 px-0.5 py-0.5 text-[13px] text-ink-3 [overflow-wrap:anywhere]">
-        <BulbIcon size={14} className="mt-[3px] shrink-0 text-ink-4" />
-        <div className="min-w-0 flex-1">
-          <Markdown text={text} isStreaming={isStreaming} />
+        <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-danger text-on-accent">
+          <AlertCircleIcon size={12} />
+        </span>
+        <div className="min-w-0">
+          <p className="mb-0.5 text-[12.5px] font-semibold text-danger">Something went wrong</p>
+          <Markdown text={item.text} className="text-ink-2" />
         </div>
       </div>
     );
   }
 
   return (
-    <div className="px-0.5 py-1 leading-relaxed text-ink [overflow-wrap:anywhere]">
+    <div className="answer text-ink [overflow-wrap:anywhere]">
       <Markdown text={text} isStreaming={isStreaming} />
     </div>
   );

@@ -775,3 +775,179 @@
     scale: none;
   }
 }
+
+/* The agent's live activity card (features/chat/ActivityCard): its status text shimmers, a
+   thin bar sweeps under the header, and the card's edge glows softly. */
+.activity-shimmer {
+  background: linear-gradient(90deg, var(--ink-2) 0%, var(--accent) 45%, var(--ink-2) 90%);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: activity-shimmer 1.8s linear infinite;
+}
+@keyframes activity-shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: 0 0;
+  }
+}
+.activity-progress {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+.activity-progress::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  width: 35%;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  animation: activity-sweep 1.4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+.activity-live {
+  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--accent) 10%, transparent),
+    var(--shadow-card);
+}
+/* The agent's answer (features/chat/TextBlock): set as reading prose, not chat text. A
+   comfortable line length, more air between blocks, accent list markers, quiet inline code
+   and headings that open a new section with a hairline. Scoped to .answer, so narration,
+   notes and tool output keep the compact Markdown style. */
+.answer {
+  max-width: 76ch;
+  font-size: 14.5px;
+  line-height: 1.7;
+}
+.answer .markdown p,
+.answer .markdown ul,
+.answer .markdown ol,
+.answer .markdown pre,
+.answer .markdown .table-wrap,
+.answer .markdown blockquote {
+  margin-bottom: 0.9em;
+}
+.answer .markdown > :last-child {
+  margin-bottom: 0;
+}
+.answer .markdown h1,
+.answer .markdown h2,
+.answer .markdown h3 {
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+  line-height: 1.35;
+  letter-spacing: -0.01em;
+}
+.answer .markdown h1:first-child,
+.answer .markdown h2:first-child,
+.answer .markdown h3:first-child {
+  margin-top: 0;
+}
+.answer .markdown h1 {
+  font-size: 19px;
+}
+.answer .markdown h2 {
+  font-size: 16.5px;
+  padding-top: 0.9em;
+  border-top: 1px solid var(--line-2);
+}
+.answer .markdown h2:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+.answer .markdown h3 {
+  font-size: 15px;
+}
+.answer .markdown ul,
+.answer .markdown ol {
+  padding-left: 1.4em;
+}
+.answer .markdown li {
+  margin-bottom: 0.35em;
+  padding-left: 0.2em;
+}
+.answer .markdown li::marker {
+  color: var(--accent);
+}
+.answer .markdown ol > li::marker {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+/* An ordered list whose items lead with bold text reads as numbered sections. */
+.answer .markdown ol > li > p:first-child > strong:first-child,
+.answer .markdown ol > li > strong:first-child {
+  color: var(--ink);
+}
+.answer .markdown strong {
+  font-weight: 650;
+}
+.answer .markdown code {
+  border: 0;
+  border-radius: 5px;
+  padding: 0.1em 0.38em;
+  font-size: 0.86em;
+  background: color-mix(in srgb, var(--accent) 9%, var(--md-fill));
+  color: var(--ink);
+}
+.answer .markdown pre {
+  border-radius: 12px;
+  padding: 0.85em 1em;
+  line-height: 1.6;
+}
+.answer .markdown pre code {
+  background: transparent;
+  padding: 0;
+  font-size: 12.5px;
+}
+.answer .markdown blockquote {
+  border-left-width: 3px;
+  border-left-color: var(--accent);
+  border-radius: 0 10px 10px 0;
+  background: var(--accent-soft);
+  color: var(--ink-2);
+}
+.answer .markdown a {
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--accent) 40%, transparent);
+  text-underline-offset: 3px;
+}
+.answer .markdown a:hover {
+  text-decoration-color: currentColor;
+}
+.answer .markdown hr {
+  margin: 1.5em 0;
+}
+
+/* The live work bar (features/chat/ActivityCard): tinted while the agent works. */
+.work-live > button {
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+}
+
+/* Narration inside the timeline: tighter paragraphs than the answer. */
+.narration .markdown > * + * {
+  margin-top: 0.35em;
+}
+@keyframes activity-sweep {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(300%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .activity-shimmer,
+  .activity-progress::after {
+    animation: none;
+  }
+  .activity-shimmer {
+    color: var(--ink-2);
+  }
+}

@@ -26,16 +26,19 @@ function parsed(input: unknown): unknown {
 /** A file's path with its tinted icon, the language on the right. */
 function FileHeader({ path, label }: { path: string; label: ReactNode }) {
   return (
-    <div className="flex items-center gap-2 border-b border-line-2 bg-subtle px-3 py-2">
-      <FileTintIcon size={14} className={`shrink-0 ${fileTint(path).icon}`} />
-      <span className="min-w-0 truncate font-mono text-[12px] font-semibold text-ink">{path}</span>
-      <span className="ml-auto shrink-0 text-[11px] font-medium text-ink-3">{label}</span>
+    <div className="flex items-center gap-2 px-3 pb-1 pt-2">
+      <FileTintIcon size={13} className={`shrink-0 ${fileTint(path).icon}`} />
+      <span className="min-w-0 truncate font-mono text-[11.5px] font-semibold text-ink-2">
+        {path}
+      </span>
+      <span className="ml-auto shrink-0 font-mono text-[10.5px] text-ink-3">{label}</span>
     </div>
   );
 }
 
+/** A flat, softly shaded well for code: no border, no shadow. */
 function Frame({ children }: { children: ReactNode }) {
-  return <div className="overflow-hidden rounded-xl border border-line bg-surface">{children}</div>;
+  return <div className="overflow-hidden rounded-lg bg-subtle">{children}</div>;
 }
 
 /** write_file: the new file as highlighted code. */
@@ -45,7 +48,7 @@ function WriteFile({ path, content }: { path: string; content: string }) {
   return (
     <Frame>
       <FileHeader path={path} label={`${languageLabel(language)} · ${lines} lines`} />
-      <pre className={`${CODE} px-3 py-2.5`}>
+      <pre className={`${CODE} px-3 pb-2.5 pt-1`}>
         <code>
           <CodeHighlight code={content} language={language} />
         </code>
@@ -82,7 +85,7 @@ function EditFile({ path, oldText, newText }: { path: string; oldText: string; n
           </>
         }
       />
-      <pre className={`${CODE} py-1.5`}>
+      <pre className={`${CODE} pb-2 pt-1`}>
         {removed.map((line, index) => (
           <div key={`r${index}`} className="flex bg-danger-bg px-3">
             <span aria-hidden className="w-4 shrink-0 select-none text-danger">
@@ -120,9 +123,7 @@ function RunCommand({ command, notes }: { command: string; notes: string[] }) {
         </code>
       </pre>
       {notes.length > 0 && (
-        <div className="border-t border-line-2 bg-subtle px-3 py-1.5 text-[11.5px] text-ink-3">
-          {notes.join(' · ')}
-        </div>
+        <div className="px-3 pb-2 font-mono text-[10.5px] text-ink-3">{notes.join(' · ')}</div>
       )}
     </Frame>
   );
@@ -131,8 +132,8 @@ function RunCommand({ command, notes }: { command: string; notes: string[] }) {
 /** The agent's one-line reason for a step that needed approval, shown above its input. */
 function Reason({ text }: { text: string }) {
   return (
-    <p className="mb-2 flex items-start gap-2 rounded-xl border border-accent-bg bg-accent-soft px-3 py-2 text-[13px] leading-snug text-ink">
-      <span className="mt-px shrink-0 text-[10.5px] font-bold uppercase tracking-[0.12em] text-accent-2">
+    <p className="mb-2 flex items-baseline gap-2 text-[12.5px] leading-snug text-ink-2">
+      <span className="shrink-0 text-[10px] font-bold uppercase tracking-[0.14em] text-accent-2">
         Why
       </span>
       <span className="min-w-0">{text}</span>
@@ -187,7 +188,7 @@ function InputBody({ tool, value }: { tool: string; value: unknown }) {
   const text =
     typeof value === 'string' ? value : prettyJson(JSON.stringify(value ?? null) ?? 'null');
   return (
-    <pre className="max-h-[240px] overflow-auto whitespace-pre-wrap rounded-xl border border-line-2 bg-subtle px-3 py-2.5 font-mono text-[12px] text-ink [overflow-wrap:anywhere]">
+    <pre className="max-h-[240px] overflow-auto whitespace-pre-wrap rounded-lg bg-subtle px-3 py-2.5 font-mono text-[12px] text-ink [overflow-wrap:anywhere]">
       {text ? <CodeText text={text} /> : '(none)'}
     </pre>
   );
