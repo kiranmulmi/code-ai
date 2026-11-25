@@ -107,6 +107,15 @@ export {
   type HistoryItem,
 } from './chat.js';
 
+export {
+  QUICK_CHAT_LIMITS,
+  quickChatMessageSchema,
+  quickChatRequestSchema,
+  type QuickChatEvent,
+  type QuickChatMessage,
+  type QuickChatRequest,
+} from './quick-chat.js';
+
 export { type Memory, type MemoryRemoval } from './memory.js';
 
 export { noteInputSchema, type Note, type NoteInput } from './note.js';

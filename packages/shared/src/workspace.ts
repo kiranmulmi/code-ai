@@ -85,6 +85,8 @@ export interface Workspace {
   hasGitTab: boolean;
   /** Speech to text for the mic button; null until set up in the workspace settings. */
   voice: WorkspaceVoice | null;
+  /** The saved model quick chat uses while this workspace is open; null: the default model. */
+  quickChatModelId: string | null;
   createdAt: string | null;
   updatedAt: string | null;
   /** The sidebar folder (WorkspaceGroup) it's filed in; null at the top level. */
@@ -134,6 +136,8 @@ const instructions = z
   .max(LIMITS.instructions, `Keep instructions under ${LIMITS.instructions} characters.`);
 
 const planning = z.enum(WORKSPACE_PLANNING);
+/** A saved model's id; null: the default model. */
+const quickChatModelId = z.string().uuid('Pick a model.').nullable();
 const disabledTools = z.array(z.enum(TOOL_GROUPS)).transform((groups) => [...new Set(groups)]);
 
 export const workspaceInputSchema = z.object({
@@ -145,6 +149,7 @@ export const workspaceInputSchema = z.object({
   hasTerminalTab: z.boolean().default(true),
   hasGitTab: z.boolean().default(true),
   voice: workspaceVoiceSchema.nullable().default(null),
+  quickChatModelId: quickChatModelId.default(null),
 });
 
 export const workspaceUpdateSchema = z.object({
@@ -157,6 +162,8 @@ export const workspaceUpdateSchema = z.object({
   hasGitTab: z.boolean().optional(),
   /** null turns speech to text off for the workspace. */
   voice: workspaceVoiceSchema.nullable().optional(),
+  /** null: quick chat uses the default model. */
+  quickChatModelId: quickChatModelId.optional(),
   /** Files it in a sidebar folder; null moves it back to the top level. */
   groupId: z.string().uuid().nullable().optional(),
 });

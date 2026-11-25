@@ -51,6 +51,7 @@ import {
 import { fetchMcpEnabled, fetchMcpServers, saveMcpEnabled } from '../mcp/api';
 import { APP_NAME } from '../../lib/brand';
 import { EMPTY_VOICE_DRAFT, VoiceSettings, type VoiceDraft } from '../voice/VoiceSettings';
+import { useModels } from '../models/useModels';
 
 type FieldErrors = {
   name?: string;
@@ -149,6 +150,9 @@ export function WorkspaceFormPage() {
   const [hasTerminalTab, setHasTerminalTab] = useState(true);
   const [hasGitTab, setHasGitTab] = useState(true);
   const [voice, setVoice] = useState<VoiceDraft>(EMPTY_VOICE_DRAFT);
+  // '' : quick chat uses the default model.
+  const [quickChatModelId, setQuickChatModelId] = useState('');
+  const models = useModels();
   const changeVoice = (next: Partial<VoiceDraft>) => {
     setVoice((current) => ({ ...current, ...next }));
     setErrors((current) => ({
@@ -219,6 +223,7 @@ export function WorkspaceFormPage() {
         setHasTerminalTab(workspace.hasTerminalTab);
         setHasGitTab(workspace.hasGitTab);
         setVoice(workspace.voice ? { isOn: true, ...workspace.voice } : EMPTY_VOICE_DRAFT);
+        setQuickChatModelId(workspace.quickChatModelId ?? '');
       })
       .catch((cause: unknown) => {
         if (!isCurrent) return;
@@ -372,6 +377,7 @@ export function WorkspaceFormPage() {
         hasTerminalTab,
         hasGitTab,
         voice: voicePayload,
+        quickChatModelId: quickChatModelId || null,
       });
       if (!parsed.success) return showErrors(toFieldErrors(parsed.error.issues));
       void save(() => updateWorkspace(workspaceId, parsed.data), 'Workspace saved');
@@ -384,6 +390,7 @@ export function WorkspaceFormPage() {
         hasTerminalTab,
         hasGitTab,
         voice: voicePayload,
+        quickChatModelId: quickChatModelId || null,
       });
       if (!parsed.success) return showErrors(toFieldErrors(parsed.error.issues));
       void save(() => createWorkspace(parsed.data), 'Workspace created');
@@ -427,6 +434,12 @@ export function WorkspaceFormPage() {
     setIsPickerOpen(false);
   }, []);
   const isFolderChanged = loaded !== null && folderPath.trim() !== loaded.path;
+  const defaultModel = models.data?.find((model) => model.isDefault) ?? models.data?.[0] ?? null;
+  const isQuickChatModelMissing =
+    quickChatModelId !== '' &&
+    models.data !== undefined &&
+    models.data !== null &&
+    !models.data.some((model) => model.id === quickChatModelId);
 
   return (
     <div className="w-full">
@@ -560,6 +573,33 @@ export function WorkspaceFormPage() {
                     </>
                   )}
                 </p>
+              </Field>
+
+              <Field
+                id="workspace-quick-chat-model"
+                label="Quick chat model"
+                hint="The model the quick chat button (bottom right) talks to while this workspace is open."
+              >
+                <select
+                  id="workspace-quick-chat-model"
+                  value={quickChatModelId}
+                  onChange={(event) => setQuickChatModelId(event.target.value)}
+                  className={`${INPUT} ${INPUT_OK} pr-8`}
+                >
+                  <option value="">
+                    {models.isLoading
+                      ? 'Loading models…'
+                      : `Default model${defaultModel ? ` (${defaultModel.name})` : ''}`}
+                  </option>
+                  {(models.data ?? []).map((model) => (
+                    <option key={model.id} value={model.id}>
+                      {model.name}
+                    </option>
+                  ))}
+                  {isQuickChatModelMissing && (
+                    <option value={quickChatModelId}>Deleted model (uses the default)</option>
+                  )}
+                </select>
               </Field>
 
               {isEdit && (

@@ -63,6 +63,7 @@ test('settings, chats, messages and runs are saved under .code-ai', async () => 
     hasTerminalTab: false,
     hasGitTab: false,
     voice: null,
+    quickChatModelId: null,
   };
   assert.deepEqual(await data.readSettings(), defaults, 'defaults before any write');
 
@@ -81,6 +82,7 @@ test('settings, chats, messages and runs are saved under .code-ai', async () => 
     hasTerminalTab: true,
     hasGitTab: false,
     voice: null,
+    quickChatModelId: null,
   });
   // Hand-edited values the app doesn't know fall back instead of breaking the workspace.
   await fs.writeFile(
@@ -92,6 +94,7 @@ test('settings, chats, messages and runs are saved under .code-ai', async () => 
       hasTerminalTab: 1,
       hasGitTab: 'on',
       voice: { modelId: 'not-a-uuid', transcriptionModel: '' },
+      quickChatModelId: 'not-a-uuid',
     }),
   );
   assert.deepEqual(await data.readSettings(), {
@@ -101,6 +104,7 @@ test('settings, chats, messages and runs are saved under .code-ai', async () => 
     hasTerminalTab: false,
     hasGitTab: false,
     voice: null,
+    quickChatModelId: null,
   });
   // An older file's single hasCodingTabs switch turns on both tabs, and isn't written back.
   await fs.writeFile(
@@ -114,6 +118,7 @@ test('settings, chats, messages and runs are saved under .code-ai', async () => 
     hasTerminalTab: true,
     hasGitTab: true,
     voice: null,
+    quickChatModelId: null,
   });
   await data.writeSettings({ hasGitTab: false });
   const rewritten = JSON.parse(

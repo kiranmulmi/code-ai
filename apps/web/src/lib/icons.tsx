@@ -200,6 +200,15 @@ export function ExpandIcon({ size = 14, ...rest }: IconProps) {
   );
 }
 
+/** Two arrows pointing in: make something smaller again (the opposite of ExpandIcon). */
+export function CollapseIcon({ size = 14, ...rest }: IconProps) {
+  return (
+    <svg {...base(size)} {...rest}>
+      <path d="M3 6.5h3.5V3M13 9.5H9.5V13M6.5 6.5 3 3M9.5 9.5 13 13" />
+    </svg>
+  );
+}
+
 export function FileIcon({ size = 14, ...rest }: IconProps) {
   return (
     <svg {...base(size)} {...rest}>

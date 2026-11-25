@@ -151,6 +151,8 @@ const settingsSchema = z.preprocess(
     hasGitTab: z.boolean().catch(false).default(false),
     // Speech to text for the mic button; a hand-edited value the app can't read turns it off.
     voice: workspaceVoiceSchema.nullable().catch(null).default(null),
+    // The model quick chat uses here; null (or a hand-edited value it can't read): the default.
+    quickChatModelId: z.string().uuid().nullable().catch(null).default(null),
   }),
 );
 export type WorkspaceSettings = z.infer<typeof settingsSchema>;
@@ -161,6 +163,7 @@ const DEFAULT_SETTINGS: WorkspaceSettings = {
   hasTerminalTab: false,
   hasGitTab: false,
   voice: null,
+  quickChatModelId: null,
 };
 
 const planSchema = z.object({

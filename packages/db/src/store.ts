@@ -112,6 +112,7 @@ export class Store {
     hasTerminalTab = true,
     hasGitTab = true,
     voice = null,
+    quickChatModelId = null,
   }: {
     name: string;
     path: string;
@@ -121,6 +122,8 @@ export class Store {
     hasTerminalTab?: boolean;
     hasGitTab?: boolean;
     voice?: WorkspaceVoiceInput | null;
+    /** The model quick chat uses here; null: the default model. */
+    quickChatModelId?: string | null;
   }): Promise<Workspace> {
     const clean = checkName(name);
     const cleanInstructions = checkInstructions(instructions);
@@ -137,6 +140,7 @@ export class Store {
       hasTerminalTab,
       hasGitTab,
       voice: toVoice(voice),
+      quickChatModelId,
     });
     return toWorkspace(await this.#workspaces.add(clean, folder));
   }
@@ -156,6 +160,7 @@ export class Store {
       hasTerminalTab,
       hasGitTab,
       voice,
+      quickChatModelId,
       groupId,
     }: {
       name?: string;
@@ -167,6 +172,8 @@ export class Store {
       hasGitTab?: boolean;
       /** Speech to text; null turns it off. */
       voice?: WorkspaceVoiceInput | null;
+      /** The model quick chat uses here; null: the default model. */
+      quickChatModelId?: string | null;
       /** The sidebar folder to file it in; null for the top level. */
       groupId?: string | null;
     },
@@ -195,6 +202,7 @@ export class Store {
         ...(hasTerminalTab !== undefined ? { hasTerminalTab } : {}),
         ...(hasGitTab !== undefined ? { hasGitTab } : {}),
         ...(voice !== undefined ? { voice: toVoice(voice) } : {}),
+        ...(quickChatModelId !== undefined ? { quickChatModelId } : {}),
       };
       if (Object.keys(settings).length) await to.writeSettings(settings);
       // Only filing it in a sidebar folder isn't an edit: it keeps its place in the list.
@@ -531,8 +539,15 @@ async function toWorkspace(
   { withChatCount = false }: { withChatCount?: boolean } = {},
 ): Promise<Workspace> {
   const data = new WorkspaceData(row.path, row.name);
-  const { instructions, planning, disabledTools, hasTerminalTab, hasGitTab, voice } =
-    await data.readSettings();
+  const {
+    instructions,
+    planning,
+    disabledTools,
+    hasTerminalTab,
+    hasGitTab,
+    voice,
+    quickChatModelId,
+  } = await data.readSettings();
   return {
     id: row.id,
     name: row.name,
@@ -542,6 +557,7 @@ async function toWorkspace(
     hasTerminalTab,
     hasGitTab,
     voice,
+    quickChatModelId,
     path: row.path,
     groupId: row.groupId,
     createdAt: row.createdAt,

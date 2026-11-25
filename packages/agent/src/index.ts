@@ -94,6 +94,7 @@ export { BUILT_IN_SPECIALISTS, GENERAL_SPECIALIST, type Specialist } from './tea
 export { Board, type BoardNote } from './team/board.js';
 export { oneAtATime } from './one-at-a-time.js';
 export { suggestChatTitle, cleanTitle } from './title.js';
+export { runQuickChat, type QuickChatOptions, type QuickChatProgress } from './quick-chat.js';
 export { improvePrompt, cleanImprovedPrompt } from './improve.js';
 export { improveSkill, parseImprovedSkill, type SkillDraft } from './improve-skill.js';
 export { writeInstructions, type InstructionsContext } from './write-instructions.js';

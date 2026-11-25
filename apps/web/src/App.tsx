@@ -2,6 +2,7 @@ import { lazy, Suspense, type ComponentType, type ReactNode } from 'react';
 import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { AuthGate } from './features/auth/AuthGate';
 import { ChatRoute } from './features/chat/ChatRoute';
+import { QuickChat } from './features/quick-chat/QuickChat';
 import { RootRedirect } from './features/workspaces/RootRedirect';
 import { PageLoader } from './components/PageLoader';
 import { FormLayout } from './layout/FormLayout';
@@ -105,6 +106,7 @@ export function App() {
         <ToastProvider>
           <AuthGate>
             <AppRoutes />
+            <QuickChat />
           </AuthGate>
         </ToastProvider>
       </ThemeProvider>
