@@ -23,7 +23,16 @@ const MENU_BUTTON =
   'absolute right-1 top-1/2 hidden h-5 w-5 -translate-y-1/2 place-items-center rounded text-ink-3 transition-colors hover:bg-[color-mix(in_srgb,var(--ink)_8%,transparent)] hover:text-ink group-focus-within:grid group-hover:grid aria-expanded:grid [@media(hover:none)]:grid';
 
 /** The ⋯ button of a row and the menu it opens. */
-function RowActions({ label, items }: { label: string; items: RowMenuItem[] }) {
+function RowActions({
+  label,
+  items,
+  className = '',
+}: {
+  label: string;
+  items: RowMenuItem[];
+  /** Extra classes, e.g. to move the button off the folder's chevron. */
+  className?: string;
+}) {
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
   return (
     <>
@@ -34,7 +43,7 @@ function RowActions({ label, items }: { label: string; items: RowMenuItem[] }) {
         aria-haspopup="menu"
         aria-expanded={anchor !== null}
         onClick={(event) => setAnchor(anchor ? null : event.currentTarget)}
-        className={MENU_BUTTON}
+        className={`${MENU_BUTTON} ${className}`}
       >
         <DotsIcon size={13} />
       </button>
@@ -62,7 +71,7 @@ export function FolderNameInput({
     onDone(save && name && name !== initial ? name : null);
   };
   return (
-    <div className="flex h-[22px] items-center gap-1.5 pl-[27px] pr-2">
+    <div className="flex h-[26px] items-center gap-1.5 pl-2.5 pr-2">
       <FolderIcon size={14} className="shrink-0 text-ft-folder" />
       <input
         autoFocus
@@ -124,25 +133,25 @@ export function FolderRow({
         onDoubleClick={onRename}
         aria-expanded={isOpen}
         title={group.name}
-        className={`flex h-[22px] w-full items-center gap-1.5 rounded pl-2.5 pr-2 text-left font-explorer text-[13px] leading-[18px] transition-colors ${
+        className={`flex h-[26px] w-full items-center gap-1.5 rounded pl-2.5 pr-2 text-left font-explorer text-[13px] leading-[18px] transition-colors ${
           isDropTarget
             ? 'bg-accent-soft text-ink ring-1 ring-accent'
             : 'text-ink hover:bg-surface-2'
         }`}
       >
+        <Icon size={14} className="shrink-0 text-ft-folder" />
+        <span className="min-w-0 truncate">{group.name}</span>
+        <span className="shrink-0 tabular-nums text-ink-4">({count})</span>
+        <span className="flex-1" />
+        {isRunning && <RunningMark className="group-focus-within:hidden group-hover:hidden" />}
         <ChevronRightIcon
           size={11}
           className={`shrink-0 text-ink-3 transition-transform ${isOpen ? 'rotate-90' : ''}`}
         />
-        <Icon size={14} className="shrink-0 text-ft-folder" />
-        <span className="min-w-0 flex-1 truncate">{group.name}</span>
-        {isRunning && <RunningMark className="group-focus-within:hidden group-hover:hidden" />}
-        <span className="shrink-0 text-[10.5px] tabular-nums text-ink-4 group-focus-within:invisible group-hover:invisible [@media(hover:none)]:invisible">
-          {count}
-        </span>
       </button>
       <RowActions
         label={`${group.name} actions`}
+        className="!right-[22px]"
         items={[
           { label: 'Rename folder', icon: <EditIcon size={13} />, onSelect: onRename },
           {
@@ -196,8 +205,8 @@ export function WorkspaceRow({
             ? `relative grid h-10 w-10 place-items-center rounded-xl transition-colors ${
                 isCurrent ? 'bg-accent-soft ring-1 ring-accent' : 'hover:bg-surface-2'
               }`
-            : `flex h-[22px] items-center gap-1.5 rounded pr-7 font-explorer text-[13px] leading-[18px] transition-colors ${
-                isIndented ? 'pl-[44px]' : 'pl-2.5'
+            : `flex h-[26px] items-center gap-1.5 rounded pr-7 font-explorer text-[13px] leading-[18px] transition-colors ${
+                isIndented ? 'pl-[30px]' : 'pl-2.5'
               } ${
                 isCurrent
                   ? 'bg-accent-soft font-medium text-accent-2'
@@ -205,7 +214,14 @@ export function WorkspaceRow({
               }`
         }
       >
-        <WorkspaceAvatar id={workspace.id} name={workspace.name} size={isCollapsed ? 'md' : 'xs'} />
+        {/* Inside a folder the name alone is enough; the collapsed rail still needs the avatar. */}
+        {(isCollapsed || !isIndented) && (
+          <WorkspaceAvatar
+            id={workspace.id}
+            name={workspace.name}
+            size={isCollapsed ? 'md' : 'xs'}
+          />
+        )}
         {!isCollapsed && (
           <>
             <span className="min-w-0 flex-1 truncate">{workspace.name}</span>

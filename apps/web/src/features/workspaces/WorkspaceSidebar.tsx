@@ -381,7 +381,7 @@ export function WorkspaceSidebar({
                       </ul>
                     )}
                     {isOpen && inside.length === 0 && !needle && (
-                      <p className="py-0.5 pl-[44px] pr-2 text-[12px] leading-[18px] text-ink-4">
+                      <p className="py-1 pl-[30px] pr-2 text-[12px] leading-[18px] text-ink-4">
                         Drag a workspace here, or use its ⋯ menu.
                       </p>
                     )}
