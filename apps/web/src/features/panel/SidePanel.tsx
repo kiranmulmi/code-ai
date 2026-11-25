@@ -1,45 +1,24 @@
 import type { ReactNode } from 'react';
 import type { Memory, Skill, WorkspaceFiles } from '@app/shared';
 import { IconButton } from '../../components/IconButton';
-import {
-  ExpandIcon,
-  FolderIcon,
-  GitDiffIcon,
-  NoteIcon,
-  PanelIcon,
-  PulseIcon,
-  TerminalIcon,
-} from '../../lib/icons';
-import { TerminalPanel } from './terminal/TerminalPanel';
+import { ExpandIcon, FolderIcon, PanelIcon, PulseIcon } from '../../lib/icons';
 import type { AsyncResource } from '../../lib/useAsync';
 import { FilesPanel } from './files/FilesPanel';
-import { GitPanel } from './git/GitPanel';
-import { useGitChangeCount } from './git/useGitChangeCount';
-import { NotesPanel } from './notes/NotesPanel';
-import { useNotes } from './notes/useNotes';
 import { TasksPanel } from './tasks/TasksPanel';
 import { useRunningTasks } from './tasks/useRunningTasks';
 import { LowerPanel } from './LowerPanel';
-import {
-  PANEL_TAB_LABEL,
-  visiblePanelTabs,
-  type OptionalPanelTabs,
-  type PanelTab,
-} from './panelTabs';
+import { PANEL_TABS, PANEL_TAB_LABEL, type PanelTab } from './panelTabs';
 import { PanelResizer } from './PanelResizer';
 import { PanelTabButton } from './PanelTabButton';
 import type { usePanelWidth } from './usePanelWidth';
 
 const PANEL_TAB_ICON: Record<PanelTab, ReactNode> = {
   files: <FolderIcon size={16} />,
-  terminal: <TerminalIcon size={16} />,
-  git: <GitDiffIcon size={16} />,
   tasks: <PulseIcon size={16} />,
-  notes: <NoteIcon size={16} />,
 };
 
 /** A small count beside a tab's label (running tasks, changed files). */
-function TabCount({ title, children }: { title: string; children: ReactNode }) {
+export function TabCount({ title, children }: { title: string; children: ReactNode }) {
   return (
     <span
       title={title}
@@ -51,7 +30,8 @@ function TabCount({ title, children }: { title: string; children: ReactNode }) {
 }
 
 /**
- * Files, the terminal, the git diff, the background tasks or the notes on top, Memory, MCP servers and
+ * Files or the background tasks on top (the terminal, git diff and notes are tabs beside the
+ * chat), Memory, MCP servers and
  * Skills in a section below (LowerPanel). A resizable column on wide screens (collapsed from
  * the header's Panel button), a drawer on small ones.
  */
@@ -66,7 +46,6 @@ export function SidePanel({
   isDrawerOpen,
   isCollapsed,
   isBusy,
-  optionalTabs,
   onCloseDrawer,
   onHide,
   footer,
@@ -83,8 +62,6 @@ export function SidePanel({
   isCollapsed: boolean;
   /** the agent is working in this workspace */
   isBusy: boolean;
-  /** which of the Terminal and Git diff tabs the workspace shows */
-  optionalTabs: OptionalPanelTabs;
   onCloseDrawer: () => void;
   /** collapses the column (wide screens) or closes the drawer */
   onHide: () => void;
@@ -94,10 +71,6 @@ export function SidePanel({
   // Polled even while another tab is open, so the Tasks tab can say how many are running.
   const running = useRunningTasks(workspaceId, isBusy);
   const runningCount = running.tasks?.length ?? 0;
-  const changed = useGitChangeCount(workspaceId, optionalTabs.git, isBusy);
-  // Loaded here so an open note's list survives switching tabs; reloaded when picked.
-  const notes = useNotes(workspaceId);
-  const { reload: reloadNotes } = notes;
   return (
     <>
       {isDrawerOpen && (
@@ -109,7 +82,7 @@ export function SidePanel({
       )}
       <aside
         id="side-panel"
-        aria-label="Files, notes, memory, MCP servers and terminal"
+        aria-label="Files, tasks, memory and MCP servers"
         // Wide screens: the column's width animates (ChatScreen) while the content keeps its
         // width and fades, so it slides in and out instead of squashing.
         className={`fixed inset-y-0 right-0 z-40 flex min-h-0 w-[min(440px,92vw)] flex-col border-l border-line bg-surface shadow-dialog transition-[transform,visibility,opacity] duration-300 lg:relative lg:inset-auto lg:z-10 lg:w-auto lg:translate-x-0 lg:overflow-hidden lg:border-line-2 lg:shadow-none ${
@@ -133,30 +106,17 @@ export function SidePanel({
             aria-label="Panel"
             className="panel-tabs flex min-w-0 flex-1 items-stretch"
           >
-            {visiblePanelTabs(optionalTabs).map((id) => (
+            {PANEL_TABS.map((id) => (
               <PanelTabButton
                 key={id}
                 id={id}
                 isActive={tab === id}
                 label={PANEL_TAB_LABEL[id]}
-                onSelect={() => {
-                  if (id === 'notes' && tab !== 'notes') reloadNotes();
-                  onTab(id);
-                }}
+                onSelect={() => onTab(id)}
               >
                 {PANEL_TAB_ICON[id]}
                 {id === 'tasks' && runningCount > 0 && (
                   <TabCount title={`${runningCount} running`}>{runningCount}</TabCount>
-                )}
-                {id === 'git' && changed && changed.count > 0 && (
-                  <TabCount
-                    title={`${changed.count}${changed.isTruncated ? '+' : ''} ${
-                      changed.count === 1 ? 'file' : 'files'
-                    } changed`}
-                  >
-                    {changed.count}
-                    {changed.isTruncated ? '+' : ''}
-                  </TabCount>
                 )}
               </PanelTabButton>
             ))}
@@ -183,15 +143,10 @@ export function SidePanel({
           data-panel-body
           // Keyed by tab, so each tab's content fades in when it's picked.
           key={tab}
-          className={`min-h-0 flex-1 animate-fade-in lg:min-w-[var(--panel-w)] ${
-            tab === 'terminal' ? 'overflow-hidden' : 'overflow-y-auto'
-          }`}
+          className="min-h-0 flex-1 animate-fade-in overflow-y-auto lg:min-w-[var(--panel-w)]"
         >
           {tab === 'files' && <FilesPanel workspaceId={workspaceId} files={files} />}
-          {tab === 'terminal' && <TerminalPanel workspaceId={workspaceId} />}
-          {tab === 'git' && <GitPanel workspaceId={workspaceId} isBusy={isBusy} />}
           {tab === 'tasks' && <TasksPanel workspaceId={workspaceId} running={running} />}
-          {tab === 'notes' && <NotesPanel workspaceId={workspaceId} notes={notes} />}
         </div>
         <LowerPanel workspaceId={workspaceId} memories={memories} skills={skills} isBusy={isBusy} />
         {footer && (

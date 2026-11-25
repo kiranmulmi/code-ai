@@ -617,8 +617,8 @@ export function WorkspaceFormPage() {
 
               <Field
                 id="workspace-panel-tabs"
-                label="Side panel tabs"
-                hint="Extra tabs for the side panel. Files and Tasks always show."
+                label="Tabs beside the chat"
+                hint="Extra tabs next to the chat. Chat and Notes always show."
               >
                 <div id="workspace-panel-tabs">
                   <PanelTabSwitches

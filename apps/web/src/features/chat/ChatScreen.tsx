@@ -11,7 +11,18 @@ import { useFiles } from '../panel/files/useFiles';
 import { useMemories } from '../panel/memory/useMemories';
 import { SkillDialogProvider } from '../skills/SkillDialogProvider';
 import { useSkills } from '../skills/useSkills';
-import { parsePanelTab, visiblePanelTabs, type PanelTab } from '../panel/panelTabs';
+import {
+  parseCenterTab,
+  parsePanelTab,
+  visibleCenterTabs,
+  type CenterTab,
+  type PanelTab,
+} from '../panel/panelTabs';
+import { GitPanel } from '../panel/git/GitPanel';
+import { useGitChangeCount } from '../panel/git/useGitChangeCount';
+import { NotesPanel } from '../panel/notes/NotesPanel';
+import { useNotes } from '../panel/notes/useNotes';
+import { TerminalPanel } from '../panel/terminal/TerminalPanel';
 import { SidePanel } from '../panel/SidePanel';
 import { usePanelWidth } from '../panel/usePanelWidth';
 import { useWorkspace } from '../workspaces/useWorkspace';
@@ -69,6 +80,7 @@ export function ChatScreen({
   const panelWidth = usePanelWidth();
   const sidebarWidth = useSidebarWidth();
   const [tab, setTab] = useStoredState<PanelTab>('agent.panelTab', parsePanelTab);
+  const [centerTab, setCenterTab] = useStoredState<CenterTab>('agent.centerTab', parseCenterTab);
   const [isPanelCollapsed, setIsPanelCollapsed] = useStoredState('agent.panelCollapsed', parseFlag);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useStoredState(
     'agent.sidebarCollapsed',
@@ -201,15 +213,24 @@ export function ChatScreen({
       : APP_NAME;
   }, [chatTitle, workspaceName]);
 
-  // Terminal and Git diff each show only when the workspace turns them on; a remembered one
-  // that's hidden here shows Files instead (and comes back where it's on).
+  // Terminal and Git diff (tabs beside the chat) each show only when the workspace turns them
+  // on; a remembered one that's hidden here shows the chat instead (and comes back where it's on).
   const hasTerminalTab = workspace.data?.hasTerminalTab ?? false;
   const hasGitTab = workspace.data?.hasGitTab ?? false;
   const optionalTabs = useMemo(
     () => ({ terminal: hasTerminalTab, git: hasGitTab }),
     [hasTerminalTab, hasGitTab],
   );
-  const shownTab = visiblePanelTabs(optionalTabs).includes(tab) ? tab : 'files';
+  const centerTabs = visibleCenterTabs(optionalTabs);
+  const shownCenterTab = centerTabs.includes(centerTab) ? centerTab : 'chat';
+  const gitChanges = useGitChangeCount(workspaceId, hasGitTab, isWorkspaceBusy);
+  // Loaded here so an open note's list survives switching tabs; reloaded when picked.
+  const notes = useNotes(workspaceId);
+  const { reload: reloadNotes } = notes;
+  const selectCenterTab = (next: CenterTab) => {
+    if (next === 'notes' && shownCenterTab !== 'notes') reloadNotes();
+    setCenterTab(next);
+  };
 
   const selectTab = (next: PanelTab) => {
     setTab(next);
@@ -297,93 +318,127 @@ export function ChatScreen({
             <ChatHeader
               title={chatId ? (chatTitle ?? 'Chat') : 'New chat'}
               isBusy={isBusy}
+              tabs={centerTabs}
+              tab={shownCenterTab}
+              onTab={selectCenterTab}
+              gitChanges={gitChanges}
               isPanelShown={isPanelShown}
               onTogglePanel={togglePanel}
               onShowSidebar={isSidebarCollapsed ? () => setIsSidebarCollapsed(false) : undefined}
-              workspace={workspace.data}
             />
-            <ChatView
-              workspaceId={workspaceId}
-              chatKey={chatId ?? 'new'}
-              state={conversation.state}
-              workspace={workspace.data}
-              showWorkspaceName={
-                workspaceList.length > 1 ||
-                (workspaceName !== undefined && workspaceName !== 'Default')
-              }
-              isBusy={isBusy}
-              isLoading={conversation.isLoading}
-              isRunningElsewhere={conversation.isRunningElsewhere}
-              hasModel={choice.model !== null}
-              modelControls={
-                <div className="flex min-w-0 items-center gap-0.5">
-                  <ModelControls
-                    models={models.data}
-                    choice={choice}
-                    disabled={isBusy}
-                    onChooseModel={(id) => {
-                      chooseModel(id);
-                      saveSettings({ modelId: id });
-                    }}
-                    onChooseEffort={(effort) => {
-                      chooseEffort(effort);
-                      saveSettings({ reasoningEffort: effort });
-                    }}
-                  />
-                  {/* Only when the agent asks first (Settings → Agent: approvals "ask"). */}
-                  {info.data?.approval === 'ask' && (
-                    <AutoApproveToggle
-                      isOn={autoApprove}
-                      onChange={(isOn) => {
-                        setAutoApprove(isOn);
-                        saveSettings({ autoApprove: isOn });
-                        conversation
-                          .changeAutoApprove(isOn)
-                          .catch((cause: unknown) =>
-                            toast(errorMessage(cause, "Couldn't change Auto-approve."), 'error'),
-                          );
+            {shownCenterTab !== 'chat' && (
+              <div
+                id="center-body"
+                role="tabpanel"
+                aria-labelledby={`center-tab-${shownCenterTab}`}
+                data-panel-body
+                // Keyed by tab, so each tab's content fades in when it's picked.
+                key={shownCenterTab}
+                className={`min-h-0 flex-1 animate-fade-in bg-surface ${
+                  shownCenterTab === 'terminal' ? 'overflow-hidden' : 'overflow-y-auto'
+                }`}
+              >
+                {shownCenterTab === 'terminal' && <TerminalPanel workspaceId={workspaceId} />}
+                {shownCenterTab === 'git' && (
+                  <GitPanel workspaceId={workspaceId} isBusy={isWorkspaceBusy} />
+                )}
+                {shownCenterTab === 'notes' && (
+                  <NotesPanel workspaceId={workspaceId} notes={notes} />
+                )}
+              </div>
+            )}
+            {/* Kept mounted (just hidden) behind the other tabs, so a draft and the scroll stay put. */}
+            <div
+              id={shownCenterTab === 'chat' ? 'center-body' : undefined}
+              role="tabpanel"
+              aria-labelledby="center-tab-chat"
+              hidden={shownCenterTab !== 'chat'}
+              className={`min-h-0 min-w-0 flex-1 flex-col ${shownCenterTab === 'chat' ? 'flex' : 'hidden'}`}
+            >
+              <ChatView
+                workspaceId={workspaceId}
+                chatKey={chatId ?? 'new'}
+                state={conversation.state}
+                workspace={workspace.data}
+                showWorkspaceName={
+                  workspaceList.length > 1 ||
+                  (workspaceName !== undefined && workspaceName !== 'Default')
+                }
+                isBusy={isBusy}
+                isLoading={conversation.isLoading}
+                isRunningElsewhere={conversation.isRunningElsewhere}
+                hasModel={choice.model !== null}
+                modelControls={
+                  <div className="flex min-w-0 items-center gap-0.5">
+                    <ModelControls
+                      models={models.data}
+                      choice={choice}
+                      disabled={isBusy}
+                      onChooseModel={(id) => {
+                        chooseModel(id);
+                        saveSettings({ modelId: id });
+                      }}
+                      onChooseEffort={(effort) => {
+                        chooseEffort(effort);
+                        saveSettings({ reasoningEffort: effort });
                       }}
                     />
-                  )}
-                </div>
-              }
-              skills={skills.data}
-              onSend={(text, attachments, picked) =>
-                void conversation.send(text, {
-                  attachments,
-                  skills: picked,
-                  autoApprove: info.data?.approval === 'ask' && autoApprove,
-                  modelId: choice.model?.id,
-                  reasoningEffort: (choice.model?.supportsReasoning && choice.effort) || undefined,
-                })
-              }
-              onSteer={(text) => void conversation.steer(text)}
-              queued={conversation.queued}
-              restoreDraft={conversation.returned}
-              onImprove={(text) =>
-                improvePrompt({
-                  text,
-                  workspaceId,
-                  modelId: choice.model?.id,
-                  reasoningEffort: (choice.model?.supportsReasoning && choice.effort) || undefined,
-                })
-              }
-              onStop={() => void conversation.stop()}
-              isStopping={conversation.isStopping}
-              onDecide={(approvalId, allow) => void conversation.decide(approvalId, allow)}
-              onAnswer={(questionId, answer) => void conversation.answer(questionId, answer)}
-              onReload={() => {
-                conversation.reload();
-                reloadChats();
-              }}
-              isVoiceMode={workspace.data?.voiceMode ?? false}
-              subscribeReply={conversation.subscribeReply}
-            />
+                    {/* Only when the agent asks first (Settings → Agent: approvals "ask"). */}
+                    {info.data?.approval === 'ask' && (
+                      <AutoApproveToggle
+                        isOn={autoApprove}
+                        onChange={(isOn) => {
+                          setAutoApprove(isOn);
+                          saveSettings({ autoApprove: isOn });
+                          conversation
+                            .changeAutoApprove(isOn)
+                            .catch((cause: unknown) =>
+                              toast(errorMessage(cause, "Couldn't change Auto-approve."), 'error'),
+                            );
+                        }}
+                      />
+                    )}
+                  </div>
+                }
+                skills={skills.data}
+                onSend={(text, attachments, picked) =>
+                  void conversation.send(text, {
+                    attachments,
+                    skills: picked,
+                    autoApprove: info.data?.approval === 'ask' && autoApprove,
+                    modelId: choice.model?.id,
+                    reasoningEffort:
+                      (choice.model?.supportsReasoning && choice.effort) || undefined,
+                  })
+                }
+                onSteer={(text) => void conversation.steer(text)}
+                queued={conversation.queued}
+                restoreDraft={conversation.returned}
+                onImprove={(text) =>
+                  improvePrompt({
+                    text,
+                    workspaceId,
+                    modelId: choice.model?.id,
+                    reasoningEffort:
+                      (choice.model?.supportsReasoning && choice.effort) || undefined,
+                  })
+                }
+                onStop={() => void conversation.stop()}
+                isStopping={conversation.isStopping}
+                onDecide={(approvalId, allow) => void conversation.decide(approvalId, allow)}
+                onAnswer={(questionId, answer) => void conversation.answer(questionId, answer)}
+                onReload={() => {
+                  conversation.reload();
+                  reloadChats();
+                }}
+                isVoiceMode={workspace.data?.voiceMode ?? false}
+                subscribeReply={conversation.subscribeReply}
+              />
+            </div>
           </div>
           <SidePanel
-            tab={shownTab}
+            tab={tab}
             onTab={selectTab}
-            optionalTabs={optionalTabs}
             workspaceId={workspaceId}
             memories={memories}
             skills={skills}

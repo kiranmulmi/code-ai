@@ -1,25 +1,41 @@
-import type { Workspace } from '@app/shared';
+import type { ReactNode } from 'react';
 import { Badge } from '../../components/Badge';
 import { IconButton } from '../../components/IconButton';
-import { ConversationIcon, PanelIcon } from '../../lib/icons';
+import { ConversationIcon, GitDiffIcon, NoteIcon, PanelIcon, TerminalIcon } from '../../lib/icons';
+import { PANEL_TAB_LABEL, type CenterTab } from '../panel/panelTabs';
+import { TabCount } from '../panel/SidePanel';
+
+const TAB_ICON: Record<CenterTab, ReactNode> = {
+  chat: <ConversationIcon size={15} />,
+  terminal: <TerminalIcon size={15} />,
+  git: <GitDiffIcon size={15} />,
+  notes: <NoteIcon size={15} />,
+};
 
 /**
- * The chat's toolbar: its title and whether the agent is working, with the theme at the end
- * (wide screens; narrower ones have it in the app bar). While a side is hidden, a button
- * brings it back: the chats sidebar (wide screens) in front of the title, the panel at the end.
+ * The middle section's toolbar: a tab strip with Chat (its title as the tooltip, and whether the agent is
+ * working) first, then the workspace's terminal, git diff and notes. While a side is hidden, a
+ * button brings it back: the chats sidebar (wide screens) in front of the tabs, the panel at the end.
  */
 export function ChatHeader({
   title,
   isBusy,
+  tabs,
+  tab,
+  onTab,
+  gitChanges,
   isPanelShown,
   onTogglePanel,
   onShowSidebar,
-  workspace,
 }: {
   title: string;
-  /** The open workspace (no longer used for settings link; kept for potential future use). */
-  workspace?: Workspace | null;
   isBusy: boolean;
+  /** the tabs this workspace shows (`visibleCenterTabs`) */
+  tabs: readonly CenterTab[];
+  tab: CenterTab;
+  onTab: (tab: CenterTab) => void;
+  /** files changed since the last commit, for the Git diff tab's count */
+  gitChanges: { count: number; isTruncated: boolean } | null;
   isPanelShown: boolean;
   onTogglePanel: () => void;
   /** Set while the sidebar is collapsed (wide screens only). */
@@ -28,9 +44,9 @@ export function ChatHeader({
   return (
     <header
       // At xl the workspace sidebar is always to the left, so this bar is never the top-left corner.
-      className="titlebar flex h-12 shrink-0 items-center justify-between gap-3 border-b border-line px-4 sm:px-6"
+      className="titlebar flex h-12 shrink-0 items-stretch justify-between gap-3 border-b border-line pl-2 pr-4 sm:pr-6"
     >
-      <div className="flex min-w-0 items-center gap-2.5">
+      <div className="flex min-w-0 flex-1 items-stretch gap-1">
         {onShowSidebar && (
           <IconButton
             onClick={onShowSidebar}
@@ -38,25 +54,63 @@ export function ChatHeader({
             aria-expanded={false}
             aria-label="Expand the sidebar"
             title="Expand the sidebar"
-            className="hidden xl:grid"
+            className="hidden self-center xl:grid"
           >
             <PanelIcon size={15} className="-scale-x-100" />
           </IconButton>
         )}
-        <span
-          aria-hidden
-          className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-accent-soft text-accent-2"
-        >
-          <ConversationIcon size={15} />
-        </span>
-        <h1 title={title} className="min-w-0 truncate text-[16px] font-extrabold text-ink">
-          {title}
-        </h1>
-        {isBusy && (
-          <Badge tone="blue" icon={<span aria-hidden className="live-dot h-1.5 w-1.5" />}>
-            Working
-          </Badge>
-        )}
+        <div role="tablist" aria-label="Chat and tools" className="flex min-w-0 items-stretch">
+          {tabs.map((id) => {
+            const isActive = tab === id;
+            const isChat = id === 'chat';
+            return (
+              <button
+                key={id}
+                type="button"
+                role="tab"
+                id={`center-tab-${id}`}
+                aria-selected={isActive}
+                aria-controls="center-body"
+                onClick={() => onTab(id)}
+                title={isChat ? title : PANEL_TAB_LABEL[id]}
+                className={`-mb-px flex items-center gap-2 border-b-2 px-3 transition-[color,border-color] duration-200 ${
+                  isChat ? 'min-w-0' : 'shrink-0'
+                } ${
+                  isActive
+                    ? 'border-accent text-ink'
+                    : 'border-transparent text-ink-2 hover:border-line-strong hover:text-ink'
+                }`}
+              >
+                <span
+                  aria-hidden
+                  className={`grid h-7 w-7 shrink-0 place-items-center rounded-lg transition-colors ${
+                    isActive ? 'bg-accent-soft text-accent-2' : 'text-ink-3'
+                  }`}
+                >
+                  {TAB_ICON[id]}
+                </span>
+                <span className="hidden text-[13.5px] font-medium sm:inline">
+                  {PANEL_TAB_LABEL[id]}
+                </span>
+                {isChat && isBusy && (
+                  <Badge tone="blue" icon={<span aria-hidden className="live-dot h-1.5 w-1.5" />}>
+                    Working
+                  </Badge>
+                )}
+                {id === 'git' && gitChanges && gitChanges.count > 0 && (
+                  <TabCount
+                    title={`${gitChanges.count}${gitChanges.isTruncated ? '+' : ''} ${
+                      gitChanges.count === 1 ? 'file' : 'files'
+                    } changed`}
+                  >
+                    {gitChanges.count}
+                    {gitChanges.isTruncated ? '+' : ''}
+                  </TabCount>
+                )}
+              </button>
+            );
+          })}
+        </div>
       </div>
       <div className="flex shrink-0 items-center gap-1">
         {/* While the panel is open its own header has the button that hides it. */}
@@ -65,8 +119,8 @@ export function ChatHeader({
             onClick={onTogglePanel}
             aria-controls="side-panel"
             aria-expanded={false}
-            title="Show plan, memory and files"
-            aria-label="Show plan, memory and files"
+            title="Show files, tasks and memory"
+            aria-label="Show files, tasks and memory"
           >
             <PanelIcon size={15} />
           </IconButton>

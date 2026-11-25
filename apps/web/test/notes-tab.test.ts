@@ -9,7 +9,7 @@ import {
   sortNotes,
   withNote,
 } from '../src/features/panel/notes/noteList';
-import { PANEL_TABS, PANEL_TAB_LABEL, visiblePanelTabs } from '../src/features/panel/panelTabs';
+import { CENTER_TABS, PANEL_TAB_LABEL, visibleCenterTabs } from '../src/features/panel/panelTabs';
 
 const note = (id: string, updatedAt: string, title = '', body = ''): Note => ({
   id,
@@ -19,10 +19,16 @@ const note = (id: string, updatedAt: string, title = '', body = ''): Note => ({
   updatedAt,
 });
 
-test('Notes is a top panel tab right after Tasks, always shown', () => {
-  assert.deepEqual(PANEL_TABS.slice(-2), ['tasks', 'notes']);
+test('Notes is the last middle tab beside the chat, always shown', () => {
+  assert.deepEqual(CENTER_TABS.slice(-1), ['notes']);
   assert.equal(PANEL_TAB_LABEL.notes, 'Notes');
-  assert.ok(visiblePanelTabs({ terminal: false, git: false }).includes('notes'));
+  assert.deepEqual(visibleCenterTabs({ terminal: false, git: false }), ['chat', 'notes']);
+  assert.deepEqual(visibleCenterTabs({ terminal: true, git: true }), [
+    'chat',
+    'terminal',
+    'git',
+    'notes',
+  ]);
 });
 
 test('the list is newest first, and a saved note replaces its old copy', () => {
