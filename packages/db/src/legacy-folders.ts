@@ -52,7 +52,8 @@ export async function moveLegacyFolders(
 
 /**
  * Move everything in the folder `from` into the folder `to` (created when missing), leaving
- * alone anything `to` already has, then remove `from` if that emptied it. A `from` that is
+ * alone anything `to` already has (except the app's own .gitignore, which is dropped), then
+ * remove `from` if that emptied it. A `from` that is
  * missing or isn't a real folder (a symlink, say) is left as it is.
  * @returns null when there was nothing to move, else the names left behind in `from`
  */
@@ -64,9 +65,13 @@ async function moveFolderContents(from: string, to: string): Promise<string[] | 
   }
   const leftBehind: string[] = [];
   for (const name of await fs.readdir(from)) {
+    const source = path.join(from, name);
     const target = path.join(to, name);
-    if (await exists(target)) leftBehind.push(name);
-    else await fs.rename(path.join(from, name), target);
+    if (!(await exists(target))) await fs.rename(source, target);
+    // The app writes its own .gitignore into each data folder; the new one does the same job,
+    // so the old copy isn't worth keeping (it would keep the old folder around for good).
+    else if (name === '.gitignore') await fs.rm(source);
+    else leftBehind.push(name);
   }
   if (leftBehind.length === 0) await fs.rmdir(from);
   return leftBehind;

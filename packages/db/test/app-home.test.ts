@@ -312,3 +312,23 @@ test('models: a saved model of a provider the app no longer offers is skipped, n
   await models.setDefault(older);
   assert.ok(!(await fs.readFile(file, 'utf8')).includes(removed));
 });
+
+test('an old folder holding only the .gitignore the new one also has is removed', async () => {
+  const root = await home();
+  const appHome = path.join(root, '.hamro-ai');
+  const workspace = path.join(root, 'workspace');
+  await fs.mkdir(path.join(workspace, '.nimbrio-ai'), { recursive: true });
+  await fs.writeFile(path.join(workspace, '.nimbrio-ai', '.gitignore'), '# old\n*\n');
+  await fs.mkdir(path.join(workspace, '.hamro-ai'));
+  await fs.writeFile(path.join(workspace, '.hamro-ai', '.gitignore'), '# new\n*\n');
+
+  const notes = await moveLegacyFolders(appHome, [workspace]);
+  assert.equal(notes.length, 1);
+  assert.doesNotMatch(notes[0] ?? '', /except/);
+  await assert.rejects(fs.access(path.join(workspace, '.nimbrio-ai')));
+  assert.equal(
+    await fs.readFile(path.join(workspace, '.hamro-ai', '.gitignore'), 'utf8'),
+    '# new\n*\n',
+  );
+  assert.deepEqual(await moveLegacyFolders(appHome, [workspace]), []);
+});

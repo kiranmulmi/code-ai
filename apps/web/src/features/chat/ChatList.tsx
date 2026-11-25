@@ -133,7 +133,7 @@ export function ChatList({
 
         {groups.map((group) => (
           <section key={group.label} aria-label={group.label} className="pt-3">
-            <h2 className="px-7 pb-1.5 text-[10.5px] font-bold uppercase tracking-[0.14em] text-ink-4">
+            <h2 className="px-7 pb-1 text-[10px] font-bold uppercase tracking-[0.14em] text-ink-4">
               {group.label}
             </h2>
             <ul className="flex flex-col gap-0.5">
@@ -159,13 +159,13 @@ export function ChatList({
           <button
             type="button"
             onClick={() => setLimit((current) => current + PAGE_SIZE)}
-            className="mx-3 mt-1 flex items-center gap-2.5 rounded-r-xl py-2 pl-4 pr-2 text-left text-[12.5px] font-medium text-ink-3 transition-colors hover:bg-subtle hover:text-ink"
+            className="mx-3 mt-1 flex items-center gap-2.5 rounded-r-xl py-1.5 pl-4 pr-2 text-left text-[12px] font-medium text-ink-3 transition-colors hover:bg-subtle hover:text-ink"
           >
             <span aria-hidden className="grid h-4 w-4 shrink-0 place-items-center">
               <ChevronRightIcon size={11} className="rotate-90" />
             </span>
             Load more
-            <span className="text-[11px] tabular-nums text-ink-4">({hiddenCount})</span>
+            <span className="text-[10.5px] tabular-nums text-ink-4">({hiddenCount})</span>
           </button>
         )}
       </div>

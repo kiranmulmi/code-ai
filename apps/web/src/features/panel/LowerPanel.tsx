@@ -25,6 +25,8 @@ import {
   type LowerPanelTab,
 } from './panelTabs';
 import { PanelTabButton } from './PanelTabButton';
+import { TabCount } from './SidePanel';
+import { onWorkspaceSaved } from '../workspaces/workspaceEvents';
 
 const ICON: Record<LowerPanelTab, ReactNode> = {
   memory: <BrainIcon size={13} />,
@@ -73,6 +75,20 @@ export function LowerPanel({
     if (wasBusy.current && !isBusy) reloadPlugins();
     wasBusy.current = isBusy;
   }, [isBusy, reloadPlugins]);
+
+  // The workspace form may turn MCP servers (plugins among them) on or off.
+  useEffect(() => onWorkspaceSaved(reloadPlugins), [reloadPlugins]);
+
+  // What each tab has in use, shown beside its name.
+  const pluginNames = new Set(plugins.data?.plugins.map((plugin) => plugin.name) ?? []);
+  const enabled = plugins.data?.mcp.enabled ?? [];
+  const counts: Record<LowerPanelTab, { count: number; title: string }> = {
+    skills: { count: skills.data?.length ?? 0, title: 'skills' },
+    agents: { count: agents.data?.specialists.length ?? 0, title: 'specialists' },
+    tools: { count: enabled.filter((name) => pluginNames.has(name)).length, title: 'on here' },
+    memory: { count: memories.data?.length ?? 0, title: 'saved' },
+    mcp: { count: enabled.length, title: 'on here' },
+  };
 
   useEffect(() => {
     if (!isDragging) return;
@@ -156,6 +172,11 @@ export function LowerPanel({
             >
               {ICON[id]}
               {PANEL_TAB_LABEL[id]}
+              {counts[id].count > 0 && (
+                <TabCount title={`${counts[id].count} ${counts[id].title}`}>
+                  {counts[id].count}
+                </TabCount>
+              )}
             </PanelTabButton>
           ))}
         </div>
@@ -187,7 +208,9 @@ export function LowerPanel({
           className="min-h-0 flex-1 animate-fade-in overflow-y-auto p-4"
         >
           {tab === 'memory' && <MemoryPanel workspaceId={workspaceId} memories={memories} />}
-          {tab === 'mcp' && <McpPanel workspaceId={workspaceId} isBusy={isBusy} />}
+          {tab === 'mcp' && (
+            <McpPanel workspaceId={workspaceId} isBusy={isBusy} onChange={reloadPlugins} />
+          )}
           {tab === 'skills' && <SkillsPanel workspaceId={workspaceId} skills={skills} />}
           {tab === 'agents' && <AgentsPanel workspaceId={workspaceId} agents={agents} />}
           {tab === 'tools' && (

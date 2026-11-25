@@ -195,8 +195,7 @@ export function SkillsPanel({
       )}
 
       <p className="mt-3 text-[12px] leading-relaxed text-ink-3">
-        The agent sees each skill&apos;s name and description and loads the ones a task needs. To
-        use one for a message yourself, pick it with the Skills button in the message box. Upload a
+        The agent sees each skill&apos;s name and description and loads the ones a task needs. Upload a
         skill folder ({SKILL_MAIN_FILE} plus files it uses, like references or templates) to give
         the agent those files too.
       </p>

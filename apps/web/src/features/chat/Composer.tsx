@@ -12,7 +12,6 @@ import {
   ATTACHMENT_LIMITS,
   attachmentKind,
   type Attachment,
-  type Skill,
   type Usage,
 } from '@app/shared';
 import { PATH_DRAG_TYPE, desktopPathOf, droppedPathsText, quoteIfSpaced } from '../../lib/dragPath';
@@ -25,8 +24,6 @@ import { ImagePreview, type PreviewImage } from './ImagePreview';
 import { ChatUsageLine } from './ChatUsageLine';
 import type { ConversationState } from './conversation';
 import type { ReturnedDraft } from './useConversation';
-import { SkillChip } from './SkillChip';
-import { SkillPicker } from './SkillPicker';
 import { useSpeechInput } from './useSpeechInput';
 import { useDraftAttachments } from './useDraftAttachments';
 
@@ -40,15 +37,13 @@ const BOX_TEXT =
  * The message box: Enter sends, Shift+Enter adds a line. `controls` pick the model. Files
  * can be attached with the paperclip or pasted; they upload right away. Files and folders
  * dropped on the box (from the Files panel, or Finder / File Explorer in the desktop app) only
- * put their full path in the text. Skills can be picked for the message with the Skills
- * button; they're sent with it.
+ * put their full path in the text.
  */
 export function Composer({
   workspaceId,
   disabled,
   hasModel,
   controls,
-  skills,
   focusKey,
   usage,
   context,
@@ -66,8 +61,6 @@ export function Composer({
   /** False until a model is set up: typing works, sending waits. */
   hasModel: boolean;
   controls: ReactNode;
-  /** The workspace's skills, to pick from; null while loading. */
-  skills: Skill[] | null;
   /** Focus moves back to the box when this changes (another chat) or a run ends. */
   focusKey: string;
   /** This chat's tokens so far, shown under the box once there are any. */
@@ -76,7 +69,7 @@ export function Composer({
   context: ConversationState['context'];
   /** Opens the chat's token usage breakdown, by message. */
   onShowUsage?: () => void;
-  onSend: (text: string, attachments: Attachment[], skills: string[]) => void;
+  onSend: (text: string, attachments: Attachment[]) => void;
   /** Rewrites the draft (the wand button); resolves to the improved text. */
   onImprove: (text: string) => Promise<string>;
   /** The agent is working on this chat: the send button becomes Stop. */
@@ -84,20 +77,14 @@ export function Composer({
   isStopping?: boolean;
   onStop?: () => void;
   /**
-   * While the agent works, sends the text to it: it reads it before its next step. Files and
-   * picked skills stay in the box for the next message.
+   * While the agent works, sends the text to it: it reads it before its next step. Attached
+   * files stay in the box for the next message.
    */
   onSteer?: (text: string) => void;
   /** Text to put back in the box (a message the agent didn't read), before what's typed. */
   restoreDraft?: ReturnedDraft | null;
 }) {
   const [value, setValue] = useState('');
-  // Skills picked for this message (by name); one deleted meanwhile is dropped on send.
-  const [picked, setPicked] = useState<string[]>([]);
-  const toggleSkill = (name: string) =>
-    setPicked((current) =>
-      current.includes(name) ? current.filter((item) => item !== name) : [...current, name],
-    );
   // Files or folders being dragged over the box: dropping them inserts their paths.
   const [isDragging, setIsDragging] = useState(false);
   const toast = useToast();
@@ -180,14 +167,8 @@ export function Composer({
       setImproveError(null);
       return;
     }
-    const available = new Set((skills ?? []).map((skill) => skill.name));
-    onSend(
-      value,
-      files.ready,
-      picked.filter((name) => available.has(name)),
-    );
+    onSend(value, files.ready);
     setValue('');
-    setPicked([]);
     setBeforeImprove(null);
     setImproveError(null);
     files.clear();
@@ -267,11 +248,8 @@ export function Composer({
             Drop to insert the full path
           </div>
         )}
-        {(files.drafts.length > 0 || picked.length > 0) && (
+        {files.drafts.length > 0 && (
           <div className="flex flex-wrap gap-2 px-3 pt-3">
-            {picked.map((name) => (
-              <SkillChip key={name} name={name} onRemove={() => toggleSkill(name)} />
-            ))}
             {files.drafts.map((draft) => (
               <AttachmentChip
                 key={draft.key}
@@ -411,7 +389,6 @@ export function Composer({
                 Undo
               </button>
             )}
-            <SkillPicker skills={skills} picked={picked} onToggle={toggleSkill} />
             <span aria-hidden className="mx-1 h-4 w-px bg-line" />
             <div className="min-w-0">{controls}</div>
           </div>
@@ -421,8 +398,8 @@ export function Composer({
               disabled={!canSubmit}
               aria-label="Send to the agent now"
               title={
-                files.ready.length || picked.length
-                  ? 'Send the text now: the agent reads it before its next step. Files and skills wait for your next message.'
+                files.ready.length
+                  ? 'Send the text now: the agent reads it before its next step. Files wait for your next message.'
                   : 'Send now: the agent reads it before its next step'
               }
               className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-accent text-on-accent shadow-accent transition-[background-color,transform] hover:bg-accent-hover enabled:hover:-translate-y-px disabled:cursor-not-allowed disabled:bg-surface-2 disabled:text-ink-4 disabled:shadow-none"

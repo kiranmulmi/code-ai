@@ -1,17 +1,42 @@
+import { lazy, Suspense, type ComponentType, type ReactNode } from 'react';
 import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { AuthGate } from './features/auth/AuthGate';
 import { ChatRoute } from './features/chat/ChatRoute';
-import { McpServerFormPage } from './features/mcp/McpServerFormPage';
-import { McpServersPage } from './features/mcp/McpServersPage';
-import { ModelFormPage } from './features/models/ModelFormPage';
-import { ModelsPage } from './features/models/ModelsPage';
-import { AgentSettingsPage } from './features/settings/AgentSettingsPage';
 import { RootRedirect } from './features/workspaces/RootRedirect';
-import { WorkspaceFormPage } from './features/workspaces/WorkspaceFormPage';
+import { PageLoader } from './components/PageLoader';
 import { FormLayout } from './layout/FormLayout';
 import { SettingsModal, useSettingsBackground } from './layout/SettingsModal';
 import { ThemeProvider } from './lib/theme';
 import { ToastProvider } from './lib/toast';
+
+/** A page loaded on first visit, so settings and forms stay out of the main bundle. */
+function lazyPage(load: () => Promise<ComponentType>) {
+  const Page = lazy(() => load().then((page) => ({ default: page })));
+  return function LazyPage(): ReactNode {
+    return (
+      <Suspense fallback={<PageLoader />}>
+        <Page />
+      </Suspense>
+    );
+  };
+}
+
+const ModelsPage = lazyPage(() => import('./features/models/ModelsPage').then((m) => m.ModelsPage));
+const ModelFormPage = lazyPage(() =>
+  import('./features/models/ModelFormPage').then((m) => m.ModelFormPage),
+);
+const AgentSettingsPage = lazyPage(() =>
+  import('./features/settings/AgentSettingsPage').then((m) => m.AgentSettingsPage),
+);
+const McpServersPage = lazyPage(() =>
+  import('./features/mcp/McpServersPage').then((m) => m.McpServersPage),
+);
+const McpServerFormPage = lazyPage(() =>
+  import('./features/mcp/McpServerFormPage').then((m) => m.McpServerFormPage),
+);
+const WorkspaceFormPage = lazyPage(() =>
+  import('./features/workspaces/WorkspaceFormPage').then((m) => m.WorkspaceFormPage),
+);
 
 /** Models, Agent and MCP servers: full pages, or a popup over the chat (SettingsModal). */
 const settingsRoutes = (

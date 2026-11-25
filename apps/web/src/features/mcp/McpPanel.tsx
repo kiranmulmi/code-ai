@@ -20,7 +20,16 @@ const ADD_LINK =
  * The MCP tab: the MCP servers turned on in this workspace (chosen in its settings) and
  * their tools. Mounted only while the tab is open, since loading it starts the servers.
  */
-export function McpPanel({ workspaceId, isBusy }: { workspaceId: string; isBusy: boolean }) {
+export function McpPanel({
+  workspaceId,
+  isBusy,
+  onChange,
+}: {
+  workspaceId: string;
+  isBusy: boolean;
+  /** after a server was turned on or off, approved or restarted (the tab counts) */
+  onChange?: () => void;
+}) {
   const toast = useToast();
   const { pathname } = useLocation();
   const load = useCallback(() => fetchMcpOverview(workspaceId), [workspaceId]);
@@ -35,6 +44,7 @@ export function McpPanel({ workspaceId, isBusy }: { workspaceId: string; isBusy:
     try {
       const next = await action();
       setData(() => next);
+      onChange?.();
       toast(message);
     } catch (cause) {
       toast(errorMessage(cause, "Couldn't change the MCP servers."), 'error');

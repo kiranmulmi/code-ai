@@ -400,11 +400,9 @@ export function ChatScreen({
                     )}
                   </div>
                 }
-                skills={skills.data}
-                onSend={(text, attachments, picked) =>
+                onSend={(text, attachments) =>
                   void conversation.send(text, {
                     attachments,
-                    skills: picked,
                     autoApprove: info.data?.approval === 'ask' && autoApprove,
                     modelId: choice.model?.id,
                     reasoningEffort:

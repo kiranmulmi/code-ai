@@ -374,6 +374,15 @@ export function ShieldIcon({ size = 14, ...rest }: IconProps) {
   );
 }
 
+/** A lightning bolt: things run straight away (Auto-approve on). */
+export function BoltIcon({ size = 14, ...rest }: IconProps) {
+  return (
+    <svg {...base(size)} {...rest}>
+      <path d="M9 1.8L3.5 9h4L7 14.2 12.5 7h-4L9 1.8z" />
+    </svg>
+  );
+}
+
 export function QuestionIcon({ size = 16, ...rest }: IconProps) {
   return (
     <svg {...base(size)} {...rest}>

@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactNode } from 'react';
-import type { Attachment, QuestionAnswer, Skill, Workspace } from '@app/shared';
+import type { Attachment, QuestionAnswer, Workspace } from '@app/shared';
 import { PageLoader } from '../../components/PageLoader';
 import { AgentMessage } from './AgentMessage';
 import { PlanDock } from './PlanDock';
@@ -33,7 +33,6 @@ export function ChatView({
   isRunningElsewhere,
   hasModel,
   modelControls,
-  skills,
   onSend,
   onSteer,
   queued,
@@ -59,9 +58,7 @@ export function ChatView({
   hasModel: boolean;
   /** The composer's model and reasoning effort pickers. */
   modelControls: ReactNode;
-  /** The workspace's skills, offered in the composer; null while loading. */
-  skills: Skill[] | null;
-  onSend: (text: string, attachments: Attachment[], skills: string[]) => void;
+  onSend: (text: string, attachments: Attachment[]) => void;
   /** Sends a message to this tab's run in progress, read before its next step. */
   onSteer: (text: string) => void;
   /** Messages sent during the run that the agent hasn't read yet. */
@@ -104,9 +101,9 @@ export function ChatView({
       ),
   );
 
-  const send = (text: string, attachments: Attachment[], picked: string[]) => {
+  const send = (text: string, attachments: Attachment[]) => {
     log.pin();
-    onSend(text, attachments, picked);
+    onSend(text, attachments);
   };
 
   return (
@@ -190,7 +187,7 @@ export function ChatView({
           usage={state.usage}
           context={state.context}
           onShowUsage={() => setUsageView({ kind: 'chat' })}
-          onSend={(text) => send(text, [], [])}
+          onSend={(text) => send(text, [])}
           onStop={onStop}
           subscribeReply={subscribeReply}
           onSpokenUpTo={setSpokenUpTo}
@@ -201,7 +198,6 @@ export function ChatView({
           disabled={!canSend && !canSteer}
           hasModel={hasModel}
           controls={modelControls}
-          skills={skills}
           focusKey={chatKey}
           usage={state.usage}
           context={state.context}
