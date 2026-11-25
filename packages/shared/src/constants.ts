@@ -305,10 +305,10 @@ export const API_LIMITS = {
 
 /** The Files panel (the file tree and its search). */
 export const FILES_PANEL = {
-  /** files listed in the tree; past it the deepest are left out */
-  maxListedFiles: 5_000,
-  /** ignored paths reported */
-  maxIgnored: 2_000,
+  /** a folder's entries sent at a time; "Show more" asks for the next ones */
+  folderPage: 500,
+  /** at most this many in one request (a refresh reloads what was already shown) */
+  maxFolderPage: 5_000,
   maxNameResults: 200,
   maxContentMatches: 300,
   /** search: files walked at most */
@@ -365,8 +365,6 @@ export const WEB_APP = {
   maxCodeBlockHighlightChars: 100_000,
   /** the file preview's search highlights at most this many matches */
   maxPreviewMatches: 999,
-  /** up to this many files, every folder in the tree starts open */
-  openAllFoldersUpTo: 40,
   /** wait for a pause in typing this long before searching files */
   fileSearchDelayMs: 250,
   /** wait for a pause in typing this long before checking a workspace folder */

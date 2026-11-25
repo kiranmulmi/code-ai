@@ -1,5 +1,11 @@
 import { useCallback, useState } from 'react';
-import type { FileContent, FileEntryKind, FileSearchMode, WorkspaceFiles } from '@app/shared';
+import type {
+  CreatedEntry,
+  FileContent,
+  FileEntryKind,
+  FileSearchMode,
+  WorkspaceFiles,
+} from '@app/shared';
 import { ConfirmDeleteDialog } from '../../../components/ConfirmDeleteDialog';
 import { IconButton } from '../../../components/IconButton';
 import { Spinner } from '../../../components/Spinner';
@@ -62,7 +68,7 @@ export function FilesPanel({
   const search = useFileSearch(workspaceId, query, mode, refreshKey);
   const isSearching = query.trim() !== '';
   const [creating, setCreating] = useState<{ parent: string; kind: FileEntryKind } | null>(null);
-  const [reveal, setReveal] = useState<string | null>(null);
+  const [reveal, setReveal] = useState<CreatedEntry | null>(null);
   const [pendingDelete, setPendingDelete] = useState<{
     path: string;
     kind: FileEntryKind;
@@ -104,7 +110,7 @@ export function FilesPanel({
     try {
       const entry = await renameEntry(workspaceId, { from, to });
       toast(`Renamed to ${entry.path}`);
-      setReveal(entry.path);
+      setReveal(entry);
       refresh();
     } catch (cause) {
       toast(errorMessage(cause, "Couldn't rename it."), 'error');
@@ -158,7 +164,7 @@ export function FilesPanel({
     }
     toast(`Created ${entry.path}`);
     setCreating(null);
-    setReveal(entry.path);
+    setReveal(entry);
     files.reload();
     if (kind === 'file') void open(entry.path, undefined, true);
   };
@@ -280,17 +286,17 @@ export function FilesPanel({
           <div className="p-4">
             <PanelMessage isLoading={files.isLoading} error={files.error} onRetry={files.reload} />
           </div>
-        ) : files.data.files.length === 0 && files.data.emptyFolders.length === 0 && !creating ? (
+        ) : files.data.root.total === 0 && !creating ? (
           <p className="px-4 py-6 text-center text-[13px] text-ink-3">
             No files yet. Create one with the buttons above, or ask the agent.
           </p>
         ) : (
           <div className="px-2 py-1.5">
             <FileTree
+              key={workspaceId}
+              workspaceId={workspaceId}
               root={files.data.path}
-              paths={files.data.files}
-              emptyFolders={files.data.emptyFolders}
-              ignored={files.data.ignored}
+              top={files.data.root}
               opening={opening}
               reveal={reveal}
               onOpen={(filePath) => void open(filePath)}
@@ -303,12 +309,6 @@ export function FilesPanel({
               onReveal={(path) => void revealInSystem(path)}
             />
           </div>
-        )}
-        {!isSearching && files.data?.isTruncated && (
-          <p className="px-4 pb-3 pt-1 text-[12px] text-ink-3">
-            Showing the first {files.data.files.length} files. Generated folders such as
-            node_modules are left out.
-          </p>
         )}
       </div>
 

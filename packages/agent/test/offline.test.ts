@@ -38,7 +38,7 @@ import { loadAgentConfig } from '../src/config.js';
 import { webSearch } from '../src/tools/web-search.js';
 import { htmlToText } from '../src/tools/fetch-page.js';
 import { listFiles } from '../src/tools/files/list-files.js';
-import { listWorkspaceFiles } from '../src/tools/files/walk.js';
+import { readFolder } from '../src/tools/files/walk.js';
 import { readFile } from '../src/tools/files/read-file.js';
 import { findFiles } from '../src/tools/files/find-files.js';
 import { searchFiles } from '../src/tools/files/search-files.js';
@@ -1798,6 +1798,36 @@ test('the instructions assistant sends the workspace, project and current text i
   assert.equal(await writeInstructions(empty.callModel, { request: '', current: 'x' }), null);
 });
 
+test('the Files panel reads one folder: folders first, generated ones marked, app data left out', async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'agent-folder-'));
+  await fs.mkdir(path.join(dir, 'src'));
+  await fs.mkdir(path.join(dir, 'node_modules', 'dep'), { recursive: true });
+  await fs.mkdir(path.join(dir, '.hamro-ai'));
+  await fs.writeFile(path.join(dir, 'README.md'), '');
+  await fs.writeFile(path.join(dir, '.env'), '');
+  await fs.writeFile(path.join(dir, '.DS_Store'), '');
+
+  assert.deepEqual(await readFolder(dir), {
+    entries: [
+      { name: 'node_modules', isDirectory: true, isGenerated: true },
+      { name: 'src', isDirectory: true, isGenerated: false },
+      { name: '.env', isDirectory: false, isGenerated: false },
+      { name: 'README.md', isDirectory: false, isGenerated: false },
+    ],
+    total: 4,
+  });
+  // A page of it, and a generated folder opened on request.
+  assert.deepEqual(
+    (await readFolder(dir, { offset: 1, limit: 2 })).entries.map((entry) => entry.name),
+    ['src', '.env'],
+  );
+  assert.deepEqual(await readFolder(path.join(dir, 'node_modules')), {
+    entries: [{ name: 'dep', isDirectory: true, isGenerated: false }],
+    total: 1,
+  });
+  await assert.rejects(readFolder(path.join(dir, 'missing')));
+});
+
 test('the Files panel search finds names and lines, skipping generated and app folders', async () => {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'agent-search-'));
   await fs.mkdir(path.join(dir, 'src'));
@@ -1814,25 +1844,6 @@ test('the Files panel search finds names and lines, skipping generated and app f
 
   const names = await findFilesByName(dir, 'GREET', 10);
   assert.deepEqual(names, { paths: ['src/Greeting.ts', 'greeting-notes.md'], isTruncated: false });
-
-  await fs.mkdir(path.join(dir, 'docs', 'empty'), { recursive: true });
-  assert.deepEqual(await listWorkspaceFiles(dir, 100), {
-    files: ['greeting-notes.md', 'image.bin', 'src/Greeting.ts'],
-    emptyFolders: ['docs/empty'],
-    isTruncated: false,
-  });
-
-  // Past the limit, the deepest files are left out, never the top of the tree.
-  await fs.mkdir(path.join(dir, 'a', 'deep'), { recursive: true });
-  await fs.writeFile(path.join(dir, 'a', 'deep', 'one.ts'), '');
-  await fs.writeFile(path.join(dir, 'a', 'deep', 'two.ts'), '');
-  await fs.writeFile(path.join(dir, 'z-last.md'), '');
-  assert.deepEqual(await listWorkspaceFiles(dir, 4), {
-    files: ['greeting-notes.md', 'image.bin', 'z-last.md', 'src/Greeting.ts'],
-    // Cut off before docs/empty was read: not known to be empty, so left out.
-    emptyFolders: [],
-    isTruncated: true,
-  });
 
   const contents = await searchFileContents(dir, 'hello', 100);
   assert.deepEqual(contents.files, [

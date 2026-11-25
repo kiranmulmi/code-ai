@@ -138,6 +138,9 @@ export {
   type FileContent,
   type FolderListing,
   type WorkspaceFiles,
+  type FolderEntry,
+  type FolderChildren,
+  folderChildrenQuerySchema,
 } from './files.js';
 export {
   gitDiffQuerySchema,

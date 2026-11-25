@@ -1,5 +1,5 @@
 // Helpers shared by the file tools (and the API's Files panel): walking the
-// workspace without wading into generated folders, globs, and display paths.
+// workspace without wading into generated folders, reading one folder, globs, and display paths.
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import type { Dirent } from 'node:fs';
@@ -72,50 +72,39 @@ export async function* walk(
   yield* visit(start, '', 1);
 }
 
+/** One entry of a folder, as the Files panel lists it. */
+export interface FolderListingEntry {
+  name: string;
+  isDirectory: boolean;
+  /** a SKIPPED_FOLDERS folder: listed, opened only when asked */
+  isGenerated: boolean;
+}
+
 /**
- * Every file in a workspace folder (generated folders left out), for the Files panel, and
- * the folders with nothing in them (they'd otherwise be missing from a tree of files).
- *
- * Breadth-first, level by level: past `limit`, it's the deepest files that are left out, so
- * the top of the tree (README, package.json, every top-level folder) is always there.
+ * One folder's entries for the Files panel, a page at a time: folders first, then files, each
+ * sorted by name. A single readdir whatever the workspace's size, so a folder is read only
+ * when it's opened. Generated folders are listed (marked) rather than left out; the app's own
+ * data and OS clutter (.DS_Store) never are. Symlinks are listed as files, never followed.
  */
-export async function listWorkspaceFiles(
+export async function readFolder(
   dir: string,
-  limit: number,
-): Promise<{ files: string[]; emptyFolders: string[]; isTruncated: boolean }> {
-  const files: string[] = [];
-  // Only folders actually read: one not reached yet isn't known to be empty.
-  const emptyFolders: string[] = [];
-  let level: string[] = [''];
-  while (level.length > 0) {
-    const next: string[] = [];
-    for (const relative of level) {
-      let entries: Dirent[];
-      try {
-        entries = await fs.readdir(relative ? path.join(dir, relative) : dir, {
-          withFileTypes: true,
-        });
-      } catch {
-        continue; // unreadable folder: skip it rather than fail the whole listing
-      }
-      entries = entries.filter(
-        (entry) => !SKIPPED_FILES.has(entry.name) && !isInAppData(entry.name),
-      );
-      if (entries.length === 0 && relative) emptyFolders.push(relative);
-      entries.sort((a, b) => a.name.localeCompare(b.name));
-      for (const entry of entries) {
-        const child = relative ? `${relative}/${entry.name}` : entry.name;
-        if (entry.isDirectory()) {
-          if (!SKIPPED_FOLDERS.has(entry.name)) next.push(child);
-          continue;
-        }
-        if (files.length === limit) return { files, emptyFolders, isTruncated: true };
-        files.push(child);
-      }
-    }
-    level = next;
-  }
-  return { files, emptyFolders, isTruncated: false };
+  { offset = 0, limit = Infinity }: { offset?: number; limit?: number } = {},
+): Promise<{ entries: FolderListingEntry[]; total: number }> {
+  const dirents = await fs.readdir(dir, { withFileTypes: true });
+  const all = dirents
+    .filter((entry) => !SKIPPED_FILES.has(entry.name) && !isInAppData(entry.name))
+    .map((entry) => {
+      const isDirectory = entry.isDirectory();
+      return {
+        name: entry.name,
+        isDirectory,
+        isGenerated: isDirectory && SKIPPED_FOLDERS.has(entry.name),
+      };
+    })
+    .sort((a, b) =>
+      a.isDirectory === b.isDirectory ? a.name.localeCompare(b.name) : a.isDirectory ? -1 : 1,
+    );
+  return { entries: all.slice(offset, offset + limit), total: all.length };
 }
 
 /** The real workspace folder and a model-supplied path resolved inside it. */

@@ -87,7 +87,7 @@ export {
   type McpToolSummary,
   type McpWorkspace,
 } from './mcp/hub.js';
-export { listWorkspaceFiles } from './tools/files/walk.js';
+export { readFolder, type FolderListingEntry } from './tools/files/walk.js';
 export { findFilesByName, searchFileContents } from './workspace-search.js';
 export {
   defineTool,

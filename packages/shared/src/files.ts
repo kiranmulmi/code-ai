@@ -1,21 +1,50 @@
 import { z } from 'zod';
-import { FILE_EDIT_MAX_CHARS, LIMITS } from './constants.js';
+import { FILE_EDIT_MAX_CHARS, FILES_PANEL, LIMITS } from './constants.js';
 
+/** One entry of a folder in the Files panel. */
+export interface FolderEntry {
+  name: string;
+  /** relative to the workspace folder, with "/" separators */
+  path: string;
+  kind: FileEntryKind;
+  /** dependencies, build output, caches, .git: listed, but only opened when asked */
+  isGenerated?: boolean;
+  /** git ignores it (.gitignore and the like); these rows are dimmed */
+  isIgnored?: boolean;
+}
+
+/**
+ * One folder's entries, a page at a time: the Files panel reads a folder only when it's
+ * opened, so even a huge workspace (node_modules and all) costs one folder per request.
+ */
+export interface FolderChildren {
+  /** the folder, relative to the workspace folder; '' is the workspace folder itself */
+  path: string;
+  /** folders first, then files, each sorted by name; from `offset` on */
+  entries: FolderEntry[];
+  /** everything in the folder, so the panel can offer the rest */
+  total: number;
+}
+
+/** GET /v1/workspaces/:id/files: the workspace folder and its top level. */
 export interface WorkspaceFiles {
   /** The workspace folder (absolute). */
   path: string;
-  /** Paths relative to the workspace folder, without generated folders like node_modules. */
-  files: string[];
-  /** folders with nothing in them, so a new folder shows in the tree */
-  emptyFolders: string[];
-  /**
-   * What git ignores here (.gitignore and the like), for dimming: files, and folders ending in
-   * "/" whose whole contents are ignored. Empty outside a git repository.
-   */
-  ignored: string[];
-  /** true when there were more files than the listing shows */
-  isTruncated: boolean;
+  /** the folder's own entries (empty when the folder is missing) */
+  root: FolderChildren;
 }
+
+/** GET /v1/workspaces/:id/files/children?path=&offset=&limit=: one folder, a page of it. */
+export const folderChildrenQuerySchema = z.object({
+  path: z.string().max(LIMITS.folderPath).default(''),
+  offset: z.coerce.number().int().min(0).default(0),
+  limit: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(FILES_PANEL.maxFolderPage)
+    .default(FILES_PANEL.folderPage),
+});
 
 export interface FileContent {
   path: string;

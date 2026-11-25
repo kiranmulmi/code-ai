@@ -16,11 +16,15 @@ export interface GitResult {
   isTruncated: boolean;
 }
 
-/** Runs git without a shell; null when git can't start (not installed, folder missing). */
+/**
+ * Runs git without a shell; null when git can't start (not installed, folder missing).
+ * `input` is written to its stdin (e.g. paths for `check-ignore --stdin`).
+ */
 export function runGit(
   cwd: string,
   args: string[],
   maxBytes = MAX_GIT_OUTPUT_BYTES,
+  input?: string,
 ): Promise<GitResult | null> {
   return new Promise((resolve) => {
     const child = spawn('git', [...GIT_ARGS, ...args], {
@@ -31,13 +35,16 @@ export function runGit(
         GIT_TERMINAL_PROMPT: '0',
         GIT_PAGER: 'cat',
       },
-      stdio: ['ignore', 'pipe', 'ignore'],
+      stdio: ['pipe', 'pipe', 'ignore'],
       windowsHide: true,
     });
     const chunks: Buffer[] = [];
     let size = 0;
     let isTruncated = false;
     const timer = setTimeout(() => child.kill('SIGKILL'), TIMEOUT_MS);
+    // git may exit before reading it all (not a repository): that's not an error here.
+    child.stdin.on('error', () => {});
+    child.stdin.end(input ?? '');
     child.stdout.on('data', (chunk: Buffer) => {
       if (isTruncated) return;
       if (size + chunk.length > maxBytes) {

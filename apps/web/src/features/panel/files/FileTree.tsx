@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { FileEntryKind } from '@app/shared';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import type { CreatedEntry, FileEntryKind, FolderChildren, FolderEntry } from '@app/shared';
 import { absolutePath, startPathDrag } from '../../../lib/dragPath';
+import { errorMessage } from '../../../lib/api';
 import { Spinner } from '../../../components/Spinner';
 import {
   ChevronRightIcon,
@@ -18,100 +19,17 @@ import { NameInput } from './NameInput';
 import { RowMenu, type RowMenuItem } from '../../../components/RowMenu';
 import { fileTint } from './fileTint';
 import { REVEAL_LABEL } from './revealLabel';
-import { WEB_APP } from '@app/shared';
+import { compactRow, foldersToShow, soleFolder, withParents } from './folderTree';
+import { useFolderTree } from './useFolderTree';
 
-interface FileNode {
-  name: string;
-  path: string;
-}
-
-interface FolderNode extends FileNode {
-  folders: FolderNode[];
-  files: FileNode[];
-}
-
-/** Up to this many files, every folder starts open; above it, they start closed. */
-const OPEN_ALL_UP_TO = WEB_APP.openAllFoldersUpTo;
 const INDENT_PX = 14;
 
 /**
- * Nest "/"-separated file paths into folders, folders first, each sorted by name. Empty
- * folders have no file to bring them in, so they come as their own list.
+ * Rows git ignores look faded, as in VS Code; so do generated folders (node_modules, .git),
+ * which are listed but only read when opened.
  */
-/**
- * Whether git ignores a path: listed itself, or inside a folder git ignores as a whole
- * (`ignored` lists such folders with a trailing "/").
- */
-function ignoredTest(ignored: readonly string[]): (path: string) => boolean {
-  const set = new Set(ignored);
-  return (path) => {
-    if (set.has(path)) return true;
-    const parts = path.split('/');
-    for (let end = parts.length; end > 0; end -= 1) {
-      if (set.has(`${parts.slice(0, end).join('/')}/`)) return true;
-    }
-    return false;
-  };
-}
-
-/** Rows git ignores look faded, as in VS Code. */
-const IGNORED_ROW = 'opacity-50';
-
-function buildTree(paths: readonly string[], emptyFolders: readonly string[]): FolderNode {
-  const root: FolderNode = { name: '', path: '', folders: [], files: [] };
-  const folderAt = new Map<string, FolderNode>([['', root]]);
-  const folderFor = (parts: readonly string[]) => {
-    let parent = root;
-    for (const part of parts) {
-      const folderPath = parent.path ? `${parent.path}/${part}` : part;
-      let folder = folderAt.get(folderPath);
-      if (!folder) {
-        folder = { name: part, path: folderPath, folders: [], files: [] };
-        folderAt.set(folderPath, folder);
-        parent.folders.push(folder);
-      }
-      parent = folder;
-    }
-    return parent;
-  };
-  for (const filePath of paths) {
-    const parts = filePath.split('/');
-    const fileName = parts.pop() ?? filePath;
-    folderFor(parts).files.push({ name: fileName, path: filePath });
-  }
-  for (const folderPath of emptyFolders) folderFor(folderPath.split('/'));
-  const byName = (a: FileNode, b: FileNode) => a.name.localeCompare(b.name);
-  for (const folder of folderAt.values()) {
-    folder.folders.sort(byName);
-    folder.files.sort(byName);
-  }
-  return root;
-}
-
-/** A folder whose only content is one folder shows as one row: "src/main/java". */
-function compact(folder: FolderNode): FolderNode {
-  let current = folder;
-  let name = folder.name;
-  while (current.files.length === 0 && current.folders.length === 1 && current.folders[0]) {
-    current = current.folders[0];
-    name = `${name}/${current.name}`;
-  }
-  return { ...current, name };
-}
-
-function allFolderPaths(folder: FolderNode, into: string[] = []): string[] {
-  for (const child of folder.folders) {
-    into.push(compact(child).path);
-    allFolderPaths(compact(child), into);
-  }
-  return into;
-}
-
-/** Every folder above `path` (and `path` itself), so it can be opened down to there. */
-function withParents(path: string): string[] {
-  const parts = path.split('/');
-  return parts.map((_, index) => parts.slice(0, index + 1).join('/'));
-}
+const FADED_ROW = 'opacity-50';
+const isFaded = (entry: FolderEntry) => entry.isIgnored === true || entry.isGenerated === true;
 
 /** The ⋯ button at a row's right end: shown on hover, on focus, and while its menu is open. */
 const MENU_BUTTON =
@@ -124,10 +42,9 @@ const MENU_BUTTON =
  * adds a new file or folder inside.
  */
 export function FileTree({
+  workspaceId,
   root,
-  paths,
-  emptyFolders,
-  ignored,
+  top,
   opening,
   reveal,
   onOpen,
@@ -139,16 +56,15 @@ export function FileTree({
   onCreate,
   onCancelCreate,
 }: {
+  workspaceId: string;
   /** the workspace folder, so dragged rows carry absolute paths */
   root: string;
-  paths: readonly string[];
-  emptyFolders: readonly string[];
-  /** what git ignores (`WorkspaceFiles.ignored`): those rows are dimmed */
-  ignored: readonly string[];
+  /** the workspace folder's own entries; a new one (a refresh) reads the open folders again */
+  top: FolderChildren;
   /** the file being loaded for preview, if any */
   opening: string | null;
   /** a path just created or renamed: its folders open so it can be seen */
-  reveal: string | null;
+  reveal: CreatedEntry | null;
   onOpen: (filePath: string) => void;
   onCreateIn: (folderPath: string, kind: FileEntryKind) => void;
   /** rejects when it couldn't be renamed (the name box stays open) */
@@ -162,40 +78,36 @@ export function FileTree({
   onCreate: (name: string) => Promise<void>;
   onCancelCreate: () => void;
 }) {
-  const tree = useMemo(() => buildTree(paths, emptyFolders), [paths, emptyFolders]);
-  const isIgnored = useMemo(() => ignoredTest(ignored), [ignored]);
-  // null until the user toggles a folder: then small trees start open, large ones closed.
-  const [openFolders, setOpenFolders] = useState<ReadonlySet<string> | null>(null);
-  const shown = useMemo(
-    () => openFolders ?? new Set(paths.length <= OPEN_ALL_UP_TO ? allFolderPaths(tree) : []),
-    [openFolders, paths.length, tree],
-  );
+  const tree = useFolderTree(workspaceId, top);
+  const { folders, open, expand, collapse, showMore, reload } = tree;
   const [menuFor, setMenuFor] = useState<string | null>(null);
   const [renaming, setRenaming] = useState<string | null>(null);
   const closeMenu = useCallback(() => setMenuFor(null), []);
 
+  // A workspace whose top level is one folder (a lone "src") opens it straight away.
+  const isFirstShow = useRef(true);
+  useEffect(() => {
+    if (!isFirstShow.current) return;
+    isFirstShow.current = false;
+    const only = soleFolder(folders['']);
+    if (only) void expand([only.path]);
+  }, [folders, expand]);
+
   // Open the folders down to a new or renamed file or folder, once per path.
-  const revealed = useRef<string | null>(null);
+  const revealed = useRef<CreatedEntry | null>(null);
   useEffect(() => {
     if (!reveal || revealed.current === reveal) return;
     revealed.current = reveal;
-    setOpenFolders(new Set([...shown, ...withParents(reveal)]));
-  }, [reveal, shown]);
+    void expand(foldersToShow(reveal.path, reveal.kind === 'folder'));
+  }, [reveal, expand]);
 
   // The folder a new file or folder goes in opens, so its name box shows there.
   const createIn = creating?.parent ?? null;
   useEffect(() => {
     if (!createIn) return;
-    const needed = withParents(createIn).filter((folder) => !shown.has(folder));
-    if (needed.length) setOpenFolders(new Set([...shown, ...needed]));
-  }, [createIn, shown]);
-
-  const toggle = (folderPath: string) => {
-    const next = new Set(shown);
-    if (next.has(folderPath)) next.delete(folderPath);
-    else next.add(folderPath);
-    setOpenFolders(next);
-  };
+    const needed = withParents(createIn).filter((folder) => !open.has(folder));
+    if (needed.length) void expand(needed);
+  }, [createIn, open, expand]);
 
   const menuItems = (path: string, kind: FileEntryKind): RowMenuItem[] => [
     ...(kind === 'folder'
@@ -273,116 +185,180 @@ export function FileTree({
       </li>
     ) : null;
 
-  const renderFolder = (folder: FolderNode, depth: number) => (
-    <>
-      {newEntry(folder.path, depth)}
-      {folder.folders.map((child) => {
-        const row = compact(child);
-        const isOpen = shown.has(row.path);
-        const folderIcon = isOpen ? (
-          <FolderOpenIcon size={14} className="shrink-0 text-ft-folder" />
-        ) : (
-          <FolderTintIcon size={14} className="shrink-0 text-ft-folder" />
-        );
-        return (
-          <li key={row.path}>
-            {renaming === row.path ? (
-              <NameInput
-                name={lastPart(row.path)}
-                label={`New name for ${row.path}`}
-                isFile={false}
-                icon={folderIcon}
-                paddingLeft={10 + depth * INDENT_PX + 17}
-                onSubmit={rename(row.path)}
-                onCancel={() => setRenaming(null)}
-              />
-            ) : (
-              <div className="group/row relative">
-                <button
-                  type="button"
-                  onClick={() => toggle(row.path)}
-                  onContextMenu={(event) => {
-                    event.preventDefault();
-                    setMenuFor(row.path);
-                  }}
-                  draggable
-                  onDragStart={(event) => startPathDrag(event, absolutePath(root, row.path))}
-                  aria-expanded={isOpen}
-                  title={row.path}
-                  style={{ paddingLeft: 10 + depth * INDENT_PX }}
-                  className={`flex w-full items-center gap-1.5 py-[2px] pr-7 text-left font-explorer text-[13px] leading-[18px] text-ink transition-colors hover:bg-surface-2 ${
-                    isIgnored(row.path) ? IGNORED_ROW : ''
-                  }`}
-                >
-                  <ChevronRightIcon
-                    size={11}
-                    className={`shrink-0 text-ink-3 transition-transform ${isOpen ? 'rotate-90' : ''}`}
-                  />
-                  {folderIcon}
-                  <span className="min-w-0 truncate">{row.name}</span>
-                </button>
-                {rowMenu(row.path, 'folder')}
-              </div>
-            )}
-            {isOpen && (
-              <div className="relative">
-                <span
-                  aria-hidden
-                  style={{ left: 15 + depth * INDENT_PX }}
-                  className="absolute bottom-1 top-0 w-px bg-line-2"
-                />
-                <ul>{renderFolder(row, depth + 1)}</ul>
-              </div>
-            )}
-          </li>
-        );
-      })}
-      {folder.files.map((file) => {
-        const tint = fileTint(file.name);
-        const fileIcon = <FileTintIcon size={14} className={`shrink-0 ${tint.icon}`} />;
-        // Files line up with folder names: past the chevron's width.
-        const paddingLeft = 10 + depth * INDENT_PX + 17;
-        return (
-          <li key={file.path}>
-            {renaming === file.path ? (
-              <NameInput
-                name={file.name}
-                label={`New name for ${file.path}`}
-                isFile
-                icon={fileIcon}
-                paddingLeft={paddingLeft}
-                onSubmit={rename(file.path)}
-                onCancel={() => setRenaming(null)}
-              />
-            ) : (
-              <div className="group/row relative">
-                <button
-                  type="button"
-                  onClick={() => onOpen(file.path)}
-                  onContextMenu={(event) => {
-                    event.preventDefault();
-                    setMenuFor(file.path);
-                  }}
-                  draggable
-                  onDragStart={(event) => startPathDrag(event, absolutePath(root, file.path))}
-                  disabled={opening !== null}
-                  title={file.path}
-                  style={{ paddingLeft }}
-                  className={`flex w-full items-center gap-1.5 py-[2px] pr-7 text-left font-explorer text-[13px] leading-[18px] transition-colors hover:bg-accent-soft hover:text-accent-2 disabled:cursor-wait ${
-                    tint.isMuted ? 'text-ink-3' : 'text-ink-2'
-                  } ${isIgnored(file.path) ? IGNORED_ROW : ''}`}
-                >
-                  {opening === file.path ? <Spinner size={13} /> : fileIcon}
-                  <span className="min-w-0 truncate">{file.name}</span>
-                </button>
-                {rowMenu(file.path, 'file')}
-              </div>
-            )}
-          </li>
-        );
-      })}
-    </>
+  /** A note row inside a folder: loading, an error, or "Show more". */
+  const noteRow = (depth: number, children: ReactNode) => (
+    <li
+      style={{ paddingLeft: 10 + depth * INDENT_PX + 17 }}
+      className="flex items-center gap-1.5 py-[2px] pr-2 text-[12.5px] leading-[18px] text-ink-3"
+    >
+      {children}
+    </li>
   );
 
-  return <ul className="flex flex-col">{renderFolder(tree, 0)}</ul>;
+  const folderRow = (entry: FolderEntry, depth: number) => {
+    const row = compactRow(entry, folders);
+    const isOpen = open.has(row.path);
+    const folderIcon = isOpen ? (
+      <FolderOpenIcon size={14} className="shrink-0 text-ft-folder" />
+    ) : (
+      <FolderTintIcon size={14} className="shrink-0 text-ft-folder" />
+    );
+    return (
+      <li key={entry.path}>
+        {renaming === row.path ? (
+          <NameInput
+            name={lastPart(row.path)}
+            label={`New name for ${row.path}`}
+            isFile={false}
+            icon={folderIcon}
+            paddingLeft={10 + depth * INDENT_PX + 17}
+            onSubmit={rename(row.path)}
+            onCancel={() => setRenaming(null)}
+          />
+        ) : (
+          <div className="group/row relative">
+            <button
+              type="button"
+              onClick={() => (isOpen ? collapse(row.path) : void expand(row.chain))}
+              onContextMenu={(event) => {
+                event.preventDefault();
+                setMenuFor(row.path);
+              }}
+              draggable
+              onDragStart={(event) => startPathDrag(event, absolutePath(root, row.path))}
+              aria-expanded={isOpen}
+              title={entry.isGenerated ? `${row.path} (generated)` : row.path}
+              style={{ paddingLeft: 10 + depth * INDENT_PX }}
+              className={`flex w-full items-center gap-1.5 py-[2px] pr-7 text-left font-explorer text-[13px] leading-[18px] text-ink transition-colors hover:bg-surface-2 ${
+                isFaded(entry) ? FADED_ROW : ''
+              }`}
+            >
+              <ChevronRightIcon
+                size={11}
+                className={`shrink-0 text-ink-3 transition-transform ${isOpen ? 'rotate-90' : ''}`}
+              />
+              {folderIcon}
+              <span className="min-w-0 truncate">{row.name}</span>
+            </button>
+            {rowMenu(row.path, 'folder')}
+          </div>
+        )}
+        {isOpen && (
+          <div className="relative">
+            <span
+              aria-hidden
+              style={{ left: 15 + depth * INDENT_PX }}
+              className="absolute bottom-1 top-0 w-px bg-line-2"
+            />
+            <ul>{renderFolder(row.path, depth + 1)}</ul>
+          </div>
+        )}
+      </li>
+    );
+  };
+
+  const fileRow = (file: FolderEntry, depth: number) => {
+    const tint = fileTint(file.name);
+    const fileIcon = <FileTintIcon size={14} className={`shrink-0 ${tint.icon}`} />;
+    // Files line up with folder names: past the chevron's width.
+    const paddingLeft = 10 + depth * INDENT_PX + 17;
+    return (
+      <li key={file.path}>
+        {renaming === file.path ? (
+          <NameInput
+            name={file.name}
+            label={`New name for ${file.path}`}
+            isFile
+            icon={fileIcon}
+            paddingLeft={paddingLeft}
+            onSubmit={rename(file.path)}
+            onCancel={() => setRenaming(null)}
+          />
+        ) : (
+          <div className="group/row relative">
+            <button
+              type="button"
+              onClick={() => onOpen(file.path)}
+              onContextMenu={(event) => {
+                event.preventDefault();
+                setMenuFor(file.path);
+              }}
+              draggable
+              onDragStart={(event) => startPathDrag(event, absolutePath(root, file.path))}
+              disabled={opening !== null}
+              title={file.path}
+              style={{ paddingLeft }}
+              className={`flex w-full items-center gap-1.5 py-[2px] pr-7 text-left font-explorer text-[13px] leading-[18px] transition-colors hover:bg-accent-soft hover:text-accent-2 disabled:cursor-wait ${
+                tint.isMuted ? 'text-ink-3' : 'text-ink-2'
+              } ${isFaded(file) ? FADED_ROW : ''}`}
+            >
+              {opening === file.path ? <Spinner size={13} /> : fileIcon}
+              <span className="min-w-0 truncate">{file.name}</span>
+            </button>
+            {rowMenu(file.path, 'file')}
+          </div>
+        )}
+      </li>
+    );
+  };
+
+  /** A folder's rows: folders first, then files (the API sorts them), read so far. */
+  const renderFolder = (folderPath: string, depth: number) => {
+    const folder = folders[folderPath];
+    const entries = folder?.entries ?? [];
+    const remaining = folder ? folder.total - entries.length : 0;
+    return (
+      <>
+        {newEntry(folderPath, depth)}
+        {entries.map((entry) =>
+          entry.kind === 'folder' ? folderRow(entry, depth) : fileRow(entry, depth),
+        )}
+        {(!folder || (folder.isLoading && entries.length === 0)) &&
+          noteRow(
+            depth,
+            <>
+              <Spinner size={11} /> Loading…
+            </>,
+          )}
+        {folder?.error != null &&
+          noteRow(
+            depth,
+            <>
+              <span className="min-w-0 truncate text-danger" title={errorMessage(folder.error, '')}>
+                {errorMessage(folder.error, "Couldn't read this folder.")}
+              </span>
+              <button
+                type="button"
+                onClick={() => reload(folderPath)}
+                className="shrink-0 font-medium text-accent-2 hover:underline"
+              >
+                Try again
+              </button>
+            </>,
+          )}
+        {folder &&
+          !folder.error &&
+          !folder.isLoading &&
+          folder.total === 0 &&
+          folderPath !== '' &&
+          noteRow(depth, <span className="italic">Empty</span>)}
+        {remaining > 0 &&
+          !folder?.error &&
+          noteRow(
+            depth,
+            <button
+              type="button"
+              onClick={() => showMore(folderPath)}
+              disabled={folder?.isLoading}
+              className="flex items-center gap-1.5 font-medium text-accent-2 hover:underline disabled:cursor-wait disabled:opacity-70"
+            >
+              {folder?.isLoading && <Spinner size={11} />}
+              Show {remaining.toLocaleString()} more
+            </button>,
+          )}
+      </>
+    );
+  };
+
+  return <ul className="flex flex-col">{renderFolder('', 0)}</ul>;
 }

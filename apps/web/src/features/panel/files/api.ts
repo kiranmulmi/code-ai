@@ -7,6 +7,7 @@ import type {
   FileSearchMode,
   FileSearchResult,
   FileWrite,
+  FolderChildren,
   WorkspaceFiles,
 } from '@app/shared';
 import { buildQuery, jsonBody, request } from '../../../lib/api';
@@ -15,6 +16,18 @@ const path = (workspaceId: string) => `/workspaces/${encodeURIComponent(workspac
 
 export function fetchFiles(workspaceId: string): Promise<WorkspaceFiles> {
   return request<WorkspaceFiles>(path(workspaceId));
+}
+
+/** One folder of the tree ('' is the workspace folder), `limit` entries from `offset`. */
+export function fetchFolder(
+  workspaceId: string,
+  folderPath: string,
+  offset: number,
+  limit: number,
+): Promise<FolderChildren> {
+  return request<FolderChildren>(
+    `${path(workspaceId)}/children${buildQuery({ path: folderPath, offset, limit })}`,
+  );
 }
 
 /** Throws an `ApiError` with status 413 when the file is too big to preview. */

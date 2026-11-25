@@ -6,7 +6,7 @@ import {
   assertCanChange,
   isInAppData,
   findFilesByName,
-  listWorkspaceFiles,
+  readFolder,
   resolveInWorkspace,
   searchFileContents,
 } from '@app/agent';
@@ -21,6 +21,8 @@ import {
   type FileWrite,
   type FileSearchMode,
   type FileSearchResult,
+  type FolderChildren,
+  type FolderEntry,
   type WorkspaceFiles,
 } from '@app/shared';
 import {
@@ -33,10 +35,8 @@ import { runGit } from '../git/run-git.js';
 import { revealInFileManager } from './reveal.js';
 import type { WorkspacesService } from '../workspaces/workspaces.service.js';
 
-/** Enough for most projects; past it, the deepest files are the ones left out (see walk.ts). */
-const MAX_LISTED_FILES = FILES_PANEL.maxListedFiles;
-/** Ignored paths reported (a fully ignored folder counts once): plenty for the tree. */
-const MAX_IGNORED = FILES_PANEL.maxIgnored;
+/** A folder's entries sent at once by default; the panel asks for more. */
+const FOLDER_PAGE = FILES_PANEL.folderPage;
 const MAX_NAME_RESULTS = FILES_PANEL.maxNameResults;
 const MAX_CONTENT_MATCHES = FILES_PANEL.maxContentMatches;
 
@@ -112,35 +112,78 @@ async function relativeTo(folder: string, target: string): Promise<string> {
 }
 
 /**
- * What git ignores in the folder, relative to it (files, and folders ending in "/" when all
- * inside is ignored). Empty when it isn't in a repository or git isn't there.
+ * Which of `paths` (relative to the workspace folder) git ignores: one `git check-ignore`
+ * for a folder's page of entries. A folder inside an ignored one is ignored too, so opening
+ * node_modules dims everything in it. Empty when it isn't in a repository or git isn't there.
  */
-async function ignoredPaths(folder: string): Promise<string[]> {
+async function ignoredAmong(root: string, paths: string[]): Promise<Set<string>> {
+  if (paths.length === 0) return new Set();
   const result = await runGit(
-    folder,
-    ['ls-files', '--others', '--ignored', '--exclude-standard', '--directory', '-z'],
+    root,
+    ['check-ignore', '--stdin', '-z'],
     1_000_000,
+    paths.join('\0') + '\0',
   );
-  if (!result || result.code !== 0) return [];
-  return result.stdout
-    .split('\0')
-    .filter((entry) => entry && entry !== './')
-    .slice(0, MAX_IGNORED);
+  // 0: some are ignored; 1: none are; anything else: not a repository, or git failed.
+  if (!result || result.code !== 0) return new Set();
+  return new Set(result.stdout.split('\0').filter(Boolean));
 }
 
-export function createFilesService(workspaces: WorkspacesService) {
+/** One folder of the workspace (`requested` relative to it, '' for the top), a page of it. */
+async function folderChildren(
+  folder: string,
+  requested: string,
+  offset: number,
+  limit: number,
+): Promise<FolderChildren> {
+  const root = await fs.realpath(folder);
+  const target = await resolve(root, requested || '.');
+  const stat = await fs.stat(target).catch(() => null);
+  if (!stat) {
+    throw new NotFoundError(
+      `${requested || 'The workspace folder'} no longer exists. Refresh the list.`,
+    );
+  }
+  if (!stat.isDirectory()) throw new ValidationError(`${requested} is a file, not a folder.`);
+  const path = nodePath.relative(root, target).split(nodePath.sep).join('/');
+  const { entries, total } = await readFolder(target, { offset, limit });
+  const paths = entries.map((entry) => (path ? `${path}/${entry.name}` : entry.name));
+  const ignored = await ignoredAmong(root, paths);
   return {
+    path,
+    total,
+    entries: entries.map((entry, index): FolderEntry => {
+      const entryPath = paths[index] ?? entry.name;
+      return {
+        name: entry.name,
+        path: entryPath,
+        kind: entry.isDirectory ? 'folder' : 'file',
+        ...(entry.isGenerated ? { isGenerated: true } : {}),
+        ...(ignored.has(entryPath) ? { isIgnored: true } : {}),
+      };
+    }),
+  };
+}
+
+export function createFilesService(workspaces: Pick<WorkspacesService, 'require'>) {
+  return {
+    /** The workspace folder and its top level; deeper folders come from `children`. */
     async list(workspaceId: string): Promise<WorkspaceFiles> {
       const { path } = await workspaces.require(workspaceId);
       const isFolder = (await fs.stat(path).catch(() => null))?.isDirectory() ?? false;
-      if (!isFolder) {
-        return { path, files: [], emptyFolders: [], ignored: [], isTruncated: false };
-      }
-      const [listing, ignored] = await Promise.all([
-        listWorkspaceFiles(path, MAX_LISTED_FILES),
-        ignoredPaths(path),
-      ]);
-      return { path, ...listing, ignored };
+      if (!isFolder) return { path, root: { path: '', entries: [], total: 0 } };
+      return { path, root: await folderChildren(path, '', 0, FOLDER_PAGE) };
+    },
+
+    /** One folder's entries, read when the Files panel opens it (generated folders too). */
+    async children(
+      workspaceId: string,
+      requested: string,
+      offset: number,
+      limit: number,
+    ): Promise<FolderChildren> {
+      const { path } = await workspaces.require(workspaceId);
+      return folderChildren(path, requested, offset, limit);
     },
 
     /** File names, or lines inside files, that contain `query` (any case). */

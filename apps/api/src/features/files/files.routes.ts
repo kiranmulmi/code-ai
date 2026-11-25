@@ -7,6 +7,7 @@ import {
   fileRevealSchema,
   fileSearchQuerySchema,
   fileWriteSchema,
+  folderChildrenQuerySchema,
 } from '@app/shared';
 import { asyncHandler } from '../../lib/async-handler.js';
 import { param } from '../../lib/params.js';
@@ -20,6 +21,17 @@ export function filesRouter(files: FilesService): Router {
     '/workspaces/:workspaceId/files',
     asyncHandler(async (req, res) => {
       res.json({ data: await files.list(param(req, 'workspaceId')) });
+    }),
+  );
+
+  /** One folder of the tree, read when it's opened ('' is the workspace folder). */
+  router.get(
+    '/workspaces/:workspaceId/files/children',
+    asyncHandler(async (req, res) => {
+      const { path, offset, limit } = parse(folderChildrenQuerySchema, req.query);
+      res.json({
+        data: await files.children(param(req, 'workspaceId'), path, offset, limit),
+      });
     }),
   );
 
