@@ -7,7 +7,7 @@ import { APP_NAME } from '../../lib/brand';
 import { EarlierPlan } from '../panel/plan/EarlierPlan';
 import { ActivityCard } from './ActivityCard';
 import { activityGroups, activityStats } from './activityGroups';
-import { tokensText, type AgentTurn } from './conversation';
+import { answerText, tokensText, type AgentTurn } from './conversation';
 import { flowSections, type Block, type Section } from './flowSections';
 import type { PlacedPlan } from './planPlacement';
 import { ApprovalCard } from './ApprovalCard';
@@ -20,17 +20,6 @@ import { ToolSteps } from './ToolStep';
 /** Token counts that open the token breakdown: dotted underline, so they read as a link. */
 export const TOKENS_BUTTON =
   'rounded-sm underline decoration-line-strong decoration-dotted underline-offset-[3px] transition-colors hover:text-accent-2 hover:decoration-current hover:decoration-solid';
-
-/** The reply's answer text (not notes on the way to a tool call, nor errors), as Markdown. */
-function answerText(turn: AgentTurn): string {
-  return turn.flow
-    .flatMap((item) =>
-      item.kind === 'text' && !item.isInterim && !item.isError ? [item.text] : [],
-    )
-    .map((text) => text.trim())
-    .filter(Boolean)
-    .join('\n\n');
-}
 
 /** One fact in the reply's footer: a small icon, then its value. */
 function Stat({ icon, title, children }: { icon: ReactNode; title: string; children: ReactNode }) {
@@ -261,12 +250,21 @@ export function AgentMessage({
             {null}
           </ActivityCard>
         )}
-        {turn.liveMeta && !turn.meta && (
-          <p
-            className="text-[11px] tabular-nums text-ink-4"
-            title="This reply's model calls and tokens so far"
-          >
-            {turn.liveMeta}
+        {!turn.meta && (turn.liveMeta || runStartedAt !== null) && (
+          <p className="flex flex-wrap items-center gap-x-1.5 text-[11px] tabular-nums text-ink-4">
+            {turn.liveMeta && (
+              <span title="This reply's model calls and tokens so far">{turn.liveMeta}</span>
+            )}
+            {turn.liveMeta && runStartedAt !== null && <span aria-hidden>·</span>}
+            {runStartedAt !== null && (
+              <span
+                title="Time taken so far, since the message was sent"
+                className="inline-flex items-center gap-1"
+              >
+                <ClockIcon size={10} />
+                <ElapsedTime startedAt={runStartedAt} />
+              </span>
+            )}
           </p>
         )}
         {isFinished && (

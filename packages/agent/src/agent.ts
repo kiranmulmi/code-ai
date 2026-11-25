@@ -39,6 +39,7 @@ import {
   LIMIT_SUMMARY_PROMPT,
   attachmentContext,
   pickedSkillsContext,
+  VOICE_CONTEXT,
   renderSkills,
   imagesShownMessage,
   memoryContext,
@@ -209,6 +210,8 @@ export interface RunInput {
   attachments?: readonly Attachment[];
   /** skills the user picked for this message: they come with it in full */
   skills?: readonly Skill[];
+  /** sent from voice mode: the reply is heard, so the agent writes `<spoken>` parts */
+  voice?: boolean;
 }
 
 export interface Agent {
@@ -660,7 +663,7 @@ export function createAgent(options: AgentOptions): Agent {
 
   async function run(
     prompt: string,
-    { attachments = [], skills = [] }: RunInput = {},
+    { attachments = [], skills = [], voice = false }: RunInput = {},
   ): Promise<RunResult> {
     const budget = new Budget(config);
     const startedAt = Date.now();
@@ -732,6 +735,7 @@ export function createAgent(options: AgentOptions): Agent {
       typed,
       attachments.length ? attachmentContext(attachments) : null,
       skills.length ? pickedSkillsContext(skills) : null,
+      voice ? VOICE_CONTEXT : null,
     ]
       .filter(Boolean)
       .join('\n\n');

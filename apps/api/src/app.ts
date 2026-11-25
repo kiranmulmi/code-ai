@@ -46,6 +46,8 @@ import { createRunsService } from './features/runs/runs.service.js';
 import { settingsRouter } from './features/settings/settings.routes.js';
 import { workspacesRouter } from './features/workspaces/workspaces.routes.js';
 import { createWorkspacesService } from './features/workspaces/workspaces.service.js';
+import { voiceRouter } from './features/voice/voice.routes.js';
+import { createVoiceService } from './features/voice/voice.service.js';
 import { httpLogOptions } from './http-logging.js';
 import { NotFoundError } from './lib/errors.js';
 import { logger } from './logger.js';
@@ -82,6 +84,9 @@ export function createApp(context: AppContext) {
             'blob:',
             ...(context.auth.config.isEnabled ? ['https://*.googleusercontent.com'] : []),
           ],
+          // blob: lets voice chat play the spoken reply (audio from the server, played from a
+          // blob: URL). Without it media falls back to default-src 'self' and playback fails.
+          'media-src': ["'self'", 'blob:'],
           // The web app signs in with Supabase straight from the browser.
           'connect-src': [
             "'self'",
@@ -121,6 +126,7 @@ export function createApp(context: AppContext) {
   v1.use(skillsRouter(skills));
   v1.use(agentsRouter(createAgentsService(context, workspaces)));
   v1.use(notesRouter(createNotesService(context, workspaces)));
+  v1.use(voiceRouter(createVoiceService(context, workspaces)));
   v1.use(mcpRouter(createMcpService(context, workspaces)));
   v1.use(pluginsRouter(createPluginsService(context, workspaces, models)));
   v1.use(filesRouter(files));

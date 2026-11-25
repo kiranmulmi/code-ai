@@ -1,4 +1,4 @@
-import type { PlanStep, StepStatus } from '@app/shared';
+import { withoutSpokenTags, type PlanStep, type StepStatus } from '@app/shared';
 import { Markdown } from '../../components/Markdown';
 import { BulbIcon, CheckIcon, CrossIcon, DashIcon, FlagIcon } from '../../lib/icons';
 import { STATUS_LABEL } from '../panel/plan/planState';
@@ -9,8 +9,8 @@ import { useSmoothText } from './useSmoothText';
 
 /** Text the agent wrote on its way to a tool call: its running commentary. */
 export function NarrationEntry({ item }: { item: TextItem }) {
-  const smooth = useSmoothText(item.text, item.isOpen);
-  if (!item.text) return null;
+  const smooth = useSmoothText(withoutSpokenTags(item.text), item.isOpen);
+  if (!item.text.trim()) return null;
   return (
     <TimelineEntry node={<DotNode tone={item.isOpen ? 'accent' : 'muted'} />} className="py-1">
       <div className="narration pr-3 pt-[2px] text-[13px] leading-[1.55] text-ink-2 [overflow-wrap:anywhere]">

@@ -44,6 +44,7 @@ export function createRunsService(
       reasoningEffort,
       autoApprove = false,
       skills: skillNames = [],
+      voice = false,
     }: RunRequest) {
       const workspace = await workspaces.require(workspaceId);
       const existing = chatId ? await chats.require(chatId, workspace.id) : null;
@@ -115,6 +116,7 @@ export function createRunsService(
             prompt: message,
             attachments: files,
             skills: picked,
+            voice,
             mcp,
             tasks,
             agentOptions: {

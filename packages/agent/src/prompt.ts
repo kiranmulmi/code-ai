@@ -354,6 +354,19 @@ export function pickedSkillsContext(skills: readonly Skill[]): string {
 }
 
 /**
+ * Put after a message sent from voice mode: the user hears the reply instead of reading it, so
+ * the agent writes what is worth saying in `<spoken>` blocks (short, plain speech), as Cursor's
+ * coding agent does in a voice call. Everything else stays on screen as usual.
+ */
+export const VOICE_CONTEXT = `[The user is in a voice conversation with you: they spoke this message and hear your replies read aloud. Added by the agent framework]
+Only text inside <spoken>...</spoken> is read aloud; everything else stays on screen as usual.
+- While working on a longer task, you may add a short <spoken> progress note (one sentence) before a tool call, only when something worth saying happened. Not before every call.
+- Start your final answer with one <spoken> block: a brief spoken reply of one to three sentences, like talking to a colleague: the outcome and what matters, not the details.
+- Spoken text is plain speech: no Markdown, code, file paths, URLs, lists or symbols. Say numbers and names the way you would say them aloud.
+- After the spoken block, write the full answer as you normally would (details, code, tables). If the spoken block already says everything, add nothing.
+[End of voice note]`;
+
+/**
  * A message the user sent while the agent was working on their request. It reaches the model
  * at the next step, so it says what it is: an addition or a correction to the task under way.
  */

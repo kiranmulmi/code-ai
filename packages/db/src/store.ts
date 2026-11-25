@@ -13,6 +13,9 @@ import {
   type McpConfig,
   type McpServerConfig,
   type ToolGroup,
+  type WorkspaceVoice,
+  type WorkspaceVoiceInput,
+  workspaceVoiceSchema,
   type Workspace,
   type WorkspaceGroup,
   type WorkspacePlanning,
@@ -108,6 +111,7 @@ export class Store {
     disabledTools = [...DEFAULT_DISABLED_TOOLS],
     hasTerminalTab = true,
     hasGitTab = true,
+    voice = null,
   }: {
     name: string;
     path: string;
@@ -116,6 +120,7 @@ export class Store {
     disabledTools?: ToolGroup[];
     hasTerminalTab?: boolean;
     hasGitTab?: boolean;
+    voice?: WorkspaceVoiceInput | null;
   }): Promise<Workspace> {
     const clean = checkName(name);
     const cleanInstructions = checkInstructions(instructions);
@@ -129,8 +134,9 @@ export class Store {
       instructions: cleanInstructions,
       planning,
       disabledTools,
-        hasTerminalTab,
+      hasTerminalTab,
       hasGitTab,
+      voice: toVoice(voice),
     });
     return toWorkspace(await this.#workspaces.add(clean, folder));
   }
@@ -147,8 +153,9 @@ export class Store {
       instructions,
       planning,
       disabledTools,
-        hasTerminalTab,
+      hasTerminalTab,
       hasGitTab,
+      voice,
       groupId,
     }: {
       name?: string;
@@ -156,8 +163,10 @@ export class Store {
       instructions?: string;
       planning?: WorkspacePlanning;
       disabledTools?: ToolGroup[];
-        hasTerminalTab?: boolean;
+      hasTerminalTab?: boolean;
       hasGitTab?: boolean;
+      /** Speech to text; null turns it off. */
+      voice?: WorkspaceVoiceInput | null;
       /** The sidebar folder to file it in; null for the top level. */
       groupId?: string | null;
     },
@@ -185,6 +194,7 @@ export class Store {
         ...(disabledTools !== undefined ? { disabledTools } : {}),
         ...(hasTerminalTab !== undefined ? { hasTerminalTab } : {}),
         ...(hasGitTab !== undefined ? { hasGitTab } : {}),
+        ...(voice !== undefined ? { voice: toVoice(voice) } : {}),
       };
       if (Object.keys(settings).length) await to.writeSettings(settings);
       // Only filing it in a sidebar folder isn't an edit: it keeps its place in the list.
@@ -521,7 +531,7 @@ async function toWorkspace(
   { withChatCount = false }: { withChatCount?: boolean } = {},
 ): Promise<Workspace> {
   const data = new WorkspaceData(row.path, row.name);
-  const { instructions, planning, disabledTools, hasTerminalTab, hasGitTab } =
+  const { instructions, planning, disabledTools, hasTerminalTab, hasGitTab, voice } =
     await data.readSettings();
   return {
     id: row.id,
@@ -531,6 +541,7 @@ async function toWorkspace(
     disabledTools,
     hasTerminalTab,
     hasGitTab,
+    voice,
     path: row.path,
     groupId: row.groupId,
     createdAt: row.createdAt,
@@ -542,6 +553,11 @@ async function toWorkspace(
         }
       : {}),
   };
+}
+
+/** A voice setting as saved: the schema's defaults filled in (no language: the server detects it). */
+function toVoice(voice: WorkspaceVoiceInput | null): WorkspaceVoice | null {
+  return voice ? workspaceVoiceSchema.parse(voice) : null;
 }
 
 function toWorkspaceGroup(row: SavedWorkspaceGroup): WorkspaceGroup {

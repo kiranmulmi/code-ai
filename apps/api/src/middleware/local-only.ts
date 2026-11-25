@@ -10,8 +10,20 @@ export function localHostOnly(req: Request, _res: Response, next: NextFunction):
 
 const BODY_METHODS = new Set(['POST', 'PUT', 'PATCH']);
 
+/**
+ * Paths that take a raw audio recording instead of JSON (speech to text). An audio content
+ * type isn't one a plain form can send, so a browser preflights it (CORS) like JSON.
+ */
+const AUDIO_PATHS = new Set(['/v1/voice/transcriptions']);
+
 /** Requiring JSON on writes blocks plain HTML form posts from other websites. */
 export function requireJson(req: Request, _res: Response, next: NextFunction): void {
-  const isJson = req.headers['content-type']?.startsWith('application/json') ?? false;
-  next(BODY_METHODS.has(req.method) && !isJson ? new UnsupportedMediaTypeError() : undefined);
+  const type = req.headers['content-type'] ?? '';
+  const isJson = type.startsWith('application/json');
+  const isAudio = AUDIO_PATHS.has(req.path) && /^(audio\/|video\/(webm|mp4))/i.test(type);
+  next(
+    BODY_METHODS.has(req.method) && !isJson && !isAudio
+      ? new UnsupportedMediaTypeError()
+      : undefined,
+  );
 }

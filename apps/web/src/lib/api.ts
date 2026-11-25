@@ -78,6 +78,13 @@ export async function requestBlob(path: string): Promise<Blob> {
   return res.blob();
 }
 
+/** Like `requestBlob`, for a request with a body (audio a POST answers with, say). */
+export async function requestBlobWith(path: string, init: RequestInit): Promise<Blob> {
+  const res = await send(path, init);
+  if (!res.ok) throw await toApiError(res);
+  return res.blob();
+}
+
 /** A JSON request body for `request`. */
 export function jsonBody(method: 'POST' | 'PUT' | 'PATCH', body: unknown): RequestInit {
   return { method, body: JSON.stringify(body) };

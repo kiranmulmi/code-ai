@@ -225,6 +225,11 @@ export const runRequestSchema = z
       .array(skillNameSchema)
       .max(SKILL_LIMITS.perMessage, `Pick at most ${SKILL_LIMITS.perMessage} skills.`)
       .optional(),
+    /**
+     * Sent from voice mode: the user hears the reply. The agent then writes what is to be said
+     * aloud in `<spoken>` blocks (see `SPOKEN_TAG`), and voice mode reads only those.
+     */
+    voice: z.boolean().optional(),
   })
   .refine((run) => run.message.trim() !== '' || (run.attachmentIds?.length ?? 0) > 0, {
     message: 'Type a message first.',

@@ -167,7 +167,8 @@ function createWindow(): void {
 }
 
 /**
- * Only this app's own page gets permissions (e.g. the clipboard for copy buttons). Without a
+ * Only this app's own page gets permissions (e.g. the clipboard for copy buttons, the
+ * microphone for speech to text). Without a
  * handler Electron would grant every request, from any page.
  */
 function limitPermissionsToApp(): void {

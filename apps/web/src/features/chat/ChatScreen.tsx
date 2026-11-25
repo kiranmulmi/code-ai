@@ -414,9 +414,10 @@ export function ChatScreen({
                     )}
                   </div>
                 }
-                onSend={(text, attachments) =>
+                onSend={(text, attachments, options) =>
                   void conversation.send(text, {
                     attachments,
+                    voice: options?.voice,
                     autoApprove: info.data?.approval === 'ask' && autoApprove,
                     modelId: choice.model?.id,
                     reasoningEffort:

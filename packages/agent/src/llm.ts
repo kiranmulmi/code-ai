@@ -2,7 +2,7 @@
 // API, which OpenAI and many other servers speak (Ollama, OpenRouter, Groq,
 // LM Studio, vLLM, Together, DeepSeek, ...). Models are set up in the app's
 // Settings -> Models and passed in per run as ModelSettings.
-import OpenAI from 'openai';
+import OpenAI, { toFile } from 'openai';
 import type {
   ChatCompletionContentPart,
   ChatCompletionCreateParamsStreaming,
@@ -355,6 +355,147 @@ function describeApiError(error: unknown, config: ModelSettings, hasImages: bool
     // Errors sent inside the stream have no status: leave it out rather than say "undefined".
     const status = error.status === undefined ? '' : ` ${error.status}`;
     return new Error(`Model server error${status}: ${error.message}`, { cause: error });
+  }
+  return error;
+}
+
+/** One recording to turn into text. */
+export interface AudioClip {
+  data: Buffer;
+  /** e.g. audio/webm;codecs=opus */
+  mimeType: string;
+  /** with the extension the server reads the format from, e.g. recording.webm */
+  filename: string;
+}
+
+/**
+ * Speech to text on the server of `config` (its base URL and API key), with the transcription
+ * model `model` (`whisper-1`, ...), through `/audio/transcriptions`. `language` (ISO-639-1,
+ * e.g. `en`) helps accuracy; empty lets the server detect it. Returns the text, trimmed.
+ */
+export async function transcribeAudio(
+  config: Pick<ModelSettings, 'label' | 'baseURL' | 'apiKey'>,
+  audio: AudioClip,
+  model: string,
+  { language, signal }: { language?: string; signal?: AbortSignal } = {},
+): Promise<string> {
+  const client = new OpenAI({
+    apiKey: config.apiKey || 'not-set',
+    baseURL: config.baseURL,
+    maxRetries: 1,
+  });
+  try {
+    const result = await client.audio.transcriptions.create(
+      {
+        file: await toFile(audio.data, audio.filename, { type: audio.mimeType }),
+        model,
+        ...(language ? { language } : {}),
+      },
+      { signal },
+    );
+    return result.text.trim();
+  } catch (error) {
+    if (signal?.aborted) throw new StoppedError();
+    throw describeTranscriptionError(error, config, model);
+  }
+}
+
+/**
+ * Text to speech on the server of `config`, with the speech model `model` (`gpt-4o-mini-tts`,
+ * `tts-1`, a local Kokoro / Piper server's name, ...) and `voice` (`alloy`, ...), through
+ * `/audio/speech`. Returns the audio as mp3.
+ */
+export async function synthesizeSpeech(
+  config: Pick<ModelSettings, 'label' | 'baseURL' | 'apiKey'>,
+  text: string,
+  model: string,
+  voice: string,
+  { instructions, signal }: { instructions?: string; signal?: AbortSignal } = {},
+): Promise<Buffer> {
+  const client = new OpenAI({
+    apiKey: config.apiKey || 'not-set',
+    baseURL: config.baseURL,
+    maxRetries: 1,
+  });
+  try {
+    const response = await client.audio.speech.create(
+      {
+        model,
+        voice,
+        input: text,
+        response_format: 'mp3',
+        // Only the gpt-4o TTS models take a speaking style; others reject the field.
+        ...(instructions && /gpt-4o/i.test(model) ? { instructions } : {}),
+      },
+      { signal },
+    );
+    return Buffer.from(await response.arrayBuffer());
+  } catch (error) {
+    if (signal?.aborted) throw new StoppedError();
+    throw describeSpeechError(error, config, model, voice);
+  }
+}
+
+function describeSpeechError(
+  error: unknown,
+  config: Pick<ModelSettings, 'label' | 'baseURL'>,
+  model: string,
+  voice: string,
+): unknown {
+  const where = config.baseURL || 'https://api.openai.com/v1';
+  if (error instanceof OpenAI.NotFoundError) {
+    return new Error(
+      `${where} doesn't support text to speech, or has no model "${model}". Pick a server with /audio/speech (OpenAI, a local Kokoro or Piper server, …). ${error.message}`,
+      { cause: error },
+    );
+  }
+  if (error instanceof OpenAI.BadRequestError) {
+    return new Error(
+      `The speech server rejected the request (model "${model}", voice "${voice}"): ${error.message}`,
+      { cause: error },
+    );
+  }
+  // The rest read the same as for transcription.
+  return describeTranscriptionError(error, config, model);
+}
+
+function describeTranscriptionError(
+  error: unknown,
+  config: Pick<ModelSettings, 'label' | 'baseURL'>,
+  model: string,
+): unknown {
+  const where = config.baseURL || 'https://api.openai.com/v1';
+  if (error instanceof OpenAI.AuthenticationError) {
+    return new Error(
+      `Authentication failed at ${where}: check the API key of "${config.label}" in Settings → Models.`,
+      { cause: error },
+    );
+  }
+  if (error instanceof OpenAI.NotFoundError) {
+    return new Error(
+      `${where} doesn't support speech to text, or has no model "${model}". Pick a server with /audio/transcriptions (OpenAI, Groq, a local whisper server). ${error.message}`,
+      { cause: error },
+    );
+  }
+  if (error instanceof OpenAI.RateLimitError) {
+    return new Error(
+      `The speech server is rate limited: ${error.message} Wait a bit and try again.`,
+      {
+        cause: error,
+      },
+    );
+  }
+  if (error instanceof OpenAI.BadRequestError) {
+    return new Error(`The speech server rejected the audio: ${error.message}`, { cause: error });
+  }
+  if (error instanceof OpenAI.APIConnectionError) {
+    return new Error(`Could not reach ${where}. Is the server running and the URL right?`, {
+      cause: error,
+    });
+  }
+  if (error instanceof OpenAI.APIError) {
+    const status = error.status === undefined ? '' : ` ${error.status}`;
+    return new Error(`Speech server error${status}: ${error.message}`, { cause: error });
   }
   return error;
 }

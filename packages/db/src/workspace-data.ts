@@ -6,7 +6,7 @@
 //     .gitignore                  "*", so chat history never ends up in the project's git
 //     <workspace>/                one workspace's data, e.g. "Client Site / v2" -> client-site-v2/
 //       .gitignore                  "*" again, so the subfolder stays out of git if moved on its own
-//       settings.json               { instructions, planning, disabledTools, hasTerminalTab, hasGitTab }
+//       settings.json               { instructions, planning, disabledTools, hasTerminalTab, hasGitTab, voice }
 //       mcp.json                    which of the app's MCP servers are on here (workspace-mcp.ts)
 //       memory.json                 long-term memory (LongTermMemory from @app/agent)
 //       chats/<id>/chat.json        title, current and earlier plans, the memory list the model last saw
@@ -32,6 +32,7 @@ import {
   STEP_STATUSES,
   groupTokens,
   TOOL_GROUPS,
+  workspaceVoiceSchema,
   WORKSPACE_PLANNING,
   workspaceSlug,
   chatSettingsSchema,
@@ -148,6 +149,8 @@ const settingsSchema = z.preprocess(
       .transform((groups) => [...new Set(groups.filter(isToolGroup))]),
     hasTerminalTab: z.boolean().catch(false).default(false),
     hasGitTab: z.boolean().catch(false).default(false),
+    // Speech to text for the mic button; a hand-edited value the app can't read turns it off.
+    voice: workspaceVoiceSchema.nullable().catch(null).default(null),
   }),
 );
 export type WorkspaceSettings = z.infer<typeof settingsSchema>;
@@ -157,6 +160,7 @@ const DEFAULT_SETTINGS: WorkspaceSettings = {
   disabledTools: [],
   hasTerminalTab: false,
   hasGitTab: false,
+  voice: null,
 };
 
 const planSchema = z.object({

@@ -701,3 +701,61 @@ export function NoteIcon({ size = 14, ...rest }: IconProps) {
     </svg>
   );
 }
+
+/** A microphone: speech to text. */
+export function MicIcon({ size = 16, ...rest }: IconProps) {
+  return (
+    <svg {...base(size)} {...rest}>
+      <rect x="5.75" y="1.75" width="4.5" height="8" rx="2.25" />
+      <path d="M3.25 7.5a4.75 4.75 0 0 0 9.5 0M8 12.25v2" />
+    </svg>
+  );
+}
+
+/** A microphone struck through: the mic is muted. */
+export function MicOffIcon({ size = 16, ...rest }: IconProps) {
+  return (
+    <svg {...base(size)} {...rest}>
+      <path d="M10.25 6.5V4a2.25 2.25 0 0 0-4.4-.67M5.75 6.25V7.5a2.25 2.25 0 0 0 3.6 1.8" />
+      <path d="M3.25 7.5a4.75 4.75 0 0 0 7.6 3.8M12.6 8.6c.1-.36.15-.73.15-1.1M8 12.25v2M2 2l12 12" />
+    </svg>
+  );
+}
+
+/** Sound bars: voice mode (talk with the agent hands-free). */
+export function WaveformIcon({ size = 16, ...rest }: IconProps) {
+  return (
+    <svg {...base(size)} {...rest}>
+      <path d="M2 7v2M5 5v6M8 2.5v11M11 5v6M14 7v2" />
+    </svg>
+  );
+}
+
+/** A handset put down: end the voice chat. */
+export function HangUpIcon({ size = 16, ...rest }: IconProps) {
+  return (
+    <svg {...base(size)} {...rest}>
+      <path d="M1.9 9.6c-.3-.5-.2-1.1.2-1.5C3.6 6.7 5.7 5.9 8 5.9s4.4.8 5.9 2.2c.4.4.5 1 .2 1.5l-.7 1.1c-.3.5-.9.6-1.4.4l-1.6-.7a1 1 0 0 1-.6-.9V8.4a7 7 0 0 0-3.6 0v1.1a1 1 0 0 1-.6.9l-1.6.7c-.5.2-1.1.1-1.4-.4z" />
+    </svg>
+  );
+}
+
+/** A speaker: replies are read aloud. */
+export function SpeakerIcon({ size = 16, ...rest }: IconProps) {
+  return (
+    <svg {...base(size)} {...rest}>
+      <path d="M2.5 6.25h2.25L8 3.5v9L4.75 9.75H2.5z" />
+      <path d="M10.5 5.75a3.2 3.2 0 0 1 0 4.5M12.4 3.9a5.8 5.8 0 0 1 0 8.2" />
+    </svg>
+  );
+}
+
+/** A speaker struck through: replies aren't read aloud. */
+export function SpeakerOffIcon({ size = 16, ...rest }: IconProps) {
+  return (
+    <svg {...base(size)} {...rest}>
+      <path d="M2.5 6.25h2.25L8 3.5v9L4.75 9.75H2.5z" />
+      <path d="M10.75 6.25l3.5 3.5M14.25 6.25l-3.5 3.5" />
+    </svg>
+  );
+}

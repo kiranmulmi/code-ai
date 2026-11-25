@@ -50,8 +50,24 @@ import {
 } from './AgentChoices';
 import { fetchMcpEnabled, fetchMcpServers, saveMcpEnabled } from '../mcp/api';
 import { APP_NAME } from '../../lib/brand';
+import { EMPTY_VOICE_DRAFT, VoiceSettings, type VoiceDraft } from '../voice/VoiceSettings';
 
-type FieldErrors = { name?: string; path?: string };
+type FieldErrors = {
+  name?: string;
+  path?: string;
+  modelId?: string;
+  transcriptionModel?: string;
+  language?: string;
+  speechModel?: string;
+  speechVoice?: string;
+};
+const VOICE_FIELDS = [
+  'modelId',
+  'transcriptionModel',
+  'language',
+  'speechModel',
+  'speechVoice',
+] as const;
 
 /** Wait for a pause in typing before asking whether the folder is free. */
 const FOLDER_CHECK_DELAY_MS = WEB_APP.folderCheckDelayMs;
@@ -60,12 +76,14 @@ const TABS = [
   { id: 'general', label: 'General' },
   { id: 'agent', label: 'Planning & tools' },
   { id: 'mcp', label: 'MCP servers' },
+  { id: 'voice', label: 'Voice' },
 ] as const;
 type FormTab = (typeof TABS)[number]['id'];
 
 /** The tab holding the first field with an error, so a failed save shows it. */
 function tabWithError(errors: FieldErrors): FormTab | null {
   if (errors.name || errors.path) return 'general';
+  if (VOICE_FIELDS.some((field) => errors[field])) return 'voice';
   return null;
 }
 
@@ -75,6 +93,15 @@ function toFieldErrors(issues: ReadonlyArray<{ path: PropertyKey[]; message: str
     const field = issue.path[0];
     if ((field === 'name' || field === 'path') && !errors[field]) {
       errors[field] = issue.message;
+    }
+    // voice.modelId, voice.transcriptionModel, voice.language, voice.speechModel, …
+    const voiceField = issue.path[1];
+    if (
+      field === 'voice' &&
+      VOICE_FIELDS.some((name) => name === voiceField) &&
+      !errors[voiceField as (typeof VOICE_FIELDS)[number]]
+    ) {
+      errors[voiceField as (typeof VOICE_FIELDS)[number]] = issue.message;
     }
   }
   return errors;
@@ -121,6 +148,16 @@ export function WorkspaceFormPage() {
   const [disabledTools, setDisabledTools] = useState<ToolGroup[]>([...DEFAULT_DISABLED_TOOLS]);
   const [hasTerminalTab, setHasTerminalTab] = useState(true);
   const [hasGitTab, setHasGitTab] = useState(true);
+  const [voice, setVoice] = useState<VoiceDraft>(EMPTY_VOICE_DRAFT);
+  const changeVoice = (next: Partial<VoiceDraft>) => {
+    setVoice((current) => ({ ...current, ...next }));
+    setErrors((current) => ({
+      ...current,
+      modelId: undefined,
+      transcriptionModel: undefined,
+      language: undefined,
+    }));
+  };
   // MCP servers: the app's list, and which are on here (saved to mcp.json after the workspace).
   const [mcpServers, setMcpServers] = useState<McpServerEntry[] | null>(null);
   const [mcpError, setMcpError] = useState<string | null>(null);
@@ -181,6 +218,7 @@ export function WorkspaceFormPage() {
         setDisabledTools(workspace.disabledTools);
         setHasTerminalTab(workspace.hasTerminalTab);
         setHasGitTab(workspace.hasGitTab);
+        setVoice(workspace.voice ? { isOn: true, ...workspace.voice } : EMPTY_VOICE_DRAFT);
       })
       .catch((cause: unknown) => {
         if (!isCurrent) return;
@@ -312,6 +350,19 @@ export function WorkspaceFormPage() {
   const submit = (event: FormEvent) => {
     event.preventDefault();
     if (folderProblem) return showErrors({ path: folderProblem });
+    // Off saves null; on needs a server and a transcription model (checked by the schema).
+    const voicePayload = voice.isOn
+      ? {
+          modelId: voice.modelId,
+          transcriptionModel: voice.transcriptionModel,
+          language: voice.language,
+          speechModel: voice.speechModel,
+          speechVoice: voice.speechVoice,
+        }
+      : null;
+    if (voice.isOn && !voice.modelId) {
+      return showErrors({ modelId: 'Pick the server that turns speech into text.' });
+    }
     if (workspaceId) {
       const parsed = workspaceUpdateSchema.safeParse({
         name,
@@ -320,6 +371,7 @@ export function WorkspaceFormPage() {
         disabledTools,
         hasTerminalTab,
         hasGitTab,
+        voice: voicePayload,
       });
       if (!parsed.success) return showErrors(toFieldErrors(parsed.error.issues));
       void save(() => updateWorkspace(workspaceId, parsed.data), 'Workspace saved');
@@ -331,6 +383,7 @@ export function WorkspaceFormPage() {
         disabledTools,
         hasTerminalTab,
         hasGitTab,
+        voice: voicePayload,
       });
       if (!parsed.success) return showErrors(toFieldErrors(parsed.error.issues));
       void save(() => createWorkspace(parsed.data), 'Workspace created');
@@ -618,6 +671,22 @@ export function WorkspaceFormPage() {
                   )}
                 </div>
               </Field>
+            </div>
+
+            <div {...panelProps('voice')}>
+              <div className={SECTION}>
+                <VoiceSettings
+                  value={voice}
+                  onChange={changeVoice}
+                  errors={{
+                    modelId: errors.modelId,
+                    transcriptionModel: errors.transcriptionModel,
+                    language: errors.language,
+                    speechModel: errors.speechModel,
+                    speechVoice: errors.speechVoice,
+                  }}
+                />
+              </div>
             </div>
           </div>
         </form>

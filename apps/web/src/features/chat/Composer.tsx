@@ -19,6 +19,11 @@ import { ChatUsageLine } from './ChatUsageLine';
 import type { ConversationState } from './conversation';
 import type { ReturnedDraft } from './useConversation';
 import { useDraftAttachments } from './useDraftAttachments';
+import { DictationButton } from '../voice/DictationButton';
+import { RecordingBar } from '../voice/RecordingBar';
+import { useDictation } from '../voice/useDictation';
+import type { VoiceMode } from '../voice/useVoiceMode';
+import { VoiceModeButton } from '../voice/VoiceModeButton';
 
 const MAX_HEIGHT = 240;
 
@@ -48,6 +53,8 @@ export function Composer({
   onStop,
   onSteer,
   restoreDraft = null,
+  isVoiceOn = false,
+  voice,
 }: {
   workspaceId: string;
   disabled: boolean;
@@ -76,6 +83,10 @@ export function Composer({
   onSteer?: (text: string) => void;
   /** Text to put back in the box (a message the agent didn't read), before what's typed. */
   restoreDraft?: ReturnedDraft | null;
+  /** The workspace has speech to text set up: the mic records and transcribes. */
+  isVoiceOn?: boolean;
+  /** Voice mode (hands-free voice chat), started by the waveform button. */
+  voice?: VoiceMode;
 }) {
   const [value, setValue] = useState('');
   // Files or folders being dragged over the box: dropping them inserts their paths.
@@ -199,6 +210,27 @@ export function Composer({
       box?.setSelectionRange(caret, caret);
     });
   };
+
+  /** Dictated text sent straight away (the send arrow while recording), after what's typed. */
+  const sendDictated = (text: string) => {
+    const message = value.trim() ? `${value.trimEnd()} ${text}` : text;
+    if (isSteering) {
+      if (disabled || isStopping) return insertAtCaret(text);
+      onSteer(message);
+    } else {
+      if (disabled || !hasModel || files.isUploading) return insertAtCaret(text);
+      onSend(message, files.ready);
+      files.clear();
+    }
+    setValue('');
+    setBeforeImprove(null);
+    setImproveError(null);
+  };
+  const dictation = useDictation({ workspaceId, onText: insertAtCaret, onSend: sendDictated });
+  const isDictating = dictation.state !== 'idle' && dictation.state !== 'starting';
+  const canSendDictated = isSteering
+    ? !disabled && !isStopping
+    : !disabled && hasModel && !files.isUploading;
 
   return (
     <form onSubmit={submit} className="shrink-0 px-4 pb-4 pt-2 sm:px-6">
@@ -349,58 +381,80 @@ export function Composer({
                 Undo
               </button>
             )}
-            <span aria-hidden className="mx-1 h-4 w-px bg-line" />
-            <div className="min-w-0">{controls}</div>
-          </div>
-          <div className="flex shrink-0 items-center gap-1.5">
-            {isSteering && value.trim() && (
-              <button
-                type="submit"
-                disabled={!canSubmit}
-                aria-label="Send to the agent now"
-                title={
-                  files.ready.length
-                    ? 'Send the text now: the agent reads it before its next step. Files wait for your next message.'
-                    : 'Send now: the agent reads it before its next step'
-                }
-                className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-xl bg-accent pl-3 pr-3.5 text-[13px] font-medium text-on-accent shadow-accent transition-[background-color,transform] hover:bg-accent-hover enabled:hover:-translate-y-px disabled:cursor-not-allowed disabled:bg-surface-2 disabled:text-ink-4 disabled:shadow-none"
-              >
-                <SendIcon size={14} />
-                <span className="hidden sm:inline">Send now</span>
-              </button>
-            )}
-            {isRunning && onStop ? (
-              <button
-                type="button"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onStop();
-                }}
-                disabled={isStopping}
-                aria-label={isStopping ? 'Stopping' : 'Stop the agent'}
-                title={isStopping ? 'Stopping…' : 'Stop the agent'}
-                className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-ink text-surface transition-[background-color,transform] hover:bg-ink-2 enabled:hover:-translate-y-px disabled:cursor-wait disabled:opacity-70"
-              >
-                {isStopping ? <Spinner size={13} label="Stopping" /> : <StopIcon size={14} />}
-              </button>
-            ) : (
-              <button
-                type="submit"
-                disabled={!canSubmit}
-                aria-label="Send"
-                title={
-                  !hasModel
-                    ? 'Add a model first'
-                    : files.isUploading
-                      ? 'Waiting for uploads…'
-                      : 'Send'
-                }
-                className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-accent text-on-accent shadow-accent transition-[background-color,transform] hover:bg-accent-hover enabled:hover:-translate-y-px disabled:cursor-not-allowed disabled:bg-surface-2 disabled:text-ink-4 disabled:shadow-none"
-              >
-                <SendIcon size={15} />
-              </button>
+            {!isDictating && (
+              <>
+                <span aria-hidden className="mx-1 h-4 w-px bg-line" />
+                <div className="min-w-0">{controls}</div>
+              </>
             )}
           </div>
+          {isDictating ? (
+            <RecordingBar dictation={dictation} canSend={canSendDictated} />
+          ) : (
+            <div className="flex shrink-0 items-center gap-1.5">
+              <DictationButton
+                workspaceId={workspaceId}
+                dictation={dictation}
+                isVoiceOn={isVoiceOn}
+                disabled={(disabled && !isSteering) || Boolean(voice?.isOn)}
+              />
+              {voice && (
+                <VoiceModeButton
+                  workspaceId={workspaceId}
+                  voice={voice}
+                  isVoiceOn={isVoiceOn}
+                  disabled={disabled || !hasModel}
+                />
+              )}
+              {isSteering && value.trim() && (
+                <button
+                  type="submit"
+                  disabled={!canSubmit}
+                  aria-label="Send to the agent now"
+                  title={
+                    files.ready.length
+                      ? 'Send the text now: the agent reads it before its next step. Files wait for your next message.'
+                      : 'Send now: the agent reads it before its next step'
+                  }
+                  className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-xl bg-accent pl-3 pr-3.5 text-[13px] font-medium text-on-accent shadow-accent transition-[background-color,transform] hover:bg-accent-hover enabled:hover:-translate-y-px disabled:cursor-not-allowed disabled:bg-surface-2 disabled:text-ink-4 disabled:shadow-none"
+                >
+                  <SendIcon size={14} />
+                  <span className="hidden sm:inline">Send now</span>
+                </button>
+              )}
+              {isRunning && onStop ? (
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onStop();
+                  }}
+                  disabled={isStopping}
+                  aria-label={isStopping ? 'Stopping' : 'Stop the agent'}
+                  title={isStopping ? 'Stopping…' : 'Stop the agent'}
+                  className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-ink text-surface transition-[background-color,transform] hover:bg-ink-2 enabled:hover:-translate-y-px disabled:cursor-wait disabled:opacity-70"
+                >
+                  {isStopping ? <Spinner size={13} label="Stopping" /> : <StopIcon size={14} />}
+                </button>
+              ) : (
+                <button
+                  type="submit"
+                  disabled={!canSubmit}
+                  aria-label="Send"
+                  title={
+                    !hasModel
+                      ? 'Add a model first'
+                      : files.isUploading
+                        ? 'Waiting for uploads…'
+                        : 'Send'
+                  }
+                  className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-accent text-on-accent shadow-accent transition-[background-color,transform] hover:bg-accent-hover enabled:hover:-translate-y-px disabled:cursor-not-allowed disabled:bg-surface-2 disabled:text-ink-4 disabled:shadow-none"
+                >
+                  <SendIcon size={15} />
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </div>
       {improveError && (

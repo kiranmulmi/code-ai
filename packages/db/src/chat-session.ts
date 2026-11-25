@@ -39,6 +39,8 @@ export interface RunInChatArgs {
   attachments?: readonly Attachment[];
   /** skills the user picked for the prompt, from store.skills(workspace) */
   skills?: readonly Skill[];
+  /** sent from voice mode: the agent writes what is to be said aloud in `<spoken>` blocks */
+  voice?: boolean;
   /** passed to createAgent: approve, ask, onEvent, logger, callModel, config */
   agentOptions?: AgentRunOptions;
   /** runs the workspace's MCP servers; without it the agent has only its built-in tools */
@@ -54,6 +56,7 @@ export async function runInChat({
   prompt,
   attachments = [],
   skills = [],
+  voice = false,
   agentOptions = {},
   mcp,
   tasks,
@@ -97,7 +100,7 @@ export async function runInChat({
   const startedAt = new Date();
   let result: RunResult | null = null;
   try {
-    result = await agent.run(prompt, { attachments, skills });
+    result = await agent.run(prompt, { attachments, skills, voice });
     return result;
   } finally {
     // Save even if the run failed midway, so the chat keeps what happened.

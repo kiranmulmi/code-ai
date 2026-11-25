@@ -14,6 +14,8 @@ import { useStickToBottom } from './useStickToBottom';
 import { UserMessage } from './UserMessage';
 import { TokenUsageDialog, type UsageView } from './TokenUsageDialog';
 import { messageUsages } from './tokenUsage';
+import { useVoiceMode } from '../voice/useVoiceMode';
+import { VoiceModeBar } from '../voice/VoiceModeBar';
 
 /** The middle column: the conversation and the message box. */
 export function ChatView({
@@ -51,7 +53,8 @@ export function ChatView({
   hasModel: boolean;
   /** The composer's model and reasoning effort pickers. */
   modelControls: ReactNode;
-  onSend: (text: string, attachments: Attachment[]) => void;
+  /** `voice`: sent from voice mode, so the reply is written to be heard (see `SendOptions`). */
+  onSend: (text: string, attachments: Attachment[], options?: { voice?: boolean }) => void;
   /** Sends a message to this tab's run in progress, read before its next step. */
   onSteer: (text: string) => void;
   /** Messages sent during the run that the agent hasn't read yet. */
@@ -79,10 +82,19 @@ export function ChatView({
   const canSteer = isBusy && !isLoading;
   const lastTurn = state.turns.at(-1);
 
-  const send = (text: string, attachments: Attachment[]) => {
+  const send = (text: string, attachments: Attachment[], options?: { voice?: boolean }) => {
     log.pin();
-    onSend(text, attachments);
+    onSend(text, attachments, options);
   };
+  // Voice mode (the composer's waveform): a hands-free loop that sends what's said.
+  const voice = useVoiceMode({
+    workspaceId,
+    chatKey,
+    state,
+    isBusy,
+    canSend: canSend && hasModel,
+    onSend: (text) => send(text, [], { voice: true }),
+  });
 
   return (
     <main className="flex min-h-0 min-w-0 flex-1 flex-col bg-[var(--chat-bg)]">
@@ -151,6 +163,7 @@ export function ChatView({
       {state.question && (
         <QuestionPrompt key={state.question.id} question={state.question} onAnswer={onAnswer} />
       )}
+      {voice.isOn && <VoiceModeBar voice={voice} />}
       <Composer
         workspaceId={workspaceId}
         disabled={!canSend && !canSteer}
@@ -167,6 +180,8 @@ export function ChatView({
         onStop={onStop}
         onSteer={onSteer}
         restoreDraft={restoreDraft}
+        isVoiceOn={Boolean(workspace?.voice)}
+        voice={voice}
       />
       {usageView && (
         <TokenUsageDialog rows={usageRows} view={usageView} onClose={() => setUsageView(null)} />

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import type {
   Attachment,
   ChatDetail,
@@ -62,6 +63,8 @@ export type SendOptions = {
   autoApprove?: boolean;
   /** Skills picked for this message, by name. */
   skills?: string[];
+  /** Sent from voice mode: the agent writes what is to be read aloud in `<spoken>` blocks. */
+  voice?: boolean;
 };
 
 /**
@@ -111,8 +114,14 @@ export function useConversation(options: Options) {
     return attachToRun(runKey, {
       onChat: (chat, isNew) => callbacks.current.onChat(chat, isNew),
       onEnd: (final) => {
-        setLoaded(final);
-        setIsRunningElsewhere(false);
+        // Commit the final state before the run leaves the live-runs store: that store's change
+        // renders synchronously (useSyncExternalStore), ahead of a plain setState, so without
+        // this one render shows `loaded` from before the run (the previous answer as the last
+        // turn), which flickers the log and made voice mode read the previous reply aloud.
+        flushSync(() => {
+          setLoaded(final);
+          setIsRunningElsewhere(false);
+        });
       },
       onMessagesReturned: giveBack,
     });
@@ -165,7 +174,14 @@ export function useConversation(options: Options) {
   const send = useCallback(
     async (
       text: string,
-      { modelId, reasoningEffort, attachments = [], autoApprove, skills = [] }: SendOptions = {},
+      {
+        modelId,
+        reasoningEffort,
+        attachments = [],
+        autoApprove,
+        skills = [],
+        voice,
+      }: SendOptions = {},
     ) => {
       const message = text.trim();
       if ((!message && !attachments.length) || isBusyRef.current) return;
@@ -187,6 +203,7 @@ export function useConversation(options: Options) {
           reasoningEffort,
           autoApprove: autoApprove || undefined,
           skills: skills.length ? skills : undefined,
+          voice: voice || undefined,
         },
         shown,
       );

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { LIMITS } from './constants.js';
+import { workspaceVoiceSchema, type WorkspaceVoice } from './voice.js';
 
 /**
  * Groups of built-in tools a workspace can turn off (a chat-only workspace doesn't need file
@@ -82,6 +83,8 @@ export interface Workspace {
   hasTerminalTab: boolean;
   /** Show the side panel's Git diff tab (off by default). */
   hasGitTab: boolean;
+  /** Speech to text for the mic button; null until set up in the workspace settings. */
+  voice: WorkspaceVoice | null;
   createdAt: string | null;
   updatedAt: string | null;
   /** The sidebar folder (WorkspaceGroup) it's filed in; null at the top level. */
@@ -141,6 +144,7 @@ export const workspaceInputSchema = z.object({
   disabledTools: disabledTools.default([...DEFAULT_DISABLED_TOOLS]),
   hasTerminalTab: z.boolean().default(true),
   hasGitTab: z.boolean().default(true),
+  voice: workspaceVoiceSchema.nullable().default(null),
 });
 
 export const workspaceUpdateSchema = z.object({
@@ -151,6 +155,8 @@ export const workspaceUpdateSchema = z.object({
   disabledTools: disabledTools.optional(),
   hasTerminalTab: z.boolean().optional(),
   hasGitTab: z.boolean().optional(),
+  /** null turns speech to text off for the workspace. */
+  voice: workspaceVoiceSchema.nullable().optional(),
   /** Files it in a sidebar folder; null moves it back to the top level. */
   groupId: z.string().uuid().nullable().optional(),
 });

@@ -1,3 +1,4 @@
+import { withoutSpokenTags } from '@app/shared';
 import { Markdown } from '../../components/Markdown';
 import { AlertCircleIcon } from '../../lib/icons';
 import type { TextItem } from './conversation';
@@ -6,10 +7,11 @@ import { useSmoothText } from './useSmoothText';
 /** Agent text outside the activity cards: the answer, or an error. */
 export function TextBlock({ item }: { item: TextItem }) {
   // Streamed text plays out at a steady pace rather than in the bursts it arrives in.
-  const smooth = useSmoothText(item.text, item.isOpen && !item.isError);
+  // A voice-mode reply's <spoken> tags aren't shown (their text is).
+  const smooth = useSmoothText(withoutSpokenTags(item.text), item.isOpen && !item.isError);
   const text = smooth.text;
   const isStreaming = item.isOpen || smooth.isCatchingUp;
-  if (!item.text) return null;
+  if (!item.text.trim()) return null;
 
   if (item.isError) {
     return (

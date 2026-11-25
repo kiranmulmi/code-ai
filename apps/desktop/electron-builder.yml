@@ -21,6 +21,9 @@ mac:
   # Developer ID, macOS asks the user to allow it once (System Settings → Privacy & Security).
   identity: '-'
   hardenedRuntime: false
+  # Without it macOS refuses the microphone (the mic button in the message box).
+  extendInfo:
+    NSMicrophoneUsageDescription: Speech to text turns what you say into text in the message box.
 
 dmg:
   title: ${productName} ${version}

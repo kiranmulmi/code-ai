@@ -270,3 +270,21 @@ export {
   type PluginWriteRequest,
   type WrittenPlugin,
 } from './plugin.js';
+
+export {
+  DEFAULT_SPEECH_MODEL,
+  DEFAULT_SPEECH_VOICE,
+  SPEECH_AUDIO_TYPE,
+  SPOKEN_TAG,
+  VOICE_LIMITS,
+  audioExtension,
+  speechRequestSchema,
+  transcriptionQuerySchema,
+  workspaceVoiceSchema,
+  withoutSpokenTags,
+  type SpeechRequest,
+  type TranscriptionQuery,
+  type TranscriptionResult,
+  type WorkspaceVoice,
+  type WorkspaceVoiceInput,
+} from './voice.js';

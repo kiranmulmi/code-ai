@@ -8,6 +8,7 @@ import type {
   StreamEvent,
   Usage,
 } from '@app/shared';
+import { withoutSpokenTags } from '@app/shared';
 import { compactNumber, formatElapsed, parseArgs, plural } from '../../lib/format';
 import { initialPlanState, withPhase, withPlan, type PlanState } from '../panel/plan/planState';
 import { PLAN_TOOL_NAMES, addedStepCount, describeActivity } from './tools';
@@ -142,6 +143,19 @@ export type TurnUsage = {
 };
 
 export type Turn = UserTurn | AgentTurn;
+
+/** The reply's answer text (not notes on the way to a tool call, nor errors), as Markdown. */
+export function answerText(turn: AgentTurn): string {
+  return turn.flow
+    .flatMap((item) =>
+      item.kind === 'text' && !item.isInterim && !item.isError
+        ? [withoutSpokenTags(item.text)]
+        : [],
+    )
+    .map((text) => text.trim())
+    .filter(Boolean)
+    .join('\n\n');
+}
 
 /** A question the agent is waiting on (ask_user), shown above the message box. */
 export type OpenQuestion = {

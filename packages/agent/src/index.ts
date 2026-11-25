@@ -30,6 +30,9 @@ export {
 export { StoppedError } from './errors.js';
 export {
   createModelCaller,
+  synthesizeSpeech,
+  transcribeAudio,
+  type AudioClip,
   type CallModel,
   type ModelReply,
   type ModelRequest,
