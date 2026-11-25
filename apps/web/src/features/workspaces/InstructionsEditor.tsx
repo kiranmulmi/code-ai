@@ -19,10 +19,10 @@ const REFINEMENTS: readonly AiChip[] = [
 ];
 
 /**
- * A steady height that fits the settings popup (min(820px, 88vh)) with the AI bar, hint and
- * buttons all in view, so only the text scrolls, inside the box. Never below 180px.
+ * A steady height that fits the Instructions tab with the AI bar, hint and Save button all in
+ * view, so only the text scrolls, inside the box. Never below 180px.
  */
-const BOX_HEIGHT = 'h-[max(180px,calc(min(820px,88vh)-388px))]';
+const BOX_HEIGHT = 'h-[max(180px,calc(100dvh-380px))]';
 
 /**
  * The workspace's instructions box with the AI writer attached: describe the workspace (or ask

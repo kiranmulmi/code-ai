@@ -20,6 +20,7 @@ import {
 } from '../panel/panelTabs';
 import { GitPanel } from '../panel/git/GitPanel';
 import { useGitChangeCount } from '../panel/git/useGitChangeCount';
+import { InstructionsPanel } from '../panel/instructions/InstructionsPanel';
 import { NotesPanel } from '../panel/notes/NotesPanel';
 import { useNotes } from '../panel/notes/useNotes';
 import { TerminalPanel } from '../panel/terminal/TerminalPanel';
@@ -227,6 +228,8 @@ export function ChatScreen({
   // Loaded here so an open note's list survives switching tabs; reloaded when picked.
   const notes = useNotes(workspaceId);
   const { reload: reloadNotes } = notes;
+  // The Instructions tab's unsaved text (null: unchanged), kept here so it survives tab switches.
+  const [instructionsDraft, setInstructionsDraft] = useState<string | null>(null);
   const selectCenterTab = (next: CenterTab) => {
     if (next === 'notes' && shownCenterTab !== 'notes') reloadNotes();
     setCenterTab(next);
@@ -342,6 +345,17 @@ export function ChatScreen({
                 {shownCenterTab === 'git' && (
                   <GitPanel workspaceId={workspaceId} isBusy={isWorkspaceBusy} />
                 )}
+                {shownCenterTab === 'instructions' && (
+                  <InstructionsPanel
+                    workspaceId={workspaceId}
+                    workspace={workspace.data}
+                    isLoading={workspace.isLoading}
+                    error={workspace.error}
+                    onRetry={reloadWorkspace}
+                    draft={instructionsDraft}
+                    onDraftChange={setInstructionsDraft}
+                  />
+                )}
                 {shownCenterTab === 'notes' && (
                   <NotesPanel workspaceId={workspaceId} notes={notes} />
                 )}
@@ -429,6 +443,7 @@ export function ChatScreen({
                   conversation.reload();
                   reloadChats();
                 }}
+                onEditInstructions={() => selectCenterTab('instructions')}
                 isVoiceMode={workspace.data?.voiceMode ?? false}
                 subscribeReply={conversation.subscribeReply}
               />

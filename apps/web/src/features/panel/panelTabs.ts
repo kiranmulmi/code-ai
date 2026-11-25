@@ -5,9 +5,9 @@ export type PanelTab = (typeof PANEL_TABS)[number];
 
 /**
  * The tabs of the middle section: the chat itself, the workspace's terminal, what changed in
- * git, and the user's own notes.
+ * git, the workspace's instructions for the agent, and the user's own notes.
  */
-export const CENTER_TABS = ['chat', 'terminal', 'git', 'notes'] as const;
+export const CENTER_TABS = ['chat', 'terminal', 'git', 'instructions', 'notes'] as const;
 
 export type CenterTab = (typeof CENTER_TABS)[number];
 
@@ -17,7 +17,10 @@ export interface OptionalPanelTabs {
   git: boolean;
 }
 
-/** The middle tabs this workspace shows: Chat and Notes always, Terminal and Git diff when on. */
+/**
+ * The middle tabs this workspace shows: Chat, Instructions and Notes always, Terminal and Git
+ * diff when on.
+ */
 export function visibleCenterTabs(optional: OptionalPanelTabs): readonly CenterTab[] {
   return CENTER_TABS.filter((tab) =>
     tab === 'terminal' ? optional.terminal : tab === 'git' ? optional.git : true,
@@ -38,6 +41,7 @@ export const PANEL_TAB_LABEL: Record<PanelTab | CenterTab | LowerPanelTab, strin
   terminal: 'Terminal',
   git: 'Git diff',
   tasks: 'Tasks',
+  instructions: 'Instructions',
   notes: 'Notes',
   memory: 'Memory',
   mcp: 'MCP',

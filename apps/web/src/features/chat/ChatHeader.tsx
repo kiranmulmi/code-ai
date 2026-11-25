@@ -1,7 +1,14 @@
 import type { ReactNode } from 'react';
 import { Badge } from '../../components/Badge';
 import { IconButton } from '../../components/IconButton';
-import { ConversationIcon, GitDiffIcon, NoteIcon, PanelIcon, TerminalIcon } from '../../lib/icons';
+import {
+  ConversationIcon,
+  GitDiffIcon,
+  InstructionsIcon,
+  NoteIcon,
+  PanelIcon,
+  TerminalIcon,
+} from '../../lib/icons';
 import { PANEL_TAB_LABEL, type CenterTab } from '../panel/panelTabs';
 import { TabCount } from '../panel/SidePanel';
 
@@ -9,12 +16,13 @@ const TAB_ICON: Record<CenterTab, ReactNode> = {
   chat: <ConversationIcon size={15} />,
   terminal: <TerminalIcon size={15} />,
   git: <GitDiffIcon size={15} />,
+  instructions: <InstructionsIcon size={15} />,
   notes: <NoteIcon size={15} />,
 };
 
 /**
  * The middle section's toolbar: a tab strip with Chat (its title as the tooltip, and whether the agent is
- * working) first, then the workspace's terminal, git diff and notes. While a side is hidden, a
+ * working) first, then the workspace's terminal, git diff, instructions and notes. While a side is hidden, a
  * button brings it back: the chats sidebar (wide screens) in front of the tabs, the panel at the end.
  */
 export function ChatHeader({

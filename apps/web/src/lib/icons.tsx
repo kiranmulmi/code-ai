@@ -704,6 +704,17 @@ export function GoogleIcon({ size = 18, ...rest }: IconProps) {
   );
 }
 
+/** A page with a sparkle: the workspace's instructions for the agent. */
+export function InstructionsIcon({ size = 14, ...rest }: IconProps) {
+  return (
+    <svg {...base(size)} {...rest}>
+      <path d="M9.5 1.5h-6v13h9V6" />
+      <path d="M5.5 8h5M5.5 10.5h5M5.5 5.5h2" />
+      <path d="M12.5 1v3M11 2.5h3" />
+    </svg>
+  );
+}
+
 export function NoteIcon({ size = 14, ...rest }: IconProps) {
   return (
     <svg {...base(size)} {...rest}>

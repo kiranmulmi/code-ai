@@ -43,6 +43,7 @@ export function ChatView({
   onDecide,
   onAnswer,
   onReload,
+  onEditInstructions,
   isVoiceMode,
   subscribeReply,
 }: {
@@ -73,6 +74,8 @@ export function ChatView({
   /** Answers the question the agent is waiting on (shown over the message box). */
   onAnswer: (questionId: string, answer: QuestionAnswer) => void;
   onReload: () => void;
+  /** Opens the Instructions tab (from the new chat's instructions card). */
+  onEditInstructions: () => void;
   /** The workspace chats by voice. */
   isVoiceMode: boolean;
   /** The reply as it streams, for reading it aloud. */
@@ -119,7 +122,11 @@ export function ChatView({
         <div className="mx-auto flex w-full max-w-[1000px] flex-col gap-5">
           {isLoading && isEmpty && <PageLoader label="Opening chat…" />}
           {!isLoading && isEmpty && (
-            <EmptyState workspace={workspace} showWorkspaceName={showWorkspaceName} />
+            <EmptyState
+              workspace={workspace}
+              showWorkspaceName={showWorkspaceName}
+              onEditInstructions={onEditInstructions}
+            />
           )}
           {state.turns.map((turn) =>
             turn.role === 'user' ? (

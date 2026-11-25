@@ -42,7 +42,6 @@ import {
 } from './api';
 import { FolderPicker } from './FolderPicker';
 import { announceWorkspaceSaved } from './workspaceEvents';
-import { InstructionsEditor } from './InstructionsEditor';
 import {
   ChatModeChoice,
   McpServerSwitches,
@@ -55,14 +54,13 @@ import { readVoicePrefs, writeVoicePrefs, type VoicePrefs } from '../chat/voiceP
 import { fetchMcpEnabled, fetchMcpServers, saveMcpEnabled } from '../mcp/api';
 import { APP_NAME } from '../../lib/brand';
 
-type FieldErrors = { name?: string; path?: string; instructions?: string };
+type FieldErrors = { name?: string; path?: string };
 
 /** Wait for a pause in typing before asking whether the folder is free. */
 const FOLDER_CHECK_DELAY_MS = WEB_APP.folderCheckDelayMs;
 
 const TABS = [
   { id: 'general', label: 'General' },
-  { id: 'instructions', label: 'Instructions' },
   { id: 'agent', label: 'Planning & tools' },
   { id: 'voice', label: 'Voice' },
   { id: 'mcp', label: 'MCP servers' },
@@ -72,7 +70,6 @@ type FormTab = (typeof TABS)[number]['id'];
 /** The tab holding the first field with an error, so a failed save shows it. */
 function tabWithError(errors: FieldErrors): FormTab | null {
   if (errors.name || errors.path) return 'general';
-  if (errors.instructions) return 'instructions';
   return null;
 }
 
@@ -80,7 +77,7 @@ function toFieldErrors(issues: ReadonlyArray<{ path: PropertyKey[]; message: str
   const errors: FieldErrors = {};
   for (const issue of issues) {
     const field = issue.path[0];
-    if ((field === 'name' || field === 'path' || field === 'instructions') && !errors[field]) {
+    if ((field === 'name' || field === 'path') && !errors[field]) {
       errors[field] = issue.message;
     }
   }
@@ -123,7 +120,6 @@ export function WorkspaceFormPage() {
 
   const [name, setName] = useState('');
   const [folderPath, setFolderPath] = useState('');
-  const [instructions, setInstructions] = useState('');
   const [planning, setPlanning] = useState<WorkspacePlanning>('default');
   // A new workspace starts with the shared defaults; editing replaces them with the saved choice.
   const [disabledTools, setDisabledTools] = useState<ToolGroup[]>([...DEFAULT_DISABLED_TOOLS]);
@@ -192,7 +188,6 @@ export function WorkspaceFormPage() {
         setLoaded(workspace);
         setName(workspace.name);
         setFolderPath(workspace.path);
-        setInstructions(workspace.instructions);
         setPlanning(workspace.planning);
         setDisabledTools(workspace.disabledTools);
         setVoiceMode(workspace.voiceMode);
@@ -334,7 +329,6 @@ export function WorkspaceFormPage() {
       const parsed = workspaceUpdateSchema.safeParse({
         name,
         path: folderPath,
-        instructions,
         planning,
         disabledTools,
         voiceMode,
@@ -347,7 +341,6 @@ export function WorkspaceFormPage() {
       const parsed = workspaceInputSchema.safeParse({
         name,
         path: folderPath,
-        instructions,
         planning,
         disabledTools,
         voiceMode,
@@ -552,43 +545,6 @@ export function WorkspaceFormPage() {
                   </Button>
                 </div>
               )}
-            </div>
-
-            <div {...panelProps('instructions')}>
-              <Field
-                id="workspace-instructions"
-                label={
-                  <>
-                    Instructions <span className="font-normal text-ink-3">· optional</span>
-                  </>
-                }
-                hint="Added to the agent's prompt in every chat here."
-              >
-                <InstructionsEditor
-                  id="workspace-instructions"
-                  value={instructions}
-                  onChange={setInstructions}
-                  hasError={Boolean(errors.instructions)}
-                  describedBy="workspace-instructions-hint"
-                  workspaceName={name}
-                  folderPath={folderPath}
-                />
-                {errors.instructions && (
-                  <p role="alert" className={ERROR}>
-                    {errors.instructions}
-                  </p>
-                )}
-                <p
-                  id="workspace-instructions-hint"
-                  className={`${HINT} flex flex-wrap justify-between gap-x-4`}
-                >
-                  <span>Memories are kept separately for each workspace.</span>
-                  <span className="tabular-nums">
-                    {instructions.length.toLocaleString('en')} /{' '}
-                    {LIMITS.instructions.toLocaleString('en')}
-                  </span>
-                </p>
-              </Field>
             </div>
 
             <div {...panelProps('agent')}>

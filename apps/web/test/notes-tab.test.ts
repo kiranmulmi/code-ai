@@ -22,13 +22,23 @@ const note = (id: string, updatedAt: string, title = '', body = ''): Note => ({
 test('Notes is the last middle tab beside the chat, always shown', () => {
   assert.deepEqual(CENTER_TABS.slice(-1), ['notes']);
   assert.equal(PANEL_TAB_LABEL.notes, 'Notes');
-  assert.deepEqual(visibleCenterTabs({ terminal: false, git: false }), ['chat', 'notes']);
+  assert.deepEqual(visibleCenterTabs({ terminal: false, git: false }), [
+    'chat',
+    'instructions',
+    'notes',
+  ]);
   assert.deepEqual(visibleCenterTabs({ terminal: true, git: true }), [
     'chat',
     'terminal',
     'git',
+    'instructions',
     'notes',
   ]);
+});
+
+test('Instructions is its own middle tab, right before Notes', () => {
+  assert.equal(PANEL_TAB_LABEL.instructions, 'Instructions');
+  assert.equal(CENTER_TABS.indexOf('instructions'), CENTER_TABS.indexOf('notes') - 1);
 });
 
 test('the list is newest first, and a saved note replaces its old copy', () => {

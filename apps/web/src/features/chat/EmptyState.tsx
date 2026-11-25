@@ -1,4 +1,3 @@
-import { Link } from 'react-router-dom';
 import type { Workspace } from '@app/shared';
 import { shorten } from '../../lib/format';
 
@@ -34,9 +33,12 @@ function Orb() {
 export function EmptyState({
   workspace,
   showWorkspaceName,
+  onEditInstructions,
 }: {
   workspace: Workspace | null;
   showWorkspaceName: boolean;
+  /** Opens the Instructions tab beside the chat. */
+  onEditInstructions: () => void;
 }) {
   const name = workspace && showWorkspaceName ? workspace.name : null;
   return (
@@ -83,9 +85,10 @@ export function EmptyState({
       </ol>
 
       {workspace?.instructions && (
-        <Link
-          to={`/workspaces/${workspace.id}/settings`}
-          className="mt-3 flex max-w-full items-center gap-3 rounded-2xl border border-accent-bg bg-accent-soft px-4 py-3 text-[13px] text-ink-2 transition-colors hover:bg-accent-bg"
+        <button
+          type="button"
+          onClick={onEditInstructions}
+          className="mt-3 flex w-full text-left max-w-full items-center gap-3 rounded-2xl border border-accent-bg bg-accent-soft px-4 py-3 text-[13px] text-ink-2 transition-colors hover:bg-accent-bg"
         >
           <span className="whitespace-nowrap rounded-full bg-accent px-2.5 py-0.5 text-[10.5px] font-bold uppercase tracking-[0.12em] text-on-accent">
             Instructions on
@@ -94,7 +97,7 @@ export function EmptyState({
             {shorten(workspace.instructions.replace(/\s+/g, ' '), 110)}
           </span>
           <span className="ml-auto whitespace-nowrap font-semibold text-accent-2">Edit</span>
-        </Link>
+        </button>
       )}
     </section>
   );
