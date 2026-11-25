@@ -83,7 +83,6 @@ export async function runInChat({
     longTermMemory: store.memory(workspace),
     filesDir: workspace.path,
     instructions: workspace.instructions,
-    voiceReplies: workspace.voiceMode,
     attachments: store.attachments(workspace),
     skills: store.skills(workspace),
     // The workspace's own specialists, only read when sub-agents are on.

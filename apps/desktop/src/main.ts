@@ -166,7 +166,10 @@ function createWindow(): void {
   void window.loadURL(`${origin}/`);
 }
 
-/** Only this app's own page may ask for permissions (the microphone, for voice mode). */
+/**
+ * Only this app's own page gets permissions (e.g. the clipboard for copy buttons). Without a
+ * handler Electron would grant every request, from any page.
+ */
 function limitPermissionsToApp(): void {
   session.defaultSession.setPermissionRequestHandler(
     (_contents, _permission, callback, details) => {

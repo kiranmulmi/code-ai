@@ -478,29 +478,6 @@ export function SkillIcon({ size = 14, ...rest }: IconProps) {
   );
 }
 
-/** A microphone: voice input. */
-export function MicIcon({ size = 16, ...rest }: IconProps) {
-  return (
-    <svg {...base(size)} {...rest}>
-      <rect x="5.75" y="1.75" width="4.5" height="8" rx="2.25" />
-      <path d="M3.25 7.5a4.75 4.75 0 0 0 9.5 0M8 12.25v2" />
-    </svg>
-  );
-}
-
-/** A phone handset laid down: hang up / end a call. */
-export function PhoneHangUpIcon({ size = 16, ...rest }: IconProps) {
-  return (
-    <svg {...base(size)} {...rest}>
-      <path
-        d="M1.6 9.1c3.6-3.5 9.2-3.5 12.8 0 .4.4.4 1 0 1.4l-1.3 1.3c-.3.3-.8.4-1.2.1l-1.7-1.1a1 1 0 0 1-.4-.9l.1-1.3a7.6 7.6 0 0 0-3.8 0l.1 1.3c0 .4-.1.7-.4.9l-1.7 1.1c-.4.3-.9.2-1.2-.1L1.6 10.5c-.4-.4-.4-1 0-1.4z"
-        fill="currentColor"
-        strokeWidth={0.6}
-      />
-    </svg>
-  );
-}
-
 /** Two opposite arrows: switch to another one. */
 export function SwitchIcon({ size = 14, ...rest }: IconProps) {
   return (

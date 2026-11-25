@@ -19,12 +19,6 @@ export type QueuedMessage = {
   text: string;
 };
 
-/**
- * The reply as it streams, for reading it aloud (voice mode): `text` pieces, and `break` when
- * something else happened (a tool call, an approval), so a sentence cut there is said as is.
- */
-export type ReplyStreamEvent = { type: 'text'; text: string } | { type: 'break' };
-
 /** One run in progress in this tab: its chat's conversation as it streams. */
 export type LiveRun = {
   key: number;
@@ -39,7 +33,6 @@ export type LiveRun = {
 /** What the chat screen showing the run wants to hear (only while it shows it). */
 export type RunHandlers = {
   onChat: (chat: ChatSummary, isNew: boolean) => void;
-  onReply: (event: ReplyStreamEvent) => void;
   /** The run ended; `state` is the conversation as it ended. */
   onEnd: (state: ConversationState) => void;
   onMessagesReturned: (texts: string[], reason: string) => void;
@@ -188,13 +181,11 @@ async function stream(key: number, entry: Entry, request: RunRequest): Promise<v
       const event = parseStreamEvent(data);
       if (!event) continue;
       if (event.type === 'text_delta') {
-        entry.handlers?.onReply({ type: 'text', text: event.text });
         pending += event.text;
         if (!frame) frame = requestAnimationFrame(flush);
         continue;
       }
       flush();
-      entry.handlers?.onReply({ type: 'break' });
       if (event.type === 'chat') {
         const isNew = entry.view.chatId === null;
         // The screen showing it moves to the chat's URL in the same render as the run gets it.

@@ -444,8 +444,6 @@ export function ChatScreen({
                   reloadChats();
                 }}
                 onEditInstructions={() => selectCenterTab('instructions')}
-                isVoiceMode={workspace.data?.voiceMode ?? false}
-                subscribeReply={conversation.subscribeReply}
               />
             </div>
           </div>

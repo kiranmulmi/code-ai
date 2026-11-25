@@ -78,8 +78,6 @@ export interface Workspace {
   planning: WorkspacePlanning;
   /** Tool groups turned off here (empty: all on). */
   disabledTools: ToolGroup[];
-  /** Chat by voice: the web app talks and listens instead of showing the message box. */
-  voiceMode: boolean;
   /** Show the side panel's Terminal tab (off by default). */
   hasTerminalTab: boolean;
   /** Show the side panel's Git diff tab (off by default). */
@@ -141,7 +139,6 @@ export const workspaceInputSchema = z.object({
   instructions: instructions.default(''),
   planning: planning.default('default'),
   disabledTools: disabledTools.default([...DEFAULT_DISABLED_TOOLS]),
-  voiceMode: z.boolean().default(false),
   hasTerminalTab: z.boolean().default(true),
   hasGitTab: z.boolean().default(true),
 });
@@ -152,7 +149,6 @@ export const workspaceUpdateSchema = z.object({
   instructions: instructions.optional(),
   planning: planning.optional(),
   disabledTools: disabledTools.optional(),
-  voiceMode: z.boolean().optional(),
   hasTerminalTab: z.boolean().optional(),
   hasGitTab: z.boolean().optional(),
   /** Files it in a sidebar folder; null moves it back to the top level. */

@@ -21,8 +21,6 @@ mac:
   # Developer ID, macOS asks the user to allow it once (System Settings → Privacy & Security).
   identity: '-'
   hardenedRuntime: false
-  extendInfo:
-    NSMicrophoneUsageDescription: Voice mode listens to what you say to the agent.
 
 dmg:
   title: ${productName} ${version}

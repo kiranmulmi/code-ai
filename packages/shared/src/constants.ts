@@ -355,10 +355,6 @@ export const WEB_APP = {
   minPasswordLength: 8,
   /** seconds before the same sign-in email can be sent again */
   resendEmailAfterS: 60,
-  /** voice input: a pause this long sends the message */
-  voiceSendAfterPauseMs: 1000,
-  /** voice input: nothing heard for this long stops listening */
-  voiceNoSpeechMs: 8000,
   /** code larger than this isn't syntax-coloured in the file preview... */
   maxHighlightChars: 200_000,
   /** ...or in chat code blocks */

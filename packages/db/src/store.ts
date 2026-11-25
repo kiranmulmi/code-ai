@@ -106,7 +106,6 @@ export class Store {
     instructions = '',
     planning = 'default',
     disabledTools = [...DEFAULT_DISABLED_TOOLS],
-    voiceMode = false,
     hasTerminalTab = true,
     hasGitTab = true,
   }: {
@@ -115,7 +114,6 @@ export class Store {
     instructions?: string;
     planning?: WorkspacePlanning;
     disabledTools?: ToolGroup[];
-    voiceMode?: boolean;
     hasTerminalTab?: boolean;
     hasGitTab?: boolean;
   }): Promise<Workspace> {
@@ -131,8 +129,7 @@ export class Store {
       instructions: cleanInstructions,
       planning,
       disabledTools,
-      voiceMode,
-      hasTerminalTab,
+        hasTerminalTab,
       hasGitTab,
     });
     return toWorkspace(await this.#workspaces.add(clean, folder));
@@ -150,8 +147,7 @@ export class Store {
       instructions,
       planning,
       disabledTools,
-      voiceMode,
-      hasTerminalTab,
+        hasTerminalTab,
       hasGitTab,
       groupId,
     }: {
@@ -160,8 +156,7 @@ export class Store {
       instructions?: string;
       planning?: WorkspacePlanning;
       disabledTools?: ToolGroup[];
-      voiceMode?: boolean;
-      hasTerminalTab?: boolean;
+        hasTerminalTab?: boolean;
       hasGitTab?: boolean;
       /** The sidebar folder to file it in; null for the top level. */
       groupId?: string | null;
@@ -188,7 +183,6 @@ export class Store {
         ...(cleanInstructions !== null ? { instructions: cleanInstructions } : {}),
         ...(planning !== undefined ? { planning } : {}),
         ...(disabledTools !== undefined ? { disabledTools } : {}),
-        ...(voiceMode !== undefined ? { voiceMode } : {}),
         ...(hasTerminalTab !== undefined ? { hasTerminalTab } : {}),
         ...(hasGitTab !== undefined ? { hasGitTab } : {}),
       };
@@ -527,7 +521,7 @@ async function toWorkspace(
   { withChatCount = false }: { withChatCount?: boolean } = {},
 ): Promise<Workspace> {
   const data = new WorkspaceData(row.path, row.name);
-  const { instructions, planning, disabledTools, voiceMode, hasTerminalTab, hasGitTab } =
+  const { instructions, planning, disabledTools, hasTerminalTab, hasGitTab } =
     await data.readSettings();
   return {
     id: row.id,
@@ -535,7 +529,6 @@ async function toWorkspace(
     instructions,
     planning,
     disabledTools,
-    voiceMode,
     hasTerminalTab,
     hasGitTab,
     path: row.path,

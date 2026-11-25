@@ -152,10 +152,6 @@ export function renderSkills(skills: readonly Pick<Skill, 'name' | 'description'
     .join('\n');
 }
 
-/**
- * Voice mode: the user speaks their messages (transcribed, so expect small mistakes) and the
- * reply is read aloud, so it has to sound right, not look right.
- */
 /** For a sub-agent (delegate_task): who reads its answer, and what it should contain. */
 export const SUBAGENT_ROLE = `Sub-agent:
 You are a sub-agent. Another AI agent gave you the task in the first message, as one part of a bigger request from the user. Your final answer goes to that agent, not to the user, and it can't ask you follow-up questions. Do the task fully with your tools, then report: what you did, what you found (with paths, links and exact values), and anything you couldn't do and why. Keep the report factual and compact: no greetings, no offers of further help.`;
@@ -170,9 +166,6 @@ You work alongside the main agent and other sub-agents on the same request. Befo
 /** For the main agent when sub-agents are on: how to run the team. */
 export const TEAM_LEAD = `Working with sub-agents:
 You can hand parts of a task to specialist sub-agents with delegate_task. Pick the specialist whose description fits. Independent parts go in the same step as several delegate_task calls, and run at the same time; a part that needs another's result goes in a later step. Sub-agents and you share the team notes (post_note / read_notes) for this request: after sub-agents finish, read_notes holds the details behind their reports. A good shape for a large task: researchers in parallel, then a writer or coder, then a reviewer when it's worth checking. Don't delegate what you can do in a step or two yourself.`;
-
-export const VOICE_REPLIES = `Voice conversation:
-The user is talking to you by voice: their messages are speech turned into text (expect small transcription mistakes and guess the intended words), and your reply is read aloud to them. Answer like a person talking: short, natural sentences, the main point first, usually two to four sentences unless they ask for more. No Markdown, headings, tables, bullet lists, emoji or URLs. Don't read out code or file contents: say what you did or found, and offer to show details in the chat. Tools still work as usual; before a long task, say in one short sentence what you're about to do.`;
 
 /** One named part of the system prompt, for the token usage breakdown. */
 export interface PromptSection {
@@ -196,14 +189,12 @@ export function systemPromptSections(
   mcpTools = '',
   off: readonly ToolGroup[] = [],
   {
-    voiceReplies = false,
     hasPlanningStep = true,
     hasAttachments = false,
     isSubagent = false,
     team = null,
     overview = '',
   }: {
-    voiceReplies?: boolean;
     hasPlanningStep?: boolean;
     hasAttachments?: boolean;
     /** a sub-agent (delegate_task): it reports to the agent that started it */
@@ -226,8 +217,6 @@ export function systemPromptSections(
   if (isSubagent) sections.push({ label: 'Sub-agent role', text: `\n\n${SUBAGENT_ROLE}` });
   if (team === 'lead') sections.push({ label: 'Team lead', text: `\n\n${TEAM_LEAD}` });
   else if (team) sections.push({ label: 'Team role', text: `\n\n${teamRole(team)}` });
-  // Before the workspace instructions, so the user's own style rules still win.
-  if (voiceReplies) sections.push({ label: 'Voice reply rules', text: `\n\n${VOICE_REPLIES}` });
   if (text) {
     sections.push({
       label: 'Workspace instructions',

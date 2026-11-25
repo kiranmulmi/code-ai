@@ -7,10 +7,7 @@ import { QuestionPrompt } from './QuestionPrompt';
 import { placePlans } from './planPlacement';
 import { Composer } from './Composer';
 import type { ConversationState } from './conversation';
-import type { QueuedMessage, ReplyStreamEvent, ReturnedDraft } from './useConversation';
-import { isSpeechInputSupported } from './useSpeechInput';
-import { isSpeechOutputSupported } from './useSpeechOutput';
-import { VoiceBar } from './VoiceBar';
+import type { QueuedMessage, ReturnedDraft } from './useConversation';
 import { EmptyState } from './EmptyState';
 import { RunningElsewhereNotice } from './RunningElsewhereNotice';
 import { useStickToBottom } from './useStickToBottom';
@@ -18,10 +15,7 @@ import { UserMessage } from './UserMessage';
 import { TokenUsageDialog, type UsageView } from './TokenUsageDialog';
 import { messageUsages } from './tokenUsage';
 
-/**
- * The middle column: the conversation and the message box, or in voice mode the voice bar
- * (the message box stays where the browser can't listen or talk, e.g. Firefox).
- */
+/** The middle column: the conversation and the message box. */
 export function ChatView({
   workspaceId,
   chatKey,
@@ -44,8 +38,6 @@ export function ChatView({
   onAnswer,
   onReload,
   onEditInstructions,
-  isVoiceMode,
-  subscribeReply,
 }: {
   /** From the URL, so files can be attached before the workspace has loaded. */
   workspaceId: string;
@@ -76,17 +68,8 @@ export function ChatView({
   onReload: () => void;
   /** Opens the Instructions tab (from the new chat's instructions card). */
   onEditInstructions: () => void;
-  /** The workspace chats by voice. */
-  isVoiceMode: boolean;
-  /** The reply as it streams, for reading it aloud. */
-  subscribeReply: (listener: (event: ReplyStreamEvent) => void) => () => void;
 }) {
-  const canTalk = isVoiceMode && isSpeechInputSupported() && isSpeechOutputSupported();
-  // Voice mode shows the newest reply's text only up to what's being said (null: all of it).
-  const [spokenUpTo, setSpokenUpTo] = useState<number | null>(null);
-  const revealUpTo = canTalk ? spokenUpTo : null;
-  const scrollContent = useMemo(() => [state.turns, revealUpTo], [state.turns, revealUpTo]);
-  const log = useStickToBottom<HTMLDivElement>(scrollContent, chatKey);
+  const log = useStickToBottom<HTMLDivElement>(state.turns, chatKey);
   const plans = useMemo(() => placePlans(state.turns, state.plan), [state.turns, state.plan]);
   const [usageView, setUsageView] = useState<UsageView | null>(null);
   const usageRows = useMemo(() => messageUsages(state.turns), [state.turns]);
@@ -95,14 +78,6 @@ export function ChatView({
   // While this tab's run works, the box stays open: what's sent goes to the agent mid-run.
   const canSteer = isBusy && !isLoading;
   const lastTurn = state.turns.at(-1);
-  const hasPendingApproval = state.turns.some(
-    (turn) =>
-      turn.role === 'agent' &&
-      turn.flow.some(
-        (item) =>
-          item.kind === 'approval' && (item.state === 'pending' || item.state === 'sending'),
-      ),
-  );
 
   const send = (text: string, attachments: Attachment[]) => {
     log.pin();
@@ -146,7 +121,6 @@ export function ChatView({
                 plans={plans}
                 onDecide={onDecide}
                 onShowUsage={() => setUsageView({ kind: 'reply', key: turn.key })}
-                revealUpTo={turn === lastTurn ? revealUpTo : null}
                 runStartedAt={turn === lastTurn ? state.runStartedAt : null}
               />
             ),
@@ -174,50 +148,26 @@ export function ChatView({
           ))}
         </ul>
       )}
-      {isVoiceMode && !canTalk && (
-        <p className="mx-auto -mb-1 w-full max-w-[1000px] px-4 text-[12.5px] text-ink-3 sm:px-6">
-          Voice mode is on, but this browser can&apos;t listen or talk. Use Chrome, Edge or Safari
-          for it; type here meanwhile.
-        </p>
-      )}
       {state.question && (
         <QuestionPrompt key={state.question.id} question={state.question} onAnswer={onAnswer} />
       )}
-      {canTalk ? (
-        <VoiceBar
-          disabled={!canSend}
-          hasModel={hasModel}
-          isRunning={isBusy}
-          isStopping={isStopping}
-          waitingFor={state.question ? 'answer' : hasPendingApproval ? 'approval' : null}
-          controls={modelControls}
-          usage={state.usage}
-          context={state.context}
-          onShowUsage={() => setUsageView({ kind: 'chat' })}
-          onSend={(text) => send(text, [])}
-          onStop={onStop}
-          subscribeReply={subscribeReply}
-          onSpokenUpTo={setSpokenUpTo}
-        />
-      ) : (
-        <Composer
-          workspaceId={workspaceId}
-          disabled={!canSend && !canSteer}
-          hasModel={hasModel}
-          controls={modelControls}
-          focusKey={chatKey}
-          usage={state.usage}
-          context={state.context}
-          onShowUsage={() => setUsageView({ kind: 'chat' })}
-          onSend={send}
-          onImprove={onImprove}
-          isRunning={isBusy}
-          isStopping={isStopping}
-          onStop={onStop}
-          onSteer={onSteer}
-          restoreDraft={restoreDraft}
-        />
-      )}
+      <Composer
+        workspaceId={workspaceId}
+        disabled={!canSend && !canSteer}
+        hasModel={hasModel}
+        controls={modelControls}
+        focusKey={chatKey}
+        usage={state.usage}
+        context={state.context}
+        onShowUsage={() => setUsageView({ kind: 'chat' })}
+        onSend={send}
+        onImprove={onImprove}
+        isRunning={isBusy}
+        isStopping={isStopping}
+        onStop={onStop}
+        onSteer={onSteer}
+        restoreDraft={restoreDraft}
+      />
       {usageView && (
         <TokenUsageDialog rows={usageRows} view={usageView} onClose={() => setUsageView(null)} />
       )}

@@ -33,10 +33,9 @@ import {
   useLiveRuns,
   wasRead,
   type QueuedMessage,
-  type ReplyStreamEvent,
 } from './liveRuns';
 
-export type { QueuedMessage, ReplyStreamEvent } from './liveRuns';
+export type { QueuedMessage } from './liveRuns';
 
 type Options = {
   workspaceId: string;
@@ -65,8 +64,6 @@ export type SendOptions = {
   skills?: string[];
 };
 
-type ReplyListener = (event: ReplyStreamEvent) => void;
-
 /**
  * The open chat: loads its history when the URL changes, and sends messages through
  * `POST /v1/runs`. The run itself lives in `liveRuns`, so it keeps streaming when the user
@@ -85,7 +82,6 @@ export function useConversation(options: Options) {
   const [reloadToken, setReloadToken] = useState(0);
   const [returned, setReturned] = useState<ReturnedDraft | null>(null);
   const callbacks = useRef(options);
-  const replyListeners = useRef(new Set<ReplyListener>());
 
   useEffect(() => {
     callbacks.current = options;
@@ -109,14 +105,11 @@ export function useConversation(options: Options) {
     callbacks.current.onMessagesReturned(reason);
   }, []);
 
-  // While its chat is open, the run tells this view about its chat, reply and end.
+  // While its chat is open, the run tells this view about its chat and end.
   useEffect(() => {
     if (runKey === null) return;
     return attachToRun(runKey, {
       onChat: (chat, isNew) => callbacks.current.onChat(chat, isNew),
-      onReply: (event) => {
-        for (const listener of replyListeners.current) listener(event);
-      },
       onEnd: (final) => {
         setLoaded(final);
         setIsRunningElsewhere(false);
@@ -298,15 +291,6 @@ export function useConversation(options: Options) {
 
   const reload = useCallback(() => setReloadToken((value) => value + 1), []);
 
-  /** Follows the reply text as it streams in (voice mode reads it aloud). Returns the unsubscribe. */
-  const subscribeReply = useCallback((listener: ReplyListener) => {
-    const listeners = replyListeners.current;
-    listeners.add(listener);
-    return () => {
-      listeners.delete(listener);
-    };
-  }, []);
-
   /**
    * Asks the server to stop the run (this tab's, or one running elsewhere). The stream keeps
    * going until the agent has stopped and saved what it did, then ends as `stopped`.
@@ -345,7 +329,6 @@ export function useConversation(options: Options) {
     changeAutoApprove,
     reset,
     reload,
-    subscribeReply,
   };
 }
 

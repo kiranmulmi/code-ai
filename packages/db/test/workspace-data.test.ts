@@ -60,7 +60,6 @@ test('settings, chats, messages and runs are saved under .code-ai', async () => 
     instructions: '',
     planning: 'default',
     disabledTools: [],
-    voiceMode: false,
     hasTerminalTab: false,
     hasGitTab: false,
   };
@@ -72,14 +71,12 @@ test('settings, chats, messages and runs are saved under .code-ai', async () => 
   await data.writeSettings({
     planning: 'off',
     disabledTools: ['files', 'web'],
-    voiceMode: true,
     hasTerminalTab: true,
   });
   assert.deepEqual(await data.readSettings(), {
     instructions: 'Be brief.',
     planning: 'off',
     disabledTools: ['files', 'web'],
-    voiceMode: true,
     hasTerminalTab: true,
     hasGitTab: false,
   });
@@ -90,7 +87,6 @@ test('settings, chats, messages and runs are saved under .code-ai', async () => 
       instructions: 'x',
       planning: 'sometimes',
       disabledTools: ['files', 'teleport', 'files'],
-      voiceMode: 'yes',
       hasTerminalTab: 1,
       hasGitTab: 'on',
     }),
@@ -99,7 +95,6 @@ test('settings, chats, messages and runs are saved under .code-ai', async () => 
     instructions: 'x',
     planning: 'default',
     disabledTools: ['files'],
-    voiceMode: false,
     hasTerminalTab: false,
     hasGitTab: false,
   });
@@ -112,7 +107,6 @@ test('settings, chats, messages and runs are saved under .code-ai', async () => 
     instructions: 'x',
     planning: 'default',
     disabledTools: [],
-    voiceMode: false,
     hasTerminalTab: true,
     hasGitTab: true,
   });

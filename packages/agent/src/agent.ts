@@ -180,8 +180,6 @@ export interface AgentOptions extends AgentRunOptions {
   filesDir: string;
   /** the workspace's instructions, added to the system prompt */
   instructions?: string;
-  /** the user talks by voice and hears the replies: ask for short, speakable answers */
-  voiceReplies?: boolean;
   /** tools beyond the built-in ones, e.g. from the workspace's MCP servers (McpHub) */
   extraTools?: readonly AnyTool[];
   /** the files users attached in this workspace's chats (read by the attachment tools) */
@@ -408,7 +406,6 @@ export function createAgent(options: AgentOptions): Agent {
     return result;
   };
   // Rebuilt at the start of each run with the workspace's skills as they are then.
-  const voiceReplies = options.voiceReplies ?? false;
   // Without the planning step the model is told to make its own plans.
   const hasPlanningStep = config.planning === 'auto';
   // Kept in its sections too, for the token usage breakdown.
@@ -418,7 +415,7 @@ export function createAgent(options: AgentOptions): Agent {
     '',
     toolset.deferredSummary,
     disabledTools,
-    { voiceReplies, hasPlanningStep, isSubagent, team: teamSection },
+    { hasPlanningStep, isSubagent, team: teamSection },
   );
   let systemPrompt = systemSections.map((section) => section.text).join('');
   let skillList = '';
@@ -714,7 +711,7 @@ export function createAgent(options: AgentOptions): Agent {
       skillList,
       toolset.deferredSummary,
       disabledTools,
-      { voiceReplies, hasPlanningStep, hasAttachments, isSubagent, team: teamSection, overview },
+      { hasPlanningStep, hasAttachments, isSubagent, team: teamSection, overview },
     );
     systemPrompt = systemSections.map((section) => section.text).join('');
     // Tools this chat already called stay sent: its earlier calls refer to them.
@@ -1256,7 +1253,6 @@ export function createAgent(options: AgentOptions): Agent {
         planner: new Planner(),
         memoryShown: null,
         steering: undefined,
-        voiceReplies: false,
         chatId: undefined,
         logger: logger.scoped(chosen.name),
       });

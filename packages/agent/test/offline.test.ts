@@ -2308,27 +2308,6 @@ test('a workspace that turns tool groups off sends neither their tools nor their
   assert.match(nth(toolMessages(nth(requests, 1)), 0).content, /turned off the tools read_file/);
 });
 
-test('voice mode asks for short spoken replies, before the workspace instructions', async () => {
-  const setup = await tempSetup();
-  const { callModel, requests } = scriptedModel([answer('Sure.'), answer('Sure.')]);
-  const options = {
-    ...setup,
-    callModel,
-    logger: silentLogger,
-    config: { planning: 'off' as const, review: 'off' as const },
-  };
-  await createAgent({ ...options, instructions: 'Reply in Nepali.' }).run('hello');
-  assert.doesNotMatch(nth(requests, 0).system ?? '', /Voice conversation:/);
-
-  await createAgent({ ...options, instructions: 'Reply in Nepali.', voiceReplies: true }).run('hi');
-  const system = nth(requests, 1).system ?? '';
-  assert.match(system, /Voice conversation:[\s\S]*read aloud/);
-  assert.ok(
-    system.indexOf('Voice conversation:') < system.indexOf('Reply in Nepali.'),
-    "the user's own instructions come after, so they win",
-  );
-});
-
 test('attachment and skill tools are sent only when the chat has files or skills', async () => {
   const setup = await tempSetup();
   const { callModel, requests } = scriptedModel([answer('Hi!'), answer('A pixel.')]);

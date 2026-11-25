@@ -5,7 +5,7 @@ import { ContextMeter } from './ContextMeter';
 import type { ConversationState } from './conversation';
 
 /**
- * The line under the message box (and the voice bar): this chat's tokens so far (click them for
+ * The line under the message box: this chat's tokens so far (click them for
  * the breakdown) and how full the context window is. Hidden until there's something to show.
  */
 export function ChatUsageLine({

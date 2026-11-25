@@ -43,14 +43,11 @@ import {
 import { FolderPicker } from './FolderPicker';
 import { announceWorkspaceSaved } from './workspaceEvents';
 import {
-  ChatModeChoice,
   McpServerSwitches,
   PlanningChoice,
   PanelTabSwitches,
   ToolGroupSwitches,
 } from './AgentChoices';
-import { VoiceSettings } from './VoiceSettings';
-import { readVoicePrefs, writeVoicePrefs, type VoicePrefs } from '../chat/voicePrefs';
 import { fetchMcpEnabled, fetchMcpServers, saveMcpEnabled } from '../mcp/api';
 import { APP_NAME } from '../../lib/brand';
 
@@ -62,7 +59,6 @@ const FOLDER_CHECK_DELAY_MS = WEB_APP.folderCheckDelayMs;
 const TABS = [
   { id: 'general', label: 'General' },
   { id: 'agent', label: 'Planning & tools' },
-  { id: 'voice', label: 'Voice' },
   { id: 'mcp', label: 'MCP servers' },
 ] as const;
 type FormTab = (typeof TABS)[number]['id'];
@@ -123,13 +119,6 @@ export function WorkspaceFormPage() {
   const [planning, setPlanning] = useState<WorkspacePlanning>('default');
   // A new workspace starts with the shared defaults; editing replaces them with the saved choice.
   const [disabledTools, setDisabledTools] = useState<ToolGroup[]>([...DEFAULT_DISABLED_TOOLS]);
-  const [voiceMode, setVoiceMode] = useState(false);
-  // This browser's voice choices: edited here, written when the form saves (Cancel drops them).
-  const [voicePrefs, setVoicePrefs] = useState<VoicePrefs>(readVoicePrefs);
-  const changeVoicePrefs = useCallback(
-    (next: Partial<VoicePrefs>) => setVoicePrefs((current) => ({ ...current, ...next })),
-    [],
-  );
   const [hasTerminalTab, setHasTerminalTab] = useState(true);
   const [hasGitTab, setHasGitTab] = useState(true);
   // MCP servers: the app's list, and which are on here (saved to mcp.json after the workspace).
@@ -190,7 +179,6 @@ export function WorkspaceFormPage() {
         setFolderPath(workspace.path);
         setPlanning(workspace.planning);
         setDisabledTools(workspace.disabledTools);
-        setVoiceMode(workspace.voiceMode);
         setHasTerminalTab(workspace.hasTerminalTab);
         setHasGitTab(workspace.hasGitTab);
       })
@@ -267,7 +255,6 @@ export function WorkspaceFormPage() {
     setIsSaving(true);
     try {
       const workspace = await write();
-      writeVoicePrefs(voicePrefs);
       if (isMcpChanged) {
         try {
           await saveMcpEnabled(workspace.id, mcpEnabled);
@@ -331,7 +318,6 @@ export function WorkspaceFormPage() {
         path: folderPath,
         planning,
         disabledTools,
-        voiceMode,
         hasTerminalTab,
         hasGitTab,
       });
@@ -343,7 +329,6 @@ export function WorkspaceFormPage() {
         path: folderPath,
         planning,
         disabledTools,
-        voiceMode,
         hasTerminalTab,
         hasGitTab,
       });
@@ -594,26 +579,6 @@ export function WorkspaceFormPage() {
                     ]}
                   />
                 </div>
-              </Field>
-            </div>
-
-            <div {...panelProps('voice')}>
-              <Field
-                id="workspace-chat-mode"
-                label="Chat mode"
-                hint="Voice: talk with the agent and hear its replies, instead of the message box."
-              >
-                <ChatModeChoice
-                  id="workspace-chat-mode"
-                  isVoice={voiceMode}
-                  onChange={setVoiceMode}
-                />
-                <p className={HINT}>
-                  {voiceMode
-                    ? 'Tap the mic once and talk; when you pause, it sends what you said and reads the reply aloud, then listens again. Replies are kept short for listening. Uses the browser’s speech recognition (Chrome, Edge or Safari; Chrome turns speech into text on Google’s servers).'
-                    : 'Type messages in the message box. Switch to Voice to choose a microphone and voice.'}
-                </p>
-                {voiceMode && <VoiceSettings value={voicePrefs} onChange={changeVoicePrefs} />}
               </Field>
             </div>
 

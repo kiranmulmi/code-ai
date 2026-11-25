@@ -1,5 +1,4 @@
 import {
-  useCallback,
   useEffect,
   useLayoutEffect,
   useRef,
@@ -12,14 +11,13 @@ import { ATTACHMENT_LIMITS, attachmentKind, type Attachment, type Usage } from '
 import { PATH_DRAG_TYPE, desktopPathOf, droppedPathsText, quoteIfSpaced } from '../../lib/dragPath';
 import { Spinner } from '../../components/Spinner';
 import { errorMessage } from '../../lib/api';
-import { MicIcon, PaperclipIcon, SendIcon, StopIcon, WandIcon } from '../../lib/icons';
+import { PaperclipIcon, SendIcon, StopIcon, WandIcon } from '../../lib/icons';
 import { useToast } from '../../lib/toast';
 import { AttachmentChip } from './AttachmentChip';
 import { ImagePreview, type PreviewImage } from './ImagePreview';
 import { ChatUsageLine } from './ChatUsageLine';
 import type { ConversationState } from './conversation';
 import type { ReturnedDraft } from './useConversation';
-import { useSpeechInput } from './useSpeechInput';
 import { useDraftAttachments } from './useDraftAttachments';
 
 const MAX_HEIGHT = 240;
@@ -87,14 +85,6 @@ export function Composer({
   const [isImproving, setIsImproving] = useState(false);
   const [beforeImprove, setBeforeImprove] = useState<string | null>(null);
   const [improveError, setImproveError] = useState<string | null>(null);
-  // Voice: what was said goes after what's typed, once you stop speaking.
-  const speech = useSpeechInput(
-    useCallback((text: string) => {
-      setValue((current) => (current.trim() ? `${current.replace(/\s+$/, '')} ${text}` : text));
-      setBeforeImprove(null);
-      ref.current?.focus();
-    }, []),
-  );
 
   const improve = () => {
     const draft = value.trim();
@@ -327,31 +317,6 @@ export function Composer({
                 event.target.value = ''; // so picking the same file again still adds it
               }}
             />
-            {speech.isSupported && (
-              <button
-                type="button"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  if (speech.isListening) speech.stop();
-                  else speech.start();
-                }}
-                disabled={disabled && !speech.isListening}
-                aria-label={speech.isListening ? 'Stop listening' : 'Speak your message'}
-                aria-pressed={speech.isListening}
-                title={
-                  speech.isListening
-                    ? 'Listening… it stops when you pause, or click to stop'
-                    : 'Speak your message: the text goes into the box when you stop speaking'
-                }
-                className={`grid h-8 w-8 shrink-0 place-items-center rounded-xl transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
-                  speech.isListening
-                    ? 'bg-danger-bg text-danger'
-                    : 'text-ink-3 hover:bg-accent-soft hover:text-accent-2 disabled:hover:bg-transparent disabled:hover:text-ink-3'
-                }`}
-              >
-                <MicIcon size={16} className={speech.isListening ? 'animate-pulse' : ''} />
-              </button>
-            )}
             <button
               type="button"
               onClick={(event) => {
@@ -438,23 +403,6 @@ export function Composer({
           </div>
         </div>
       </div>
-      {(speech.isListening || speech.error) && (
-        <p
-          role={speech.error ? 'alert' : 'status'}
-          className={`mx-auto mt-1.5 flex w-full max-w-[1000px] items-center gap-1.5 px-1 text-[12px] ${
-            speech.error ? 'text-danger' : 'text-ink-3'
-          }`}
-        >
-          {speech.error ?? (
-            <>
-              <span aria-hidden className="h-1.5 w-1.5 animate-pulse rounded-full bg-danger" />
-              <span className="min-w-0 truncate">
-                {speech.interim ? `“${speech.interim}”` : 'Listening… speak now'}
-              </span>
-            </>
-          )}
-        </p>
-      )}
       {improveError && (
         <p
           role="alert"

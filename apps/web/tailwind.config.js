@@ -123,10 +123,6 @@ export default {
           from: { opacity: '0', transform: 'translateY(-4px)' },
           to: { opacity: '1', transform: 'none' },
         },
-        'voice-wave': {
-          '0%, 100%': { transform: 'scaleY(0.35)' },
-          '50%': { transform: 'scaleY(1)' },
-        },
         // Toasts rise in from below; the bar under each one empties as its time runs out.
         'toast-in': {
           from: { opacity: '0', transform: 'translateY(8px) scale(0.98)' },
@@ -188,7 +184,6 @@ export default {
         pop: 'pop 0.35s ease-out',
         enter: 'enter 0.35s ease-out',
         'spin-fast': 'spin 0.8s linear infinite',
-        'voice-wave': 'voice-wave 0.9s ease-in-out infinite',
         'toast-in': 'toast-in 0.22s ease-out',
         // Its duration is set inline per toast (animationDuration).
         'toast-timer': 'toast-timer linear forwards',

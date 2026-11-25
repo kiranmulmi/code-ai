@@ -110,7 +110,6 @@ export function AgentMessage({
   plans,
   onDecide,
   onShowUsage,
-  revealUpTo = null,
   runStartedAt = null,
 }: {
   turn: AgentTurn;
@@ -119,21 +118,9 @@ export function AgentMessage({
   onDecide: (approvalId: string, allow: boolean) => void;
   /** Opens this reply's token usage breakdown. */
   onShowUsage?: () => void;
-  /** Voice mode: show the answer only up to this many characters (null: all of it). */
-  revealUpTo?: number | null;
   /** When the running request started (ms), for the live timer on its status line. */
   runStartedAt?: number | null;
 }) {
-  let unrevealed = revealUpTo ?? Infinity;
-  const reveal = <T extends { text: string; isOpen: boolean }>(item: T): T => {
-    const shown =
-      item.text.length <= unrevealed
-        ? item
-        : { ...item, text: item.text.slice(0, unrevealed), isOpen: true };
-    unrevealed = Math.max(0, unrevealed - item.text.length);
-    return shown;
-  };
-
   /** A block on an activity card's timeline. */
   const renderEntry = (block: Block): ReactNode => {
     switch (block.kind) {
@@ -159,7 +146,7 @@ export function AgentMessage({
       }
       case 'text':
         if (block.isError) return null;
-        return <NarrationEntry key={block.key} item={reveal(block)} />;
+        return <NarrationEntry key={block.key} item={block} />;
       case 'note':
         return <NoteEntry key={block.key} item={block} />;
       case 'thought':
@@ -187,7 +174,7 @@ export function AgentMessage({
   const renderStandalone = (section: Section): ReactNode => {
     switch (section.kind) {
       case 'text':
-        return <TextBlock key={section.key} item={section.isError ? section : reveal(section)} />;
+        return <TextBlock key={section.key} item={section} />;
       case 'approval':
         return <ApprovalCard key={section.key} item={section} onDecide={onDecide} />;
       default:
@@ -223,7 +210,7 @@ export function AgentMessage({
     );
   });
   const answer = answerText(turn);
-  const isFinished = !isRunning && revealUpTo === null && Boolean(answer || turn.meta);
+  const isFinished = !isRunning && Boolean(answer || turn.meta);
 
   const steps = turn.usage?.steps ?? null;
 

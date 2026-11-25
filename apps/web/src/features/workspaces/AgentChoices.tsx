@@ -69,47 +69,6 @@ export function PlanningChoice({
   );
 }
 
-/** How you chat in this workspace: typing, or talking (voice mode). */
-export function ChatModeChoice({
-  id,
-  isVoice,
-  onChange,
-}: {
-  id: string;
-  isVoice: boolean;
-  onChange: (isVoice: boolean) => void;
-}) {
-  return (
-    <div
-      id={id}
-      role="radiogroup"
-      aria-label="Chat mode"
-      className="mt-2 inline-flex rounded-xl border border-line bg-surface p-0.5"
-    >
-      {[
-        { value: false, label: 'Text' },
-        { value: true, label: 'Voice' },
-      ].map((option) => {
-        const isOn = isVoice === option.value;
-        return (
-          <button
-            key={option.label}
-            type="button"
-            role="radio"
-            aria-checked={isOn}
-            onClick={() => onChange(option.value)}
-            className={`h-8 rounded-lg px-3.5 text-[13px] font-medium transition-colors ${
-              isOn ? 'bg-accent-soft text-accent-2' : 'text-ink-2 hover:bg-subtle hover:text-ink'
-            }`}
-          >
-            {option.label}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
 /** One switch per tool group; on unless turned off. */
 export function ToolGroupSwitches({
   disabled,
