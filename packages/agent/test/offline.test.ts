@@ -270,9 +270,6 @@ test("file tools can't see or touch the app's own .code-ai data", async () => {
   await assert.rejects(readFile.run({ path: '.code-ai/memory.json' }, ctx), refused);
   await assert.rejects(readFile.run({ path: '.Code-AI/memory.json' }, ctx), refused);
   await assert.rejects(listFiles.run({ path: '.code-ai' }, ctx), refused);
-  // The folder's names before the app was renamed, in case an old copy is left.
-  await assert.rejects(readFile.run({ path: '.nimbrio-ai/memory.json' }, ctx), refused);
-  await assert.rejects(readFile.run({ path: '.agentic-ai/memory.json' }, ctx), refused);
   await assert.rejects(
     writeFile.run({ path: '.code-ai/memory.json', content: '[]' }, ctx),
     refused,

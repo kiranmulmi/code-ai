@@ -7,7 +7,6 @@ import os from 'node:os';
 import path from 'node:path';
 import { DEFAULT_AGENT_SETTINGS } from '@app/shared';
 import { appHomeFile } from '../src/app-home.js';
-import { moveLegacyFolders } from '../src/legacy-folders.js';
 import { McpServerStore } from '../src/mcp-servers.js';
 import { ModelStore } from '../src/models.js';
 import { SettingsStore } from '../src/settings.js';
@@ -221,77 +220,6 @@ test('workspaces: saved privately, one slug per folder even when two adds race',
   await assert.rejects(list.list(), /workspaces\.json is damaged/);
 });
 
-test('the old .agentic-ai folders move to the new name, never over newer files', async () => {
-  const root = await home();
-  const appHome = path.join(root, '.code-ai');
-  const oldHome = path.join(root, '.agentic-ai');
-  await fs.mkdir(oldHome);
-  await fs.writeFile(path.join(oldHome, 'models.json'), '{"old":true}');
-
-  // A workspace whose new folder already exists (a file in both stays put), and one without.
-  const merged = path.join(root, 'merged');
-  await fs.mkdir(path.join(merged, '.agentic-ai', 'chats'), { recursive: true });
-  await fs.writeFile(path.join(merged, '.agentic-ai', 'memory.json'), '"old"');
-  await fs.mkdir(path.join(merged, '.code-ai'));
-  await fs.writeFile(path.join(merged, '.code-ai', 'memory.json'), '"new"');
-  const moved = path.join(root, 'moved');
-  await fs.mkdir(path.join(moved, '.agentic-ai'), { recursive: true });
-  // A link isn't followed or moved.
-  const linked = path.join(root, 'linked');
-  await fs.mkdir(linked);
-  await fs.symlink(oldHome, path.join(linked, '.agentic-ai'));
-
-  const notes = await moveLegacyFolders(appHome, [merged, moved, linked, path.join(root, 'gone')]);
-  assert.equal(notes.length, 3);
-  assert.equal(await fs.readFile(path.join(appHome, 'models.json'), 'utf8'), '{"old":true}');
-  await assert.rejects(fs.access(oldHome));
-  assert.equal(await fs.readFile(path.join(merged, '.code-ai', 'memory.json'), 'utf8'), '"new"');
-  assert.ok((await fs.stat(path.join(merged, '.code-ai', 'chats'))).isDirectory());
-  assert.equal(await fs.readFile(path.join(merged, '.agentic-ai', 'memory.json'), 'utf8'), '"old"');
-  assert.match(notes[1] ?? '', /except memory\.json/);
-  assert.ok((await fs.stat(path.join(moved, '.code-ai'))).isDirectory());
-  assert.ok((await fs.lstat(path.join(linked, '.agentic-ai'))).isSymbolicLink());
-
-  // Nothing left to move the second time.
-  assert.deepEqual(await moveLegacyFolders(appHome, [moved]), []);
-});
-
-test('the old .nimbrio-ai folders move to .code-ai too', async () => {
-  const root = await home();
-  const appHome = path.join(root, '.code-ai');
-  const oldHome = path.join(root, '.nimbrio-ai');
-  await fs.mkdir(oldHome);
-  await fs.writeFile(path.join(oldHome, 'models.json'), '{"nimbrio":true}');
-  const workspace = path.join(root, 'workspace');
-  await fs.mkdir(path.join(workspace, '.nimbrio-ai', 'chats'), { recursive: true });
-
-  const notes = await moveLegacyFolders(appHome, [workspace]);
-  assert.equal(notes.length, 2);
-  assert.equal(await fs.readFile(path.join(appHome, 'models.json'), 'utf8'), '{"nimbrio":true}');
-  await assert.rejects(fs.access(oldHome));
-  assert.ok((await fs.stat(path.join(workspace, '.code-ai', 'chats'))).isDirectory());
-  await assert.rejects(fs.access(path.join(workspace, '.nimbrio-ai')));
-});
-
-test('the old .hamro-ai folders move to .code-ai', async () => {
-  const root = await home();
-  const appHome = path.join(root, '.code-ai');
-  const oldHome = path.join(root, '.hamro-ai');
-  await fs.mkdir(path.join(oldHome, 'logs'), { recursive: true });
-  await fs.writeFile(path.join(oldHome, 'models.json'), '{"hamro":true}');
-  const workspace = path.join(root, 'workspace');
-  await fs.mkdir(path.join(workspace, '.hamro-ai', 'my-app', 'chats'), { recursive: true });
-
-  const notes = await moveLegacyFolders(appHome, [workspace]);
-  assert.equal(notes.length, 2);
-  assert.equal(await fs.readFile(path.join(appHome, 'models.json'), 'utf8'), '{"hamro":true}');
-  assert.ok((await fs.stat(path.join(appHome, 'logs'))).isDirectory());
-  await assert.rejects(fs.access(oldHome));
-  assert.ok((await fs.stat(path.join(workspace, '.code-ai', 'my-app', 'chats'))).isDirectory());
-  await assert.rejects(fs.access(path.join(workspace, '.hamro-ai')));
-  assert.deepEqual(await moveLegacyFolders(appHome, [workspace]), []);
-});
-
 test('models: a saved model of a provider the app no longer offers is skipped, not an error', async () => {
   const dir = await home();
   const file = appHomeFile(dir, 'models');
@@ -330,24 +258,4 @@ test('models: a saved model of a provider the app no longer offers is skipped, n
   // The next change writes the file without it.
   await models.setDefault(older);
   assert.ok(!(await fs.readFile(file, 'utf8')).includes(removed));
-});
-
-test('an old folder holding only the .gitignore the new one also has is removed', async () => {
-  const root = await home();
-  const appHome = path.join(root, '.code-ai');
-  const workspace = path.join(root, 'workspace');
-  await fs.mkdir(path.join(workspace, '.nimbrio-ai'), { recursive: true });
-  await fs.writeFile(path.join(workspace, '.nimbrio-ai', '.gitignore'), '# old\n*\n');
-  await fs.mkdir(path.join(workspace, '.code-ai'));
-  await fs.writeFile(path.join(workspace, '.code-ai', '.gitignore'), '# new\n*\n');
-
-  const notes = await moveLegacyFolders(appHome, [workspace]);
-  assert.equal(notes.length, 1);
-  assert.doesNotMatch(notes[0] ?? '', /except/);
-  await assert.rejects(fs.access(path.join(workspace, '.nimbrio-ai')));
-  assert.equal(
-    await fs.readFile(path.join(workspace, '.code-ai', '.gitignore'), 'utf8'),
-    '# new\n*\n',
-  );
-  assert.deepEqual(await moveLegacyFolders(appHome, [workspace]), []);
 });

@@ -55,7 +55,6 @@ export {
 } from './memory/long-term.js';
 export {
   APP_DATA_FOLDER,
-  LEGACY_APP_DATA_FOLDERS,
   checkInput,
   isInAppData,
   resolveInWorkspace,

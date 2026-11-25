@@ -29,9 +29,6 @@ coverage/
 .claude/local/
 
 .code-ai
-# the old name, until the app moves it to .code-ai on start
-.hamro-ai
-.nimbrio-ai
 
 # Desktop app build output
 apps/desktop/.stage/

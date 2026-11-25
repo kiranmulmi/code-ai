@@ -140,24 +140,13 @@ export class Budget {
 export const APP_DATA_FOLDER = '.code-ai';
 
 /**
- * The data folder's names before the app was renamed (agentic-ai, then Nimbrio AI, then Hamro
- * AI), newest first. @app/db moves them to APP_DATA_FOLDER on start; until then (or when both existed)
- * file tools can't reach them either.
- */
-export const LEGACY_APP_DATA_FOLDERS: readonly string[] = [
-  '.hamro-ai',
-  '.nimbrio-ai',
-  '.agentic-ai',
-];
-
-/**
- * Whether a relative path goes through an APP_DATA_FOLDER (or an old name), at any depth (a
+ * Whether a relative path goes through an APP_DATA_FOLDER, at any depth (a
  * workspace nested in another keeps its own) and in any letter case (macOS disks ignore case).
  */
 export function isInAppData(relativePath: string): boolean {
   return relativePath.split(/[\\/]/).some((part) => {
     const name = part.toLowerCase();
-    return name === APP_DATA_FOLDER || LEGACY_APP_DATA_FOLDERS.includes(name);
+    return name === APP_DATA_FOLDER;
   });
 }
 
@@ -375,7 +364,7 @@ export function assertNotSecretFile(shownPath: string): void {
 
 /**
  * For the agent's run_command only (the user's own terminal tab isn't limited): commands that
- * name this app's data folders are refused. ~/.code-ai/ holds every model API key and MCP
+ * name this app's data folder are refused. ~/.code-ai/ holds every model API key and MCP
  * token in plain JSON. A backstop like refuseCommand, not a sandbox: a command
  * that builds the path at run time gets through, and redactSecrets catches what it prints.
  * Off when GUARDRAILS.protectAppData (@app/shared constants) is false.
@@ -384,10 +373,8 @@ export function assertNotSecretFile(shownPath: string): void {
 export function refuseSecretAccess(command: string): string | null {
   if (!GUARDRAILS.protectAppData) return null;
   const lower = command.toLowerCase();
-  for (const folder of [APP_DATA_FOLDER, ...LEGACY_APP_DATA_FOLDERS]) {
-    if (lower.includes(folder)) {
-      return `${folder}/ holds this app's API keys, sign-ins, chats and settings; the agent's commands can't touch it.`;
-    }
+  if (lower.includes(APP_DATA_FOLDER)) {
+    return `${APP_DATA_FOLDER}/ holds this app's API keys, sign-ins, chats and settings; the agent's commands can't touch it.`;
   }
   return null;
 }

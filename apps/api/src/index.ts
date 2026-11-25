@@ -12,7 +12,7 @@ import { logger } from './logger.js';
 async function start(): Promise<void> {
   const auth = createAuthService(readAuthSettings(env));
   const store = new Store();
-  // The data folders were renamed with the app; first move the old ones (and their logs).
+  // Move a workspace's data from the old flat .code-ai/ layout into its subfolder.
   for (const note of await store.moveLegacyFolders()) logger.info(note);
   // The level is set in the app, so the logger asks for it on every line once it's loaded.
   let settings: AppSettings | null = null;

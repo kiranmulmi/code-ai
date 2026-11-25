@@ -28,7 +28,7 @@ import {
 } from '@app/agent';
 import { DEFAULT_APP_HOME, appHomeFile } from './app-home.js';
 import { InputError } from './errors.js';
-import { moveFlatWorkspaceData, moveLegacyFolders } from './legacy-folders.js';
+import { moveFlatWorkspaceData } from './legacy-folders.js';
 import { WorkspaceAttachments } from './attachments.js';
 import { WorkspaceSkills } from './workspace-skills.js';
 import { WorkspaceAgents } from './workspace-agents.js';
@@ -53,7 +53,6 @@ export interface Chat extends ChatRecord {
 }
 
 export class Store {
-  readonly #appHome: string;
   readonly #workspaces: WorkspaceList;
   /** Which workspace each chat seen so far belongs to, so finding it again is one look. */
   readonly #chatHome = new Map<string, string>();
@@ -69,7 +68,6 @@ export class Store {
 
   /** `appHome`: the folder for the app's own settings files (default ~/.code-ai). */
   constructor({ appHome = DEFAULT_APP_HOME }: { appHome?: string } = {}) {
-    this.#appHome = appHome;
     this.#workspaces = new WorkspaceList(appHomeFile(appHome, 'workspaces'));
     this.#mcpTrust = new McpTrust(appHomeFile(appHome, 'mcpTrust'));
     this.models = new ModelStore(appHomeFile(appHome, 'models'));
@@ -433,22 +431,14 @@ export class Store {
   }
 
   /**
-   * The app's data folders had other names: move ~/.hamro-ai, ~/.nimbrio-ai, ~/.agentic-ai and
-   * each listed workspace's .hamro-ai, .nimbrio-ai and .agentic-ai to the new one; then move a workspace's data kept
+   * Move a workspace's data kept
    * right in .code-ai/ (before several workspaces could share a folder) into its
    * .code-ai/<workspace>/, with its MCP approval (legacy-folders.ts). Call it on start, before
    * anything reads or writes them. Returns what happened, for the log.
    */
   async moveLegacyFolders(): Promise<string[]> {
-    // The app home first: the workspace list may be in an old one.
-    const home = await moveLegacyFolders(this.#appHome, []);
     const workspaces = await this.#workspaces.list();
-    const renamed = await moveLegacyFolders(
-      this.#appHome,
-      workspaces.map((row) => row.path),
-    );
-    const flat = await moveFlatWorkspaceData(workspaces, this.#mcpTrust);
-    return [...home, ...renamed, ...flat];
+    return moveFlatWorkspaceData(workspaces, this.#mcpTrust);
   }
 
   /**

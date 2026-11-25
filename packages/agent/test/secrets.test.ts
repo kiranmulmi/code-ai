@@ -121,7 +121,6 @@ test("run_command can't touch the app's data folders; the user's own terminal ch
     'cat $HOME/.code-ai/mcp-servers.json',
     'ls -la .code-ai',
     'grep -r token ~/.Code-AI/',
-    'cat ~/.nimbrio-ai/models.json',
   ]) {
     assert.ok(refuseSecretAccess(command), command);
     assert.equal(

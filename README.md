@@ -47,7 +47,7 @@ The agent can also **run commands** (`run_command`): bash in the workspace folde
 
 **Attach files** in the chat with the paperclip, by dropping them on the message box or by pasting (a screenshot, say): images, PDFs, Word documents (`.docx`) and text files such as code, CSV, JSON or Markdown, up to 10 per message and 15 MB each. They upload right away and are kept privately in the workspace's `.code-ai/<workspace>/uploads/`, not in your project. The agent reads them with its own tools: `read_attachment` (the text of a PDF page by page, a Word document, or a text file), `view_image` (shows an image to the model; this needs a model that can see images) and `save_attachment` (copies one into the workspace folder, with your approval, e.g. to put an uploaded logo into a site).
 
-There is no database. The app's own data is global to your machine, so it's kept in files in your home folder, `~/.code-ai/` (written readable only by you, since some hold API keys and tokens). Run logs (JSONL, for debugging) go to `~/.code-ai/logs/`; set `AGENT_LOG_DIR` to move them. The app used to be called agentic-ai: on start it moves any old `~/.agentic-ai/` and workspace `.agentic-ai/` folders to the new name.
+There is no database. The app's own data is global to your machine, so it's kept in files in your home folder, `~/.code-ai/` (written readable only by you, since some hold API keys and tokens). Run logs (JSONL, for debugging) go to `~/.code-ai/logs/`; set `AGENT_LOG_DIR` to move them.
 
 | File                  | Holds                                                                    |
 | --------------------- | ------------------------------------------------------------------------ |

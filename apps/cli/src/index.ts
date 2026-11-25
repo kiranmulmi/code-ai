@@ -146,7 +146,7 @@ async function main(): Promise<void> {
   const prompt = isOnce ? args.filter((a) => a !== '--once').join(' ') : '';
 
   const store = new Store();
-  // The data folders were renamed with the app; move the old ones first.
+  // Move a workspace's data from the old flat .code-ai/ layout into its subfolder.
   for (const note of await store.moveLegacyFolders()) console.log(note);
   // MCP servers used to be set per workspace folder; move any old ones to the app's list.
   for (const note of await store.importLegacyMcp()) console.log(note);
