@@ -83,7 +83,7 @@ export function ToolSteps({ items }: { items: readonly ToolItem[] }) {
 
   return (
     <section className="flex flex-col gap-1">
-      <div className="flex items-center px-2.5 text-[11px] font-medium text-ink-3">
+      <div className="flex items-center px-2.5 text-[11px] font-medium italic text-ink-3">
         <span>tool calls (</span>
         <span
           // A new key each time the count changes, so the count pops again.

@@ -11,7 +11,7 @@ export const CENTER_TABS = ['chat', 'terminal', 'git', 'instructions', 'notes'] 
 
 export type CenterTab = (typeof CENTER_TABS)[number];
 
-/** The optional tabs a workspace turns on (`hasTerminalTab`, `hasGitTab`); off by default. */
+/** The optional tabs a workspace turns on (`hasTerminalTab`, `hasGitTab`); on for new workspaces. */
 export interface OptionalPanelTabs {
   terminal: boolean;
   git: boolean;

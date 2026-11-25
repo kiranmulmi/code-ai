@@ -28,10 +28,11 @@ import {
   renameWorkspaceGroup,
   updateWorkspace,
 } from './api';
-import { arrangeWorkspaces, byRecentActivity } from './workspaceFolders';
+import { arrangeWorkspaces } from './workspaceFolders';
 import {
   FolderNameInput,
   FolderRow,
+  RailFolder,
   WORKSPACE_DRAG_TYPE,
   WorkspaceRow,
   isWorkspaceDrag,
@@ -66,7 +67,7 @@ type DropTarget = string | 'top' | null;
  * The workspaces, in a column of their own at the far left of the chat screen (wide screens
  * only; narrower ones switch from the chats drawer). Expanded it lists the folders the user made
  * (open or closed, each with its workspaces) and the workspaces in none, with a search box;
- * collapsed it is a rail of avatars. A workspace moves into or out of a folder from its ⋯ menu
+ * collapsed it is a rail of folder icons (hover one for its workspaces) and avatars. A workspace moves into or out of a folder from its ⋯ menu
  * or by dragging it. A workspace where the agent is working shows a spinner (and so does its
  * folder); switching stays open, and the run keeps going.
  */
@@ -117,7 +118,6 @@ export function WorkspaceSidebar({
     () => arrangeWorkspaces(workspaces, groups, needle),
     [workspaces, groups, needle],
   );
-  const rail = useMemo(() => byRecentActivity(workspaces), [workspaces]);
   const firstMatch = arranged.folders.flatMap((f) => f.workspaces)[0] ?? arranged.loose[0];
 
   const setOpen = (id: string, isOpen: boolean) =>
@@ -326,7 +326,20 @@ export function WorkspaceSidebar({
       >
         {isCollapsed ? (
           <ul className="flex flex-col items-center gap-1.5">
-            {rail.map((workspace) => row(workspace, false))}
+            {/* Folders as one icon each (hover shows what's inside), then the loose workspaces. */}
+            {arranged.folders.map(({ group, workspaces: inside }) => (
+              <RailFolder
+                key={group.id}
+                group={group}
+                workspaces={inside}
+                currentId={current?.id ?? null}
+                runningIds={runningWorkspaceIds}
+              />
+            ))}
+            {arranged.folders.length > 0 && arranged.loose.length > 0 && (
+              <li className="my-0.5 w-8 border-t border-line" aria-hidden="true" />
+            )}
+            {arranged.loose.map((workspace) => row(workspace, false))}
           </ul>
         ) : (
           <>

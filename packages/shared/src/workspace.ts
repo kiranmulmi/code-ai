@@ -142,8 +142,8 @@ export const workspaceInputSchema = z.object({
   planning: planning.default('default'),
   disabledTools: disabledTools.default([...DEFAULT_DISABLED_TOOLS]),
   voiceMode: z.boolean().default(false),
-  hasTerminalTab: z.boolean().default(false),
-  hasGitTab: z.boolean().default(false),
+  hasTerminalTab: z.boolean().default(true),
+  hasGitTab: z.boolean().default(true),
 });
 
 export const workspaceUpdateSchema = z.object({

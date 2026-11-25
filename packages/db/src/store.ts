@@ -109,8 +109,8 @@ export class Store {
     planning = 'default',
     disabledTools = [...DEFAULT_DISABLED_TOOLS],
     voiceMode = false,
-    hasTerminalTab = false,
-    hasGitTab = false,
+    hasTerminalTab = true,
+    hasGitTab = true,
   }: {
     name: string;
     path: string;

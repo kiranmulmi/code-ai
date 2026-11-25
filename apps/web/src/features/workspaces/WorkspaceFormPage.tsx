@@ -130,8 +130,8 @@ export function WorkspaceFormPage() {
     (next: Partial<VoicePrefs>) => setVoicePrefs((current) => ({ ...current, ...next })),
     [],
   );
-  const [hasTerminalTab, setHasTerminalTab] = useState(false);
-  const [hasGitTab, setHasGitTab] = useState(false);
+  const [hasTerminalTab, setHasTerminalTab] = useState(true);
+  const [hasGitTab, setHasGitTab] = useState(true);
   // MCP servers: the app's list, and which are on here (saved to mcp.json after the workspace).
   const [mcpServers, setMcpServers] = useState<McpServerEntry[] | null>(null);
   const [mcpError, setMcpError] = useState<string | null>(null);
