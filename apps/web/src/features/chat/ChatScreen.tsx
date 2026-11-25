@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { useNavigate } from 'react-router-dom';
-import type { ChatSettings, ChatSummary } from '@app/shared';
+import type { AppInfo, ChatSettings, ChatSummary, Workspace } from '@app/shared';
 import { AppNav } from '../../layout/AppNav';
 import { errorMessage, isNotFound } from '../../lib/api';
 import { useToast } from '../../lib/toast';
 import { useMediaQuery } from '../../lib/useMediaQuery';
+import type { AsyncResource } from '../../lib/useAsync';
 import { useStoredState } from '../../lib/useStoredState';
 import { useFiles } from '../panel/files/useFiles';
 import { useMemories } from '../panel/memory/useMemories';
@@ -14,14 +15,6 @@ import { parsePanelTab, visiblePanelTabs, type PanelTab } from '../panel/panelTa
 import { SidePanel } from '../panel/SidePanel';
 import { usePanelWidth } from '../panel/usePanelWidth';
 import { useWorkspace } from '../workspaces/useWorkspace';
-import { useWorkspaceGroups } from '../workspaces/useWorkspaceGroups';
-import { useWorkspaces } from '../workspaces/useWorkspaces';
-import {
-  WORKSPACE_RAIL_WIDTH,
-  WORKSPACE_SIDEBAR_MIN_WIDTH,
-  WORKSPACE_SIDEBAR_WIDTH,
-  WorkspaceSidebar,
-} from '../workspaces/WorkspaceSidebar';
 import { onWorkspaceSaved } from '../workspaces/workspaceEvents';
 import { rememberLastWorkspace } from '../workspaces/lastWorkspace';
 import { improvePrompt, saveChatSettings } from './api';
@@ -30,7 +23,6 @@ import { ChatSidebar } from './ChatSidebar';
 import { ChatView } from './ChatView';
 import { AutoApproveToggle } from './AutoApproveToggle';
 import { ModelControls } from './ModelControls';
-import { useAppInfo } from './useAppInfo';
 import { useChats } from './useChats';
 import { onRunNews, useLiveRuns } from './liveRuns';
 import { useConversation } from './useConversation';
@@ -39,32 +31,32 @@ import { useSidebarWidth } from './useSidebarWidth';
 import { APP_NAME } from '../../lib/brand';
 
 const parseFlag = (stored: string | null) => stored === 'true';
-/** The workspace sidebar's dragged width, remembered apart from the chats sidebar's. */
-const WORKSPACES_SIDEBAR = {
-  key: 'agent.workspacesWidth',
-  defaultWidth: WORKSPACE_SIDEBAR_WIDTH,
-  minWidth: WORKSPACE_SIDEBAR_MIN_WIDTH,
-};
 
 /**
- * The chat screen for one workspace: sidebar (workspaces and chats), the open chat,
- * and the side panel (plan, memory, files). `chatId` is null for a new chat.
+ * The chat screen for one workspace: the chats sidebar, the open chat, and the side panel
+ * (plan, memory, files). `chatId` is null for a new chat. The workspace sidebar is ChatRoute's,
+ * to its left, so it stays put while this screen is replaced by another workspace's.
  */
 export function ChatScreen({
   workspaceId,
   chatId,
+  info,
+  workspaces,
 }: {
   workspaceId: string;
   chatId: string | null;
+  /**
+   * Loaded once by ChatRoute, which outlives this screen (switching workspaces remounts it),
+   * and shared with its workspace sidebar.
+   */
+  info: AsyncResource<AppInfo>;
+  workspaces: AsyncResource<Workspace[]>;
 }) {
   const navigate = useNavigate();
   const toast = useToast();
   const workspacePath = `/workspaces/${workspaceId}`;
 
-  const info = useAppInfo();
   const workspace = useWorkspace(workspaceId);
-  const workspaces = useWorkspaces();
-  const workspaceGroups = useWorkspaceGroups();
   const chats = useChats(workspaceId);
   const memories = useMemories(workspaceId);
   const skills = useSkills(workspaceId);
@@ -76,15 +68,10 @@ export function ChatScreen({
   const isWide = useMediaQuery('(min-width: 1024px)');
   const panelWidth = usePanelWidth();
   const sidebarWidth = useSidebarWidth();
-  const workspacesWidth = useSidebarWidth(WORKSPACES_SIDEBAR);
   const [tab, setTab] = useStoredState<PanelTab>('agent.panelTab', parsePanelTab);
   const [isPanelCollapsed, setIsPanelCollapsed] = useStoredState('agent.panelCollapsed', parseFlag);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useStoredState(
     'agent.sidebarCollapsed',
-    parseFlag,
-  );
-  const [isWorkspacesCollapsed, setIsWorkspacesCollapsed] = useStoredState(
-    'agent.workspacesCollapsed',
     parseFlag,
   );
   const [isPanelDrawerOpen, setIsPanelDrawerOpen] = useState(false);
@@ -94,7 +81,6 @@ export function ChatScreen({
   const { reload: reloadMemories } = memories;
   const { reload: reloadFiles } = files;
   const { reload: reloadWorkspaces } = workspaces;
-  const { reload: reloadWorkspaceGroups } = workspaceGroups;
   const { reload: reloadWorkspace } = workspace;
 
   // A workspace saved in the popup over this screen: show its new name, folder, instructions.
@@ -260,11 +246,9 @@ export function ChatScreen({
     '--panel-col': isPanelCollapsed ? '0px' : `${panelWidth.width}px`,
     '--sidebar-w': `${sidebarWidth.width}px`,
     '--sidebar-col': isSidebarCollapsed ? '0px' : `${sidebarWidth.width}px`,
-    '--workspaces-w': `${workspacesWidth.width}px`,
-    '--workspaces-col': `${isWorkspacesCollapsed ? WORKSPACE_RAIL_WIDTH : workspacesWidth.width}px`,
   } as CSSProperties;
   const columns =
-    'lg:grid-cols-[minmax(0,1fr)_var(--panel-col)] xl:grid-cols-[var(--workspaces-col)_var(--sidebar-col)_minmax(0,1fr)_var(--panel-col)]';
+    'lg:grid-cols-[minmax(0,1fr)_var(--panel-col)] xl:grid-cols-[var(--sidebar-col)_minmax(0,1fr)_var(--panel-col)]';
   const workspaceList = workspaces.data ?? [];
 
   return (
@@ -288,26 +272,6 @@ export function ChatScreen({
           className={`panel-grid grid min-h-0 flex-1 grid-cols-1 grid-rows-[minmax(0,1fr)] lg:transition-[grid-template-columns] lg:duration-300 lg:ease-[cubic-bezier(0.2,0,0,1)] motion-reduce:transition-none ${columns}`}
           style={panelStyle}
         >
-          <WorkspaceSidebar
-            current={workspace.data}
-            workspaces={workspaceList}
-            runningWorkspaceIds={runningWorkspaceIds}
-            info={info.data}
-            infoError={info.error}
-            groups={workspaceGroups.data ?? []}
-            isCollapsed={isWorkspacesCollapsed}
-            width={workspacesWidth}
-            onToggle={() => setIsWorkspacesCollapsed(!isWorkspacesCollapsed)}
-            onFiled={(workspaceId, groupId) =>
-              workspaces.setData((list) =>
-                list ? list.map((w) => (w.id === workspaceId ? { ...w, groupId } : w)) : list,
-              )
-            }
-            onChanged={() => {
-              reloadWorkspaces();
-              reloadWorkspaceGroups();
-            }}
-          />
           <ChatSidebar
             isOpen={isSidebarOpen}
             isCollapsed={isSidebarCollapsed}

@@ -39,7 +39,7 @@ import {
 
 /**
  * The expanded column's default and smallest widths (the user can drag it wider); the collapsed
- * rail is `WORKSPACE_RAIL_WIDTH`. ChatScreen sizes the grid and sets `--workspaces-w`.
+ * rail is `WORKSPACE_RAIL_WIDTH`. ChatRoute sizes the column and sets `--workspaces-w`.
  */
 export const WORKSPACE_SIDEBAR_WIDTH = 232;
 export const WORKSPACE_SIDEBAR_MIN_WIDTH = 200;
