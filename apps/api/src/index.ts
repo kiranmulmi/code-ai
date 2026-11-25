@@ -42,15 +42,12 @@ async function start(): Promise<void> {
   const hasModels = (await store.models.list()).length > 0;
   const server = app.listen(env.PORT, HOST, () => {
     const hasWebApp = fs.existsSync(path.join(WEB_DIST_DIR, 'index.html'));
+    const url = `http://localhost:${env.PORT}`;
+    const signIn = auth.config.isEnabled ? 'sign-in on' : 'sign-in off';
     logger.info(
-      {
-        url: `http://localhost:${env.PORT}`,
-        servesWebApp: hasWebApp,
-        signIn: auth.config.isEnabled,
-      },
       hasWebApp
-        ? 'agent app running'
-        : 'agent API running (start the web app with npm run dev:web)',
+        ? `ready at ${url} · web app served here · ${signIn}`
+        : `API ready at ${url} · ${signIn} · start the web app with npm run dev:web`,
     );
     if (!hasModels) {
       logger.warn('No models yet: add one in the app under Settings → Models before chatting.');

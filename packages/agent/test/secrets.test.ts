@@ -32,7 +32,13 @@ const GITHUB = fake('ghp_', 36);
 const GITLAB = fake('glpat-', 26);
 const OPENAI = fake('sk-proj-', 40);
 
-const silentLogger: AgentLogger = { file: null, event() {}, step() {}, warn() {}, error() {} };
+const silentLogger: AgentLogger = {
+  file: null,
+  record() {},
+  warn() {},
+  error() {},
+  scoped: () => silentLogger,
+};
 
 async function workspace(): Promise<{ dir: string; ctx: ToolContext }> {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'agent-secrets-'));
@@ -253,7 +259,7 @@ test('the agent masks secrets in tool output before the model, the stream and th
     extraTools: [leaky],
     callModel,
     config: { planning: 'off', review: 'off', approval: 'auto' },
-    logger: { ...silentLogger, event: (_name, data) => void logged.push(JSON.stringify(data)) },
+    logger: { ...silentLogger, record: (entry) => void logged.push(JSON.stringify(entry)) },
     onEvent: (event) => void streamed.push(JSON.stringify(event)),
   });
   const result = await agent.run('Show the demo config.');

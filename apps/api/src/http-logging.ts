@@ -13,8 +13,17 @@ const POLLED_ROUTES = [
   /^\/v1\/workspaces\/[^/]+\/git(\?|$)/,
 ];
 
+/**
+ * The full path. Inside a router Express trims `req.url` to the part after the mount point
+ * (`/workspaces/…` without `/v1`), so the routes above never matched it; `originalUrl` keeps it.
+ */
+function fullUrl(req: IncomingMessage): string {
+  const { originalUrl } = req as IncomingMessage & { originalUrl?: string };
+  return originalUrl ?? req.url ?? '';
+}
+
 function isPolledRead(req: IncomingMessage): boolean {
-  return req.method === 'GET' && POLLED_ROUTES.some((route) => route.test(req.url ?? ''));
+  return req.method === 'GET' && POLLED_ROUTES.some((route) => route.test(fullUrl(req)));
 }
 
 /** What a request log keeps. Headers are left out on purpose: they carry cookies and tokens. */
@@ -57,7 +66,7 @@ export const httpLogOptions: Options<IncomingMessage, ServerResponse> = {
   },
   customLogLevel: logLevelFor,
   customSuccessMessage: (req, res, responseTime) =>
-    `${req.method} ${req.url} ${res.statusCode} ${Math.round(responseTime)}ms`,
+    `${req.method} ${fullUrl(req)} ${res.statusCode} ${Math.round(responseTime)}ms`,
   customErrorMessage: (req, res, err) =>
-    `${req.method} ${req.url} ${res.statusCode} ${err.message}`,
+    `${req.method} ${fullUrl(req)} ${res.statusCode} ${err.message}`,
 };

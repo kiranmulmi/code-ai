@@ -14,7 +14,7 @@ import { LongTermMemory } from '../src/memory/long-term.js';
 import type { AgentLogger } from '../src/logger.js';
 
 const silentLogger = new Proxy({} as AgentLogger, {
-  get: (_target, key) => (key === 'file' ? null : () => {}),
+  get: (_target, key) => (key === 'file' ? null : key === 'scoped' ? () => silentLogger : () => {}),
 });
 
 async function tempSetup() {

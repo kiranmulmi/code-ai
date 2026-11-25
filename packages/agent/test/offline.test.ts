@@ -82,10 +82,10 @@ import type { ModelMessage, ToolCall, ToolMessage } from '../src/memory/short-te
 
 const silentLogger: AgentLogger = {
   file: null,
-  event() {},
-  step() {},
+  record() {},
   warn() {},
   error() {},
+  scoped: () => silentLogger,
 };
 
 interface TestSetup {

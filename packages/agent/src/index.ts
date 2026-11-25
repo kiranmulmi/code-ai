@@ -11,7 +11,22 @@ export {
   type SteeringMessage,
 } from './agent.js';
 export { loadAgentConfig, LOG_LEVELS, type AgentConfig, type LogLevel } from './config.js';
-export { createLogger, type AgentLogger, type LoggerOptions } from './logger.js';
+export {
+  createLogger,
+  silentLogger,
+  supportsColor,
+  type AgentLogger,
+  type AgentLogEntry,
+  type LoggerOptions,
+} from './logger.js';
+export {
+  formatLine,
+  formatDuration,
+  shortId,
+  type LogLine,
+  type LineLevel,
+  type Segment,
+} from './log-format.js';
 export { StoppedError } from './errors.js';
 export {
   createModelCaller,

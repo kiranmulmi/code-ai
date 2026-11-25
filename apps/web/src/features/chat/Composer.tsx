@@ -8,12 +8,7 @@ import {
   type FormEvent,
   type ReactNode,
 } from 'react';
-import {
-  ATTACHMENT_LIMITS,
-  attachmentKind,
-  type Attachment,
-  type Usage,
-} from '@app/shared';
+import { ATTACHMENT_LIMITS, attachmentKind, type Attachment, type Usage } from '@app/shared';
 import { PATH_DRAG_TYPE, desktopPathOf, droppedPathsText, quoteIfSpaced } from '../../lib/dragPath';
 import { Spinner } from '../../components/Spinner';
 import { errorMessage } from '../../lib/api';
@@ -392,52 +387,55 @@ export function Composer({
             <span aria-hidden className="mx-1 h-4 w-px bg-line" />
             <div className="min-w-0">{controls}</div>
           </div>
-          {isSteering && value.trim() && (
-            <button
-              type="submit"
-              disabled={!canSubmit}
-              aria-label="Send to the agent now"
-              title={
-                files.ready.length
-                  ? 'Send the text now: the agent reads it before its next step. Files wait for your next message.'
-                  : 'Send now: the agent reads it before its next step'
-              }
-              className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-accent text-on-accent shadow-accent transition-[background-color,transform] hover:bg-accent-hover enabled:hover:-translate-y-px disabled:cursor-not-allowed disabled:bg-surface-2 disabled:text-ink-4 disabled:shadow-none"
-            >
-              <SendIcon size={15} />
-            </button>
-          )}
-          {isRunning && onStop ? (
-            <button
-              type="button"
-              onClick={(event) => {
-                event.stopPropagation();
-                onStop();
-              }}
-              disabled={isStopping}
-              aria-label={isStopping ? 'Stopping' : 'Stop the agent'}
-              title={isStopping ? 'Stopping…' : 'Stop the agent'}
-              className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-ink text-surface transition-[background-color,transform] hover:bg-ink-2 enabled:hover:-translate-y-px disabled:cursor-wait disabled:opacity-70"
-            >
-              {isStopping ? <Spinner size={13} label="Stopping" /> : <StopIcon size={14} />}
-            </button>
-          ) : (
-            <button
-              type="submit"
-              disabled={!canSubmit}
-              aria-label="Send"
-              title={
-                !hasModel
-                  ? 'Add a model first'
-                  : files.isUploading
-                    ? 'Waiting for uploads…'
-                    : 'Send'
-              }
-              className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-accent text-on-accent shadow-accent transition-[background-color,transform] hover:bg-accent-hover enabled:hover:-translate-y-px disabled:cursor-not-allowed disabled:bg-surface-2 disabled:text-ink-4 disabled:shadow-none"
-            >
-              <SendIcon size={15} />
-            </button>
-          )}
+          <div className="flex shrink-0 items-center gap-1.5">
+            {isSteering && value.trim() && (
+              <button
+                type="submit"
+                disabled={!canSubmit}
+                aria-label="Send to the agent now"
+                title={
+                  files.ready.length
+                    ? 'Send the text now: the agent reads it before its next step. Files wait for your next message.'
+                    : 'Send now: the agent reads it before its next step'
+                }
+                className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-xl bg-accent pl-3 pr-3.5 text-[13px] font-medium text-on-accent shadow-accent transition-[background-color,transform] hover:bg-accent-hover enabled:hover:-translate-y-px disabled:cursor-not-allowed disabled:bg-surface-2 disabled:text-ink-4 disabled:shadow-none"
+              >
+                <SendIcon size={14} />
+                <span className="hidden sm:inline">Send now</span>
+              </button>
+            )}
+            {isRunning && onStop ? (
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onStop();
+                }}
+                disabled={isStopping}
+                aria-label={isStopping ? 'Stopping' : 'Stop the agent'}
+                title={isStopping ? 'Stopping…' : 'Stop the agent'}
+                className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-ink text-surface transition-[background-color,transform] hover:bg-ink-2 enabled:hover:-translate-y-px disabled:cursor-wait disabled:opacity-70"
+              >
+                {isStopping ? <Spinner size={13} label="Stopping" /> : <StopIcon size={14} />}
+              </button>
+            ) : (
+              <button
+                type="submit"
+                disabled={!canSubmit}
+                aria-label="Send"
+                title={
+                  !hasModel
+                    ? 'Add a model first'
+                    : files.isUploading
+                      ? 'Waiting for uploads…'
+                      : 'Send'
+                }
+                className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-accent text-on-accent shadow-accent transition-[background-color,transform] hover:bg-accent-hover enabled:hover:-translate-y-px disabled:cursor-not-allowed disabled:bg-surface-2 disabled:text-ink-4 disabled:shadow-none"
+              >
+                <SendIcon size={15} />
+              </button>
+            )}
+          </div>
         </div>
       </div>
       {(speech.isListening || speech.error) && (

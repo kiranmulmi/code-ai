@@ -19,7 +19,13 @@ import { McpTrust } from '../src/mcp-trust.js';
 import { WorkspaceData } from '../src/workspace-data.js';
 import { runInChat, historyForUi, titleFrom } from '../src/chat-session.js';
 
-const silentLogger: AgentLogger = { file: null, event() {}, step() {}, warn() {}, error() {} };
+const silentLogger: AgentLogger = {
+  file: null,
+  record() {},
+  warn() {},
+  error() {},
+  scoped: () => silentLogger,
+};
 
 let shared: Store | undefined;
 let tmp = '';

@@ -19,7 +19,13 @@ import type { AnyTool, ToolContext } from '../src/tools/define.js';
 
 const FIXTURE = fileURLToPath(new URL('./fixtures/echo-mcp-server.mjs', import.meta.url));
 
-const silentLogger: AgentLogger = { file: null, event() {}, step() {}, warn() {}, error() {} };
+const silentLogger: AgentLogger = {
+  file: null,
+  record() {},
+  warn() {},
+  error() {},
+  scoped: () => silentLogger,
+};
 
 const echoServer = (extra: Partial<McpServerConfig> = {}): McpServerConfig => ({
   command: process.execPath,

@@ -11,6 +11,8 @@ const schema = z.object({
   PORT: z.coerce.number().int().positive().default(4000),
   CORS_ORIGIN: z.string().default('http://localhost:5173'),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
+  /** `pretty` (default): readable lines. `json`: pino's JSON lines, for log tools. */
+  LOG_FORMAT: z.enum(['pretty', 'json']).default('pretty'),
   // Sign-in with Supabase Auth: on when both are set (see .env.example).
   SUPABASE_URL: z.string().trim().default(''),
   SUPABASE_ANON_KEY: z.string().trim().default(''),

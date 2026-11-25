@@ -100,6 +100,7 @@ import {
   type AskFn,
 } from './guardrails.js';
 import { createLogger, type AgentLogger } from './logger.js';
+import { shortId } from './log-format.js';
 import { errorMessage, isRecord } from './errors.js';
 import { oneAtATime } from './one-at-a-time.js';
 
@@ -310,6 +311,15 @@ export function createAgent(options: AgentOptions): Agent {
       },
     });
     const { usage, message } = response;
+    logger.record({
+      type: 'model_call',
+      kind,
+      model: response.model || null,
+      durationMs: Date.now() - startedAt,
+      usage,
+      finishReason: response.finishReason,
+      toolCalls: message.tool_calls?.map((call) => call.function.name) ?? [],
+    });
     const input = inputBreakdown(request, usage.inputTokens, step);
     const output = outputBreakdown(message, usage.outputTokens);
     // A call the server reported nothing for (some servers send no usage) still sent its
@@ -337,7 +347,10 @@ export function createAgent(options: AgentOptions): Agent {
   );
   const limits = contextLimits(contextWindow);
   const meter = new ContextMeter();
-  const logger = options.logger ?? createLogger({ level: config.logLevel, logDir: config.logDir });
+  const baseLogger =
+    options.logger ?? createLogger({ level: config.logLevel, logDir: config.logDir });
+  // Lines are labelled with the chat, so runs in several chats at once can be told apart.
+  const logger = options.chatId ? baseLogger.scoped(shortId(options.chatId)) : baseLogger;
   const approve = options.approve ?? createApprover(config.approval, options.ask);
   // ask_user: sub-agents working at the same time take turns asking, since the user answers one
   // question at a time. A sub-agent is given its parent's queue, so it doesn't add its own.
@@ -587,11 +600,9 @@ export function createAgent(options: AgentOptions): Agent {
       const text = redactSecrets(
         typeof output === 'string' ? output : JSON.stringify(output, null, 2),
       );
-      logger.event('tool_result', { tool: name, ok: true, chars: text.length });
       return limitToolOutput(text, limits.toolOutputChars);
     } catch (error) {
       const message = redactSecrets(errorMessage(error));
-      logger.event('tool_result', { tool: name, ok: false, error: message });
       return toolError(message);
     }
   }
@@ -655,6 +666,7 @@ export function createAgent(options: AgentOptions): Agent {
     { attachments = [], skills = [] }: RunInput = {},
   ): Promise<RunResult> {
     const budget = new Budget(config);
+    const startedAt = Date.now();
     currentBudget = budget;
     // Fresh team notes for each request (a sub-agent keeps the one it was given).
     if (canDelegate) board = new Board();
@@ -668,7 +680,14 @@ export function createAgent(options: AgentOptions): Agent {
         usage: budget.usage(),
         calls: budget.calls,
       };
-      logger.event('run_end', { status, steps: result.steps, toolsUsed, usage: result.usage });
+      logger.record({
+        type: 'run_end',
+        status,
+        steps: result.steps,
+        tools: toolsUsed.length,
+        durationMs: Date.now() - startedAt,
+        usage: result.usage,
+      });
       return result;
     };
 
@@ -678,8 +697,10 @@ export function createAgent(options: AgentOptions): Agent {
     const inputCheck = checkInput(typed, config);
     if (!inputCheck.ok) return finish('rejected', inputCheck.reason);
 
-    logger.event('run_start', {
+    logger.record({
+      type: 'run_start',
       prompt,
+      model: options.model?.label ?? null,
       attachments: attachments.length,
       skills: skills.map((skill) => skill.name),
     });
@@ -740,7 +761,7 @@ export function createAgent(options: AgentOptions): Agent {
       for (const { id, text, sentAt } of messages) {
         conversation.addUser(steeringMessage(text), { display: text, steeredAt: sentAt });
         request = `${request}\n\nAdded by the user while you worked:\n${text}`;
-        logger.event('steer', { text });
+        logger.record({ type: 'steer', text });
         emit({ type: 'steer', id, text, sentAt });
       }
       return messages.length > 0;
@@ -792,7 +813,7 @@ export function createAgent(options: AgentOptions): Agent {
           stopSendingImages(error);
           reply = await callStep();
         }
-        const { message, finishReason, usage, model } = reply;
+        const { message, finishReason, usage } = reply;
         meter.calibrate(sent.raw, usage.inputTokens);
         emit({
           type: 'context',
@@ -800,12 +821,6 @@ export function createAgent(options: AgentOptions): Agent {
           usedTokens: usage.inputTokens || sent.tokens,
           windowTokens: contextWindow.window,
           summarizeAtTokens: compactThreshold(contextWindow),
-        });
-        logger.event('model_response', {
-          finish_reason: finishReason,
-          usage,
-          model,
-          tool_calls: message.tool_calls?.length ?? 0,
         });
 
         if (message.refusal || finishReason === 'content_filter') {
@@ -844,7 +859,7 @@ export function createAgent(options: AgentOptions): Agent {
             checksLeft -= 1;
             answerBeforeCheck = answer;
             const unfinished = planner.unfinishedSteps();
-            logger.step(`check: ${unfinished.length} plan step(s) still open`);
+            logger.record({ type: 'plan_check', open: unfinished.length });
             emit({ type: 'check', unfinished });
             conversation.addUser(planCheckMessage(unfinished, planner.plan?.doneWhen ?? ''), {
               internal: true,
@@ -883,7 +898,7 @@ export function createAgent(options: AgentOptions): Agent {
             batch.map(async (call) => {
               const { name, arguments: args } = call.function;
               toolsUsed.push(name);
-              logger.step(`${name} ${summarize(args)}`);
+              const toolStartedAt = Date.now();
               emit({ type: 'tool_call', id: call.id, name, args });
               const ran =
                 finishReason === 'length'
@@ -892,7 +907,17 @@ export function createAgent(options: AgentOptions): Agent {
                     )
                   : await runTool(name, args, call.id);
               const result = noteRepeat(repeats, name, args, ran);
-              if (result !== ran) logger.warn(`${name} was called again with the same result`);
+              const failed = ran.startsWith('Error: ');
+              logger.record({
+                type: 'tool',
+                name,
+                args: redactSecrets(args),
+                ok: !failed,
+                durationMs: Date.now() - toolStartedAt,
+                chars: ran.length,
+                ...(failed ? { error: ran.slice('Error: '.length) } : {}),
+                ...(result !== ran ? { isRepeat: true } : {}),
+              });
               emit({ type: 'tool_result', id: call.id, name, ...toolResultPreview(result) });
               if (PLAN_TOOLS.has(name)) emit({ type: 'plan', plan: planner.plan });
               if (name === 'create_plan' && !ran.startsWith('Error: ')) planThisRun = true; // re-planned mid-task
@@ -972,7 +997,7 @@ export function createAgent(options: AgentOptions): Agent {
       },
       { internal: true },
     );
-    logger.event('run_failed', { error: errorMessage(error) });
+    logger.record({ type: 'run_failed', error: errorMessage(error) });
   }
 
   /**
@@ -1074,7 +1099,7 @@ export function createAgent(options: AgentOptions): Agent {
       conversation.forModel().messages,
     ).tokens;
     const summarized = covered.length - (hadSummary ? 1 : 0);
-    logger.event('compaction', { summarized, tokensBefore, tokensAfter, upTo });
+    logger.record({ type: 'compaction', summarized, tokensBefore, tokensAfter });
     emit({ type: 'compaction', summarizedMessages: summarized, tokensBefore, tokensAfter });
     return true;
   }
@@ -1105,7 +1130,12 @@ export function createAgent(options: AgentOptions): Agent {
       skills: skillList,
       overview,
     });
-    logger.event('planning', decision);
+    logger.record({
+      type: 'route',
+      mode: decision.mode,
+      reason: decision.reason,
+      steps: decision.mode === 'plan' ? decision.steps.length : 0,
+    });
     emit({
       type: 'route',
       mode: decision.mode,
@@ -1114,7 +1144,6 @@ export function createAgent(options: AgentOptions): Agent {
     });
 
     if (decision.mode !== 'plan') {
-      logger.step(`answering directly${decision.reason ? `: ${decision.reason}` : ''}`);
       return false;
     }
     const id = `plan_${Date.now()}`;
@@ -1130,9 +1159,6 @@ export function createAgent(options: AgentOptions): Agent {
     });
     conversation.addToolResult(id, rendered);
     toolsUsed.push('create_plan');
-    logger.step(
-      `plan: ${decision.steps.length} steps${decision.reason ? ` (${decision.reason})` : ''}`,
-    );
     emit({ type: 'tool_call', id, name: 'create_plan', args });
     emit({ type: 'tool_result', id, name: 'create_plan', ok: true, preview: rendered });
     emit({ type: 'plan', plan: planner.plan });
@@ -1171,7 +1197,7 @@ export function createAgent(options: AgentOptions): Agent {
       if (error instanceof StoppedError || isStopped()) throw error;
       logger.warn(`The review failed, so the answer stands: ${errorMessage(error)}`);
     }
-    logger.event('review', { verdict: review.verdict, issues: review.issues });
+    logger.record({ type: 'review', verdict: review.verdict, issues: review.issues });
     emit({ type: 'review', verdict: review.verdict, issues: review.issues });
     return review;
   }
@@ -1207,7 +1233,8 @@ export function createAgent(options: AgentOptions): Agent {
             : options.subagentModel
               ? { callModel: undefined, model: options.subagentModel }
               : {};
-      logger.step(`sub-agent "${label}" (${chosen.name}) started`);
+      logger.record({ type: 'subagent_start', label, specialist: chosen.name });
+      const subagentStartedAt = Date.now();
       const child = createAgent({
         ...options,
         ...ownModel,
@@ -1231,13 +1258,19 @@ export function createAgent(options: AgentOptions): Agent {
         steering: undefined,
         voiceReplies: false,
         chatId: undefined,
+        logger: logger.scoped(chosen.name),
       });
       const result = await child.run(task);
       for (const call of result.calls) {
         budget.recordCall(call, { ...call, kind: 'subagent' });
       }
       emit({ type: 'usage', steps: budget.steps, usage: budget.usage() });
-      logger.step(`sub-agent "${label}" ended: ${result.status}`);
+      logger.record({
+        type: 'subagent_end',
+        label,
+        status: result.status,
+        durationMs: Date.now() - subagentStartedAt,
+      });
       if (result.status === 'stopped') throw new StoppedError();
       const note =
         result.status === 'done'
@@ -1382,11 +1415,6 @@ function canonicalArguments(args: string): string {
 // The chat format has no error flag on tool results, so mark errors in the text.
 function toolError(message: string): string {
   return `Error: ${message}`;
-}
-
-function summarize(args: string): string {
-  const text = typeof args === 'string' ? args : JSON.stringify(args ?? {});
-  return text.length > 120 ? `${text.slice(0, 117)}...` : text;
 }
 
 /**

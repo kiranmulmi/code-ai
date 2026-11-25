@@ -47,3 +47,10 @@ test('failures are never hidden, even on polled routes', () => {
   assert.equal(levelFor('GET', '/v1/workspaces/abc/tasks', 500), 'error');
   assert.equal(levelFor('GET', '/v1/info', 200, new Error('boom')), 'error');
 });
+
+test('polled routes are recognised inside the /v1 router, where Express trims req.url', () => {
+  const req = Object.assign(fakeReq('GET', '/workspaces/abc/git'), {
+    originalUrl: '/v1/workspaces/abc/git',
+  });
+  assert.equal(logLevelFor(req, fakeRes(304)), 'debug');
+});

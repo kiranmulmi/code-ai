@@ -12,7 +12,13 @@ import type { AgentLogger } from '../src/logger.js';
 import type { CallModel, ModelReply, ModelRequest } from '../src/llm.js';
 import type { ToolCall } from '../src/memory/short-term.js';
 
-const silentLogger: AgentLogger = { file: null, event() {}, step() {}, warn() {}, error() {} };
+const silentLogger: AgentLogger = {
+  file: null,
+  record() {},
+  warn() {},
+  error() {},
+  scoped: () => silentLogger,
+};
 
 async function tempSetup() {
   const tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'agent-critic-test-'));
