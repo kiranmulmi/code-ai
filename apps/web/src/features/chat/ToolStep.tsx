@@ -1,11 +1,13 @@
-import { useCallback, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { parseCommandFiles, type CommandFileChange, type CommandFiles } from '@app/shared';
 import { Badge } from '../../components/Badge';
 import { CodeHighlight } from '../../components/CodeHighlight';
 import { CodeText } from '../../components/CodeText';
 import { Spinner } from '../../components/Spinner';
 import { inlineArgs, prettyJson } from '../../lib/format';
-import { delegateInfo, specialistTitle, stepSummary } from './tools';
-import { ChevronRightIcon, CrossIcon } from '../../lib/icons';
+import { commandFilesSummary, delegateInfo, specialistTitle, stepSummary } from './tools';
+import { ChevronRightIcon, CrossIcon, FileTintIcon } from '../../lib/icons';
+import { fileTint } from '../panel/files/fileTint';
 import { languageForPath } from '../../lib/languages';
 import type { SubagentActivity, ToolItem } from './conversation';
 import { toolIcon } from './toolIcon';
@@ -161,6 +163,61 @@ function SubagentSteps({ activity }: { activity: SubagentActivity }) {
   );
 }
 
+const CHANGE_LABEL: Record<CommandFileChange, { mark: string; className: string; title: string }> =
+  {
+    added: { mark: 'A', className: 'text-success', title: 'Created' },
+    modified: { mark: 'M', className: 'text-warn', title: 'Changed' },
+    deleted: { mark: 'D', className: 'text-danger', title: 'Deleted' },
+  };
+
+/** A file a command touched: its tinted icon, its path, and how (created, changed, deleted, read). */
+function FileChip({ path, change }: { path: string; change?: CommandFileChange }) {
+  const label = change ? CHANGE_LABEL[change] : null;
+  return (
+    <span
+      title={`${label ? label.title : 'Read'}: ${path}`}
+      className="inline-flex h-6 max-w-full items-center gap-1.5 rounded-md border border-line-2 bg-subtle px-2 font-mono text-[11.5px] text-ink-2"
+    >
+      {label && (
+        <span className={`shrink-0 text-[10.5px] font-bold ${label.className}`}>{label.mark}</span>
+      )}
+      <FileTintIcon size={12} className={`shrink-0 ${fileTint(path).icon}`} />
+      <span className={`min-w-0 truncate ${change === 'deleted' ? 'line-through' : ''}`}>
+        {path}
+      </span>
+    </span>
+  );
+}
+
+/** run_command: the files it changed (found by comparing the workspace) and read (guessed). */
+function CommandFileList({ files }: { files: CommandFiles }) {
+  const groups = [
+    {
+      title: 'Changed',
+      chips: files.changed.map((entry) => (
+        <FileChip key={`c:${entry.path}`} path={entry.path} change={entry.change} />
+      )),
+      more: files.moreChanged,
+    },
+    {
+      title: 'Read',
+      chips: files.read.map((file) => <FileChip key={`r:${file}`} path={file} />),
+      more: files.moreRead,
+    },
+  ].filter((group) => group.chips.length > 0);
+  return (
+    <div className="flex flex-col gap-2">
+      {groups.map((group) => (
+        <div key={group.title} className="flex flex-wrap items-center gap-1.5">
+          <span className="w-14 shrink-0 text-[11px] font-medium text-ink-3">{group.title}</span>
+          {group.chips}
+          {group.more > 0 && <span className="text-[11px] text-ink-3">+{group.more} more</span>}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 /** One tool call. Click it to see the input and result, which open in a card below it. */
 export function ToolStep({ item, isNew = false }: { item: ToolItem; isNew?: boolean }) {
   // A call that arrives while we watch slides in from above.
@@ -180,6 +237,14 @@ function ToolCall({ item, className = '' }: { item: ToolItem; className?: string
   const isRunning = item.state === 'running';
   const delegated = item.name === 'delegate_task' ? delegateInfo(item.args) : null;
   const summary = delegated ? { text: delegated.label, isReason: true } : stepSummary(item.args);
+  const files = useMemo(
+    () =>
+      item.name === 'run_command' && item.state !== 'running' && item.state !== 'error'
+        ? parseCommandFiles(item.result)
+        : null,
+    [item.name, item.state, item.result],
+  );
+  const filesSummary = files ? commandFilesSummary(files) : '';
   return (
     <details className={`group text-[12.5px] ${className}`}>
       <summary className="flex h-8 cursor-pointer list-none items-center gap-2.5 rounded-lg px-2.5 text-[11px] transition-colors hover:bg-surface group-open:bg-surface [&::-webkit-details-marker]:hidden">
@@ -198,6 +263,11 @@ function ToolCall({ item, className = '' }: { item: ToolItem; className?: string
         >
           {summary.text}
         </span>
+        {filesSummary && (
+          <Badge tone="grey" icon={<FileTintIcon size={10} />}>
+            {filesSummary}
+          </Badge>
+        )}
         {item.state === 'error' && <Badge tone="red">failed</Badge>}
         <ChevronRightIcon
           size={10}
@@ -209,6 +279,12 @@ function ToolCall({ item, className = '' }: { item: ToolItem; className?: string
           <div className="eyebrow mb-1.5">Input</div>
           <ToolInput tool={item.name} input={item.args} />
         </div>
+        {files && filesSummary && (
+          <div className="bg-surface px-3 py-2.5">
+            <div className="eyebrow mb-1.5">Files</div>
+            <CommandFileList files={files} />
+          </div>
+        )}
         <div className="bg-surface px-3 py-2.5">
           <div className="eyebrow mb-1.5">Result</div>
           <pre

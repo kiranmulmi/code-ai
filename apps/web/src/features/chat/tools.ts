@@ -1,3 +1,4 @@
+import type { CommandFiles } from '@app/shared';
 import { hostOf, inlineArgs, parseArgs, shorten } from '../../lib/format';
 
 /** The plan panel shows these; in the chat they would only repeat it. */
@@ -66,4 +67,15 @@ export function delegateInfo(args: string): { specialist: string; label: string 
     specialist: text(a.agent).trim() || 'general',
     label: text(a.label).trim() || shorten(text(a.task), 60) || 'Sub-agent',
   };
+}
+
+/** run_command's row: how many files it changed and read, e.g. "2 changed · 1 read" ("" if none). */
+export function commandFilesSummary(files: CommandFiles): string {
+  const changed = files.changed.length + files.moreChanged;
+  const read = files.read.length + files.moreRead;
+  const noun = (count: number) => `${count} file${count === 1 ? '' : 's'}`;
+  if (changed && read) return `${changed} changed · ${read} read`;
+  if (changed) return `${noun(changed)} changed`;
+  if (read) return `${noun(read)} read`;
+  return '';
 }

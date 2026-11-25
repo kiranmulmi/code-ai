@@ -153,6 +153,10 @@ export const TOOL_LIMITS = {
     /** long output keeps its start and end, this long each */
     outputHeadChars: 2_000,
     outputTailChars: 8_000,
+    /** files compared before and after a command, to list what it changed; past this, none are */
+    maxFilesTracked: 20_000,
+    /** files named in each of its "files changed" / "files read" lines */
+    maxFilesListed: 12,
   },
   backgroundTasks: {
     /** running tasks one workspace may have at once */

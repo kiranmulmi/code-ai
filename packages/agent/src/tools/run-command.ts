@@ -4,7 +4,8 @@ import { defineTool } from './define.js';
 import { commandEnv, refuseCommand, refuseSecretAccess } from '../guardrails.js';
 import { locate } from './files/walk.js';
 import { BoundedOutput, isProcessGroup, shellFor, signalGroup } from './shell.js';
-import { TOOL_LIMITS } from '@app/shared';
+import { TOOL_LIMITS, formatCommandFiles } from '@app/shared';
+import { compareSnapshots, guessReadFiles, snapshotFiles } from './command-files.js';
 
 const DEFAULT_TIMEOUT_SECONDS = TOOL_LIMITS.runCommand.defaultTimeoutSeconds;
 /** A background command's first output (or early exit) is reported after this long. */
@@ -57,7 +58,7 @@ export const runCommand = defineTool<CommandInput>({
     if (!command.trim()) throw new Error('The command is empty.');
     const refusal = refuseCommand(command) ?? refuseSecretAccess(command);
     if (refusal) throw new Error(`${refusal} This command was not run.`);
-    const { target, shown } = await locate(ctx, cwd);
+    const { root, target, shown } = await locate(ctx, cwd);
     if (!(await fs.stat(target)).isDirectory()) throw new Error(`"${shown}" is not a folder.`);
     const where = shown === '.' ? '' : ` (in ${shown}/)`;
 
@@ -76,14 +77,23 @@ export const runCommand = defineTool<CommandInput>({
               : `exit code ${now.exitCode}`
           }`
         : `running in the background as task ${task.id} (pid ${task.pid ?? '?'}); read more with task_output, end it with stop_task`;
-      return `$ ${command}${where}\n${status}\n\n${output}`;
+      const files = formatCommandFiles([], await guessReadFiles(command, root, target));
+      return [`$ ${command}${where}`, status, ...files].join('\n') + `\n\n${output}`;
     }
 
     const seconds = Math.min(
       Math.max(timeoutSeconds ?? DEFAULT_TIMEOUT_SECONDS, 1),
       MAX_TIMEOUT_SECONDS,
     );
+    // Before and after, to list the files the command changed (null: too many files to compare).
+    const before = await snapshotFiles(root);
     const result = await runShell(command, target, seconds * 1000, ctx.signal);
+    const after = before ? await snapshotFiles(root) : null;
+    const changed = before && after ? compareSnapshots(before, after) : [];
+    const changedPaths = new Set(changed.map((entry) => entry.path));
+    const read = (await guessReadFiles(command, root, target)).filter(
+      (file) => !changedPaths.has(file),
+    );
 
     const took = `${(result.durationMs / 1000).toFixed(1)}s`;
     const status = result.isTimedOut
@@ -91,7 +101,11 @@ export const runCommand = defineTool<CommandInput>({
       : result.exitCode !== null
         ? `exit code ${result.exitCode} · ${took}`
         : `killed by ${result.signal ?? 'a signal'} · ${took}`;
-    return `$ ${command}${where}\n${status}\n\n${result.output.trimEnd() || '(no output)'}`;
+    const files = formatCommandFiles(changed, read);
+    return (
+      [`$ ${command}${where}`, status, ...files].join('\n') +
+      `\n\n${result.output.trimEnd() || '(no output)'}`
+    );
   },
 });
 

@@ -241,6 +241,13 @@ export {
   type TaskStart,
 } from './task.js';
 
+export {
+  formatCommandFiles,
+  parseCommandFiles,
+  type CommandFileChange,
+  type CommandFiles,
+} from './command-files.js';
+
 export { type AuthConfig, type AuthUser } from './auth.js';
 
 export {

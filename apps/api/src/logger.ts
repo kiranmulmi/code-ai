@@ -1,22 +1,7 @@
 import { pino } from 'pino';
 import { env } from './config/env.js';
 
-/** Human-readable, colorized logs while developing; plain JSON in production
- *  (easier to pipe to log aggregators and to write to files). */
-const isDev = process.env.NODE_ENV !== 'production';
-
-export const logger = pino(
-  isDev
-    ? {
-        level: env.LOG_LEVEL,
-        transport: {
-          target: 'pino-pretty',
-          options: {
-            colorize: true,
-            translateTime: 'SYS:standard',
-            levelFirst: true,
-          },
-        },
-      }
-    : { level: env.LOG_LEVEL },
-);
+/** One-line JSON for every log entry, dev and prod alike: easy to grep, pipe to
+ *  aggregators, and read in the terminal. (Pretty-printed object dumps made the
+ *  request logs span a dozen lines per entry.) */
+export const logger = pino({ level: env.LOG_LEVEL });

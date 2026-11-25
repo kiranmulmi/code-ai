@@ -49,6 +49,7 @@ import { movePath } from '../src/tools/files/move-path.js';
 import { copyPath } from '../src/tools/files/copy-path.js';
 import { deletePath } from '../src/tools/files/delete-path.js';
 import { runCommand } from '../src/tools/run-command.js';
+import { parseCommandFiles } from '@app/shared';
 import { stopTask, taskOutput } from '../src/tools/tasks.js';
 import { BackgroundTasks } from '../src/background-tasks.js';
 import { LongTermMemory, renderMemories } from '../src/memory/long-term.js';
@@ -441,6 +442,44 @@ test(
     assert.match(inSrc, /math\.ts/);
     await assert.rejects(runCommand.run({ command: 'ls', cwd: '..' }, ctx), /outside/);
     await assert.rejects(runCommand.run({ command: 'sudo ls' }, ctx), /another user[\s\S]*not run/);
+  },
+);
+
+test(
+  'run_command lists the files a command changed and the files it reads',
+  { skip: !hasBash },
+  async () => {
+    const ctx = await sampleProject();
+    await fs.mkdir(path.join(ctx.workspace, 'node_modules'), { recursive: true });
+    const out = String(
+      await runCommand.run(
+        {
+          command:
+            "cat src/math.ts | grep -c add; echo hi > notes.txt; sed -i.bak 's/a/a/' src/math.ts; rm src/math.ts.bak; touch node_modules/x.js",
+        },
+        ctx,
+      ),
+    );
+    const files = parseCommandFiles(out);
+    assert.deepEqual(files.changed, [
+      { path: 'notes.txt', change: 'added' },
+      { path: 'src/math.ts', change: 'modified' },
+    ]);
+    assert.deepEqual(files.read, [], 'a file it changed is listed once, as changed');
+    assert.match(
+      out,
+      /^\$ .*\nexit code 0 · [^\n]*\nfiles changed: A notes.txt, M src\/math.ts\n\n/,
+    );
+
+    const read = parseCommandFiles(
+      String(await runCommand.run({ command: 'cd src && head -n 1 math.ts < ../notes.txt' }, ctx)),
+    );
+    assert.deepEqual(read.changed, []);
+    assert.deepEqual(read.read.sort(), ['notes.txt', 'src/math.ts']);
+
+    await fs.rm(path.join(ctx.workspace, 'notes.txt'));
+    const quiet = String(await runCommand.run({ command: 'echo nothing' }, ctx));
+    assert.match(quiet, /^\$ echo nothing\nexit code 0 · [\d.]+s\n\nnothing$/);
   },
 );
 
