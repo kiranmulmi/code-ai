@@ -1,5 +1,5 @@
 // Observability: every step of a run goes to the terminal as one readable line, and to a JSONL
-// file in ~/.hamro-ai/logs/ (one entry per line, AGENT_LOG_DIR to move it), so you can see why
+// file in ~/.code-ai/logs/ (one entry per line, AGENT_LOG_DIR to move it), so you can see why
 // the agent did what it did after the fact. The console level is set in the app
 // (Settings -> Agent): `info` shows the run's timeline, `debug` adds every model call.
 //

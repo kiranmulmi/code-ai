@@ -1,5 +1,5 @@
 // The list of workspaces (id, name, folder, sidebar folder) and the sidebar folders that
-// collect them ("groups"), in ~/.hamro-ai/workspaces.json. Everything else about a workspace
+// collect them ("groups"), in ~/.code-ai/workspaces.json. Everything else about a workspace
 // lives in its own folder (workspace-data.ts), which other workspaces may share.
 import { randomUUID } from 'node:crypto';
 import { workspaceSlug } from '@app/shared';

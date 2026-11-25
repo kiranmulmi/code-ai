@@ -4,7 +4,7 @@ import type { DragEvent } from 'react';
  * Dragging a file or folder from the Files panel carries its absolute path under this type
  * (plus text/plain), so the message box can insert the path instead of attaching a file.
  */
-export const PATH_DRAG_TYPE = 'application/x-hamro-path';
+export const PATH_DRAG_TYPE = 'application/x-code-ai-path';
 
 /** The absolute path of `relative` inside the workspace folder `root`. */
 export function absolutePath(root: string, relative: string): string {
@@ -28,7 +28,7 @@ interface DesktopBridge {
  * can tell it. Null in a browser, which shares only the name.
  */
 export function desktopPathOf(file: File): string | null {
-  const bridge = (window as { hamroDesktop?: DesktopBridge }).hamroDesktop;
+  const bridge = (window as { codeAiDesktop?: DesktopBridge }).codeAiDesktop;
   try {
     return bridge?.pathForFile?.(file) || null;
   } catch {

@@ -123,7 +123,7 @@ export function AgentsPanel({
       <p className="mt-3 text-[12px] leading-relaxed text-ink-3">
         With sub-agents on (Settings → Agent), the agent hands parts of a task to these specialists.
         Each one works with only its tools and reports back. Yours are kept in{' '}
-        <span className="font-mono">.hamro-ai/{'<workspace>'}/agents/</span> and used from your next
+        <span className="font-mono">.code-ai/{'<workspace>'}/agents/</span> and used from your next
         message.
       </p>
 

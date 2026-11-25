@@ -62,7 +62,7 @@ interface Connection {
   stderr: string[];
 }
 
-const CLIENT_INFO = { name: 'hamro-ai', version: '0.1.0' };
+const CLIENT_INFO = { name: 'code-ai', version: '0.1.0' };
 const MAX_TOOLS_PER_SERVER = MCP_LIMITS.maxToolsPerServer;
 const STDERR_LINES = MCP_LIMITS.stderrLines;
 

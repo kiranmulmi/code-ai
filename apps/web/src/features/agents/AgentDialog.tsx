@@ -54,7 +54,7 @@ export type AgentDialogTarget =
 
 /**
  * Write or edit one of the workspace's specialists in a popup. Saved as
- * `.hamro-ai/<workspace>/agents/<name>.md`. Closing with unsaved changes asks first.
+ * `.code-ai/<workspace>/agents/<name>.md`. Closing with unsaved changes asks first.
  */
 export function AgentDialog({
   workspaceId,
@@ -310,7 +310,7 @@ export function AgentDialog({
                 <p className={HINT}>
                   What the agent asks for. Saved as{' '}
                   <span className="break-all font-mono text-[12px]">
-                    .hamro-ai/{'<workspace>'}/agents/{fileName}
+                    .code-ai/{'<workspace>'}/agents/{fileName}
                   </span>
                   . A built-in&apos;s name (coder, researcher…) replaces that built-in here.
                 </p>

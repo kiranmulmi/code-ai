@@ -1,4 +1,4 @@
-// The app's MCP servers, in ~/.hamro-ai/mcp-servers.json (written 0600: `env` and `headers`
+// The app's MCP servers, in ~/.code-ai/mcp-servers.json (written 0600: `env` and `headers`
 // often hold tokens), in the { mcpServers } shape other MCP clients use. Set up once, used by
 // any workspace that turns them on (WorkspaceMcp). Only this app writes them, so they need no
 // approval step.

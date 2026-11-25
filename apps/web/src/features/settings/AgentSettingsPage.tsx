@@ -91,7 +91,7 @@ const fmt = (value: number) => value.toLocaleString('en');
 
 /**
  * `/settings/agent`: how the agent behaves in every workspace (approvals, planning,
- * limits, web search, logging). Saved in ~/.hamro-ai; applies from the next message.
+ * limits, web search, logging). Saved in ~/.code-ai; applies from the next message.
  */
 export function AgentSettingsPage() {
   const navigate = useNavigate();
@@ -291,7 +291,7 @@ export function AgentSettingsPage() {
         >
           <Row
             label="Sub-agents"
-            hint="Lets the agent hand self-contained parts of a task to specialist sub-agents (delegate_task): a researcher, coder, reviewer, writer, or your own from the workspace's .hamro-ai/<workspace>/agents/ folder. Each works in a fresh context, shares findings on the team notes, and reports back. They share the message's token budget and ask for approval like the agent does."
+            hint="Lets the agent hand self-contained parts of a task to specialist sub-agents (delegate_task): a researcher, coder, reviewer, writer, or your own from the workspace's .code-ai/<workspace>/agents/ folder. Each works in a fresh context, shares findings on the team notes, and reports back. They share the message's token budget and ask for approval like the agent does."
           >
             <Switch
               isOn={draft.subagents}
@@ -375,7 +375,7 @@ export function AgentSettingsPage() {
           </Row>
           <Row
             label="Console log level"
-            hint={`${LOG_TEXT[draft.logLevel]} in the server's terminal. Each run is also written to a JSONL log in ~/.hamro-ai/logs (move it with AGENT_LOG_DIR in .env).`}
+            hint={`${LOG_TEXT[draft.logLevel]} in the server's terminal. Each run is also written to a JSONL log in ~/.code-ai/logs (move it with AGENT_LOG_DIR in .env).`}
           >
             <Segmented
               label="Console log level"

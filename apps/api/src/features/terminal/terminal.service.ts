@@ -72,7 +72,7 @@ export function createTerminalService(workspaces: WorkspacesService) {
         ...withoutAppSecrets(process.env),
         TERM: 'xterm-256color',
         COLORTERM: 'truecolor',
-        TERM_PROGRAM: 'hamro-ai',
+        TERM_PROGRAM: 'code-ai',
       } as Record<string, string>,
     });
     const session: TerminalSession = {

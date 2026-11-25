@@ -1,6 +1,7 @@
-// The app used to be called agentic-ai, then Nimbrio AI, and kept its data in `.agentic-ai`, then
-// `.nimbrio-ai` folders (in the home folder and in each workspace). And a workspace's data used
-// to sit right in its folder's .hamro-ai/, one workspace per folder; now each has a subfolder
+// The app used to be called agentic-ai, then Nimbrio AI, then Hamro AI, and kept its data in
+// `.agentic-ai`, `.nimbrio-ai`, then `.hamro-ai` folders (in the home folder and in each
+// workspace). The MCP approvals of the moved workspace folders are carried over too. And a workspace's data used
+// to sit right in its folder's .code-ai/, one workspace per folder; now each has a subfolder
 // there (workspace-data.ts). Store.moveLegacyFolders moves both to the new places on start.
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -8,7 +9,7 @@ import { APP_DATA_FOLDER, LEGACY_APP_DATA_FOLDERS, errorCode } from '@app/agent'
 import type { McpTrust } from './mcp-trust.js';
 import { workspaceDataDir } from './workspace-data.js';
 
-/** What a workspace kept right in .hamro-ai/ before each got its own subfolder. */
+/** What a workspace kept right in .code-ai/ before each got its own subfolder. */
 const FLAT_ENTRIES = [
   'settings.json',
   'memory.json',
@@ -21,7 +22,7 @@ const FLAT_ENTRIES = [
 ];
 
 /**
- * Move the old data folders next to `appHome` (~/.nimbrio-ai, ~/.agentic-ai) into `appHome`,
+ * Move the old data folders next to `appHome` (~/.hamro-ai, ~/.nimbrio-ai, ~/.agentic-ai) into `appHome`,
  * and each workspace folder's into its APP_DATA_FOLDER, newest name first. A file both have
  * stays in the old folder.
  * @returns what happened, one line each, for the log
@@ -97,7 +98,7 @@ async function exists(file: string): Promise<boolean> {
 }
 
 /**
- * Move each folder's old flat data (.hamro-ai/settings.json, chats/, ...) into the subfolder
+ * Move each folder's old flat data (.code-ai/settings.json, chats/, ...) into the subfolder
  * of the workspace that uses the folder, with its mcp.json approval (once keyed by folder).
  * Only one workspace could use a folder then, so the first listed on it gets the data. An
  * entry the subfolder already has stays where it is. Run after moveLegacyFolders.
@@ -110,11 +111,11 @@ export async function moveFlatWorkspaceData(
   const notes: string[] = [];
   const seen = new Set<string>();
   for (const { path: folder, name } of workspaces) {
-    if (seen.has(folder)) continue;
-    seen.add(folder);
     const root = path.join(folder, APP_DATA_FOLDER);
     const dataDir = workspaceDataDir(folder, name);
-    if (await isRealFolder(root)) {
+    const isFirstOnFolder = !seen.has(folder);
+    seen.add(folder);
+    if (isFirstOnFolder && (await isRealFolder(root))) {
       const moved: string[] = [];
       const leftBehind: string[] = [];
       for (const entry of FLAT_ENTRIES) {
@@ -139,8 +140,17 @@ export async function moveFlatWorkspaceData(
         );
       }
     }
-    if (await trust.carryOver(folder, dataDir)) {
-      notes.push(`Moved the MCP approval of ${folder} to ${dataDir}.`);
+    // Approvals are keyed by the data folder's full path: one given under an old folder name
+    // (<folder>/.hamro-ai/<workspace>, any workspace on the folder) or before subfolders
+    // (<folder>, the first workspace only) moves to the new one.
+    const oldKeys = LEGACY_APP_DATA_FOLDERS.map((legacy) =>
+      path.join(folder, legacy, path.basename(dataDir)),
+    );
+    if (isFirstOnFolder) oldKeys.push(folder);
+    for (const oldKey of oldKeys) {
+      if (await trust.carryOver(oldKey, dataDir)) {
+        notes.push(`Moved the MCP approval of ${oldKey} to ${dataDir}.`);
+      }
     }
   }
   return notes;

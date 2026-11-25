@@ -83,7 +83,7 @@ async function startServer(): Promise<number> {
   const shellPath = await loginShellPath();
   const log = fs.createWriteStream(serverLogPath(), { flags: 'w' });
   const child = utilityProcess.fork(SERVER_ENTRY, [], {
-    serviceName: 'Hamro AI server',
+    serviceName: 'Code AI server',
     stdio: 'pipe',
     env: {
       ...process.env,
@@ -102,7 +102,7 @@ async function startServer(): Promise<number> {
     log.end();
     if (isQuitting) return;
     dialog.showErrorBox(
-      'Hamro AI stopped',
+      'Code AI stopped',
       `The app's server stopped unexpectedly (exit code ${code}).\n\nDetails are in ${serverLogPath()}`,
     );
     app.quit();
@@ -122,7 +122,7 @@ function createWindow(): void {
     height: 900,
     minWidth: 380,
     minHeight: 560,
-    title: 'Hamro AI',
+    title: 'Code AI',
     show: false,
     // The page's own --bg, so opening doesn't flash white in dark mode.
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#08131f' : '#f2f7f6',
@@ -199,6 +199,23 @@ async function launch(): Promise<void> {
   createWindow();
 }
 
+/**
+ * The app was called Hamro AI, so Electron kept its own data (the window's localStorage: theme,
+ * panel sizes) in a folder of that name. Move it to the new name once, before anything opens it.
+ */
+function moveOldUserData(): void {
+  const current = app.getPath('userData');
+  const old = path.join(path.dirname(current), 'Hamro AI');
+  if (fs.existsSync(current) || !fs.existsSync(old)) return;
+  try {
+    fs.renameSync(old, current);
+  } catch {
+    // Not worth failing the start over: the window just begins with default UI prefs.
+  }
+}
+
+moveOldUserData();
+
 if (!app.requestSingleInstanceLock()) {
   // Another copy is already running: it focuses its window (below) and this one leaves.
   app.quit();
@@ -231,7 +248,7 @@ if (!app.requestSingleInstanceLock()) {
       isQuitting = true;
       server?.kill();
       dialog.showErrorBox(
-        "Hamro AI couldn't start",
+        "Code AI couldn't start",
         `${error instanceof Error ? error.message : String(error)}\n\nDetails are in ${serverLogPath()}`,
       );
       app.quit();

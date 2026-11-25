@@ -1,5 +1,5 @@
 // Runs one request in a saved chat: load the chat's state from the workspace folder
-// (.hamro-ai/), let the agent work with the workspace's memory, files and
+// (.code-ai/), let the agent work with the workspace's memory, files and
 // instructions, then save what happened. Shared by the API server and the CLI.
 import {
   createAgent,

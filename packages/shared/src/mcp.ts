@@ -1,9 +1,9 @@
 import { z } from 'zod';
 
 // MCP servers give the agent extra tools. They are set up once for the whole app (saved in
-// ~/.hamro-ai/mcp-servers.json), each in the `mcpServers` entry shape other MCP clients use, so a snippet from a
+// ~/.code-ai/mcp-servers.json), each in the `mcpServers` entry shape other MCP clients use, so a snippet from a
 // server's README can be pasted in as is. Each workspace turns them on or off in
-// <folder>/.hamro-ai/<workspace>/mcp.json; a new server is off everywhere until turned on.
+// <folder>/.code-ai/<workspace>/mcp.json; a new server is off everywhere until turned on.
 
 export const MCP_TRANSPORTS = ['stdio', 'http', 'sse'] as const;
 export type McpTransport = (typeof MCP_TRANSPORTS)[number];

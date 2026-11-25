@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process';
 
-const MARKER = '__HAMRO_PATH__';
+const MARKER = '__CODE_AI_PATH__';
 const TIMEOUT_MS = 5000;
 
 /**
@@ -40,7 +40,7 @@ export function loginShellPath(env: NodeJS.ProcessEnv = process.env): Promise<st
   return new Promise((resolve) => {
     execFile(
       shell,
-      // Braces: `$PATH__HAMRO_PATH__` would be read as one (unset) variable name.
+      // Braces: `$PATH__CODE_AI_PATH__` would be read as one (unset) variable name.
       ['-ilc', `printf '%s' "${MARKER}\${PATH}${MARKER}"`],
       { timeout: TIMEOUT_MS, env, encoding: 'utf8' },
       (_error, stdout) => resolve(parseMarkedPath(stdout)),

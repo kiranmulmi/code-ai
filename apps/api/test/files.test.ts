@@ -57,7 +57,7 @@ test('the top level comes first; a folder is read only when asked, generated one
   );
   assert.equal(files.root.total, 5);
   // The app's own data folder (made by the Store) is never listed.
-  assert.ok(!files.root.entries.some((entry) => entry.name === '.hamro-ai'));
+  assert.ok(!files.root.entries.some((entry) => entry.name === '.code-ai'));
 
   const src = await service.children(id, 'src', 0, 100);
   assert.deepEqual(src.entries, [{ name: 'deep', path: 'src/deep', kind: 'folder' }]);

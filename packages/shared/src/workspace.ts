@@ -21,7 +21,7 @@ const MAX_SLUG_LENGTH = 64;
 const RESERVED_SLUGS: ReadonlySet<string> = new Set(['chats', 'uploads', 'skills', 'agents']);
 
 /**
- * The name of a workspace's data subfolder (`<folder>/.hamro-ai/<slug>/`), so several
+ * The name of a workspace's data subfolder (`<folder>/.code-ai/<slug>/`), so several
  * workspaces can share a folder: its name in lowercase letters and digits (accents dropped),
  * any other run of characters a single '-', at most 64 long ("Client Site / v2" ->
  * "client-site-v2"). A name with none of those (all symbols, or another script) gets

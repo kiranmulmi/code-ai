@@ -18,7 +18,7 @@
 /** Bump when the server's behaviour changes: saved plugins get the new file on next save or start. */
 export const PLUGIN_SERVER_VERSION = '1';
 
-export const PLUGIN_SERVER_SOURCE = String.raw`// Written by hamro-ai (plugin server v${PLUGIN_SERVER_VERSION}). Do not edit: it is replaced on save.
+export const PLUGIN_SERVER_SOURCE = String.raw`// Written by code-ai (plugin server v${PLUGIN_SERVER_VERSION}). Do not edit: it is replaced on save.
 // Edit tools.mjs instead (in the app's Tools tab).
 import { createInterface } from 'node:readline';
 import { pathToFileURL, fileURLToPath } from 'node:url';

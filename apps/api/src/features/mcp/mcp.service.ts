@@ -15,8 +15,8 @@ import { ConflictError, NotFoundError } from '../../lib/errors.js';
 import type { WorkspacesService } from '../workspaces/workspaces.service.js';
 
 /**
- * MCP servers: set up once for the app (~/.hamro-ai/mcp-servers.json), turned on per workspace (its
- * .hamro-ai/<workspace>/mcp.json), started by the hub for the workspaces that use them.
+ * MCP servers: set up once for the app (~/.code-ai/mcp-servers.json), turned on per workspace (its
+ * .code-ai/<workspace>/mcp.json), started by the hub for the workspaces that use them.
  */
 export function createMcpService(
   { store, mcp: hub, runs }: AppContext,
@@ -54,10 +54,7 @@ export function createMcpService(
   async function overviewOf(workspace: Workspace, state: McpState): Promise<McpOverview> {
     const servers = await store.mcpServers.list();
     const reports = new Map<string, McpServerReport>(
-      (await hub.connect(workspace, runnableMcpServers(servers, state))).map((r) => [
-        r.name,
-        r,
-      ]),
+      (await hub.connect(workspace, runnableMcpServers(servers, state))).map((r) => [r.name, r]),
     );
     const on = new Set(state.enabled);
     // Only the servers this workspace uses (chosen in its settings), on or off.

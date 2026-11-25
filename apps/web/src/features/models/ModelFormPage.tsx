@@ -309,7 +309,7 @@ export function ModelFormPage() {
                 text={
                   isKeyRemoved
                     ? 'The saved key is removed when you save.'
-                    : 'Not needed for Ollama or LM Studio. Kept in ~/.hamro-ai/models.json, readable only by you, sent only to this server, and never shown again.'
+                    : 'Not needed for Ollama or LM Studio. Kept in ~/.code-ai/models.json, readable only by you, sent only to this server, and never shown again.'
                 }
               />
             </span>

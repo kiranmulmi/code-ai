@@ -1,4 +1,4 @@
-// Offline tests for the Store: the workspace list (in a temp app home instead of ~/.hamro-ai),
+// Offline tests for the Store: the workspace list (in a temp app home instead of ~/.code-ai),
 // and each workspace's chats, memory and files in its folder. No database or server needed.
 import { test, before } from 'node:test';
 import assert from 'node:assert/strict';
@@ -45,7 +45,7 @@ function nth<T>(items: readonly T[], index: number): T {
 
 before(async () => {
   tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'agent-store-test-'));
-  // Never the real ~/.hamro-ai: each run gets its own app home folder.
+  // Never the real ~/.code-ai: each run gets its own app home folder.
   shared = new Store({ appHome: path.join(tmp, 'home') });
 });
 
@@ -153,7 +153,7 @@ test('workspaces keep their own memories and the folder chosen for them', async 
     (await store.memory(moved).all()).map((m) => m.fact),
     ['A fact that moves too.'],
   );
-  await assert.rejects(fs.access(path.join(a.path, '.hamro-ai')), 'nothing is left behind');
+  await assert.rejects(fs.access(path.join(a.path, '.code-ai')), 'nothing is left behind');
 
   // Another workspace can share the folder, but not under a name with the same slug.
   await assert.rejects(store.createWorkspace({ name: 'tutor!', path: moved.path }), {
@@ -174,7 +174,7 @@ test('workspaces keep their own memories and the folder chosen for them', async 
   assert.equal(await store.folderProblem(folder('not-made-yet'), b.id), null);
   await assert.rejects(fs.access(folder('not-made-yet')), 'checking creates nothing');
   const leftover = folder('leftover');
-  await fs.mkdir(path.join(leftover, '.hamro-ai', 'research'), { recursive: true });
+  await fs.mkdir(path.join(leftover, '.code-ai', 'research'), { recursive: true });
   assert.match((await store.folderProblem(leftover, b.id)) ?? '', /already has data/);
   assert.equal(
     await store.folderProblem(leftover, undefined, 'Research'),
@@ -300,7 +300,7 @@ test("a chat is saved and continues across requests, with the workspace's instru
 
   const chats = await store.listChats(ws.id);
   assert.equal(nth(chats, 0).id, chat.id);
-  const saved2 = path.join(ws.path, '.hamro-ai', workspaceSlug(ws.name), 'chats', chat.id);
+  const saved2 = path.join(ws.path, '.code-ai', workspaceSlug(ws.name), 'chats', chat.id);
   assert.ok((await fs.stat(path.join(saved2, 'messages.jsonl'))).isFile(), 'saved in the folder');
   assert.equal(nth(await store.listWorkspaces(), -1).chatCount, 1);
 });
@@ -343,7 +343,7 @@ test('deleting a workspace deletes its chats and memories, not its files', async
   assert.equal(await store.deleteWorkspace(ws.id), true);
   assert.equal(await store.getChat(chat.id), null);
   assert.deepEqual(await store.memory(ws).all(), []);
-  await assert.rejects(fs.access(path.join(ws.path, '.hamro-ai')));
+  await assert.rejects(fs.access(path.join(ws.path, '.code-ai')));
   assert.equal(await fs.readFile(path.join(ws.path, 'keep.txt'), 'utf8'), 'mine');
   assert.equal(await store.getWorkspace('not-a-uuid'), null);
 });
@@ -362,7 +362,7 @@ test('an app-written title never replaces one the user chose', async () => {
 });
 
 test('MCP servers are kept app-wide and imported once from old workspace files', async () => {
-  // Its own app home, so the test never touches the real ~/.hamro-ai.
+  // Its own app home, so the test never touches the real ~/.code-ai.
   const appHome = path.join(tmp, 'mcp-home');
   const trustFile = path.join(appHome, 'mcp-trust.json');
   const store = new Store({ appHome });
@@ -422,7 +422,7 @@ test('workspaces with different names share a folder, each with its own data', a
   assert.deepEqual(await store.memory(beta).all(), [], 'so is memory');
   assert.deepEqual(await store.skills(alpha).list(), [], 'and skills');
   assert.equal((await store.skills(beta).list()).length, 1);
-  const root = path.join(alpha.path, '.hamro-ai');
+  const root = path.join(alpha.path, '.code-ai');
   assert.deepEqual((await fs.readdir(root)).sort(), ['.gitignore', 'alpha', 'beta-site']);
 
   // A name with the same slug can't share it.
@@ -450,12 +450,12 @@ test('workspaces with different names share a folder, each with its own data', a
   const moved = await store.updateWorkspace(alpha.id, { name: 'Alpha', path: folder('alpha-own') });
   assert.ok(moved);
   assert.equal((await store.getChat(chatA.id))?.title, 'Alpha chat');
-  assert.ok((await fs.stat(path.join(moved.path, '.hamro-ai', 'alpha', 'chats'))).isDirectory());
+  assert.ok((await fs.stat(path.join(moved.path, '.code-ai', 'alpha', 'chats'))).isDirectory());
   assert.deepEqual((await fs.readdir(root)).sort(), ['.gitignore', 'beta-site']);
   // And back to the shared folder.
   await store.updateWorkspace(alpha.id, { path: shared });
   assert.equal((await store.getChat(chatA.id))?.title, 'Alpha chat');
-  await assert.rejects(fs.access(path.join(moved.path, '.hamro-ai')), 'nothing left behind');
+  await assert.rejects(fs.access(path.join(moved.path, '.code-ai')), 'nothing left behind');
 
   // Deleting one leaves the other's data.
   assert.equal(await store.deleteWorkspace(beta.id), true);
@@ -464,7 +464,7 @@ test('workspaces with different names share a folder, each with its own data', a
   assert.deepEqual((await fs.readdir(root)).sort(), ['.gitignore', 'alpha']);
 
   assert.equal(await store.deleteWorkspace(alpha.id), true);
-  await assert.rejects(fs.access(root), '.hamro-ai goes with the last workspace');
+  await assert.rejects(fs.access(root), '.code-ai goes with the last workspace');
 });
 
 test('re-adding a workspace by name on its folder brings its chats back', async () => {
@@ -496,10 +496,10 @@ test('on start, old flat data moves into the workspace subfolder, with its MCP a
   const store = new Store({ appHome });
   const ws = await store.createWorkspace({ name: 'Old Project', path: project });
   const other = await store.createWorkspace({ name: 'Second', path: project });
-  await fs.rm(path.join(ws.path, '.hamro-ai'), { recursive: true });
+  await fs.rm(path.join(ws.path, '.code-ai'), { recursive: true });
 
-  // The old layout: one workspace's files right in .hamro-ai/.
-  const flat = path.join(ws.path, '.hamro-ai');
+  // The old layout: one workspace's files right in .code-ai/.
+  const flat = path.join(ws.path, '.code-ai');
   const chatId = '11111111-1111-4111-8111-111111111111';
   await fs.mkdir(path.join(flat, 'chats', chatId), { recursive: true });
   await fs.writeFile(
@@ -539,7 +539,7 @@ test('on start, old flat data moves into the workspace subfolder, with its MCP a
 
 test('on start, a .nimbrio-ai folder ends up in the workspace subfolder', async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'agent-legacy-e2e-'));
-  const appHome = path.join(root, '.hamro-ai');
+  const appHome = path.join(root, '.code-ai');
   const project = path.join(root, 'project');
   // The old app home with its workspace list, and the workspace's old data folder.
   const oldHome = path.join(root, '.nimbrio-ai');
@@ -564,10 +564,53 @@ test('on start, a .nimbrio-ai folder ends up in the workspace subfolder', async 
   assert.ok(notes.length >= 3, notes.join('\n'));
   await assert.rejects(fs.access(path.join(project, '.nimbrio-ai')));
   assert.ok(
-    (await fs.stat(path.join(project, '.hamro-ai', 'legacy-app', 'chats', chatId))).isDirectory(),
+    (await fs.stat(path.join(project, '.code-ai', 'legacy-app', 'chats', chatId))).isDirectory(),
   );
-  await fs.access(path.join(project, '.hamro-ai', 'legacy-app', 'memory.json'));
+  await fs.access(path.join(project, '.code-ai', 'legacy-app', 'memory.json'));
   assert.equal((await store.getChat(chatId))?.title, 'From nimbrio');
+  assert.deepEqual(await store.moveLegacyFolders(), [], 'nothing to do the second time');
+});
+
+test('on start, .hamro-ai data and its MCP approvals move to .code-ai', async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'agent-hamro-e2e-'));
+  const appHome = path.join(root, '.code-ai');
+  const oldHome = path.join(root, '.hamro-ai');
+  const project = path.join(root, 'project');
+  await fs.mkdir(oldHome, { recursive: true });
+  // Two workspaces sharing one folder, each with its own data and an approved mcp.json.
+  const first = { id: '44444444-4444-4444-8444-444444444444', name: 'First', path: project };
+  const second = { id: '55555555-5555-4555-8555-555555555555', name: 'Second', path: project };
+  await fs.writeFile(
+    path.join(oldHome, 'workspaces.json'),
+    JSON.stringify({ workspaces: [first, second] }),
+  );
+  const mcpFile = { enabled: ['docs'] };
+  const oldTrust = new McpTrust(path.join(oldHome, 'mcp-trust.json'));
+  for (const ws of [first, second]) {
+    const dir = path.join(project, '.hamro-ai', workspaceSlug(ws.name));
+    await fs.mkdir(dir, { recursive: true });
+    await fs.writeFile(path.join(dir, 'mcp.json'), JSON.stringify(mcpFile));
+    await oldTrust.trust(dir, mcpFile);
+  }
+  const chatId = '66666666-6666-4666-8666-666666666666';
+  const oldChat = path.join(project, '.hamro-ai', 'second', 'chats', chatId);
+  await fs.mkdir(oldChat, { recursive: true });
+  await fs.writeFile(
+    path.join(oldChat, 'chat.json'),
+    JSON.stringify({ id: chatId, title: 'From hamro', createdAt: null, updatedAt: null }),
+  );
+
+  const store = new Store({ appHome });
+  const notes = await store.moveLegacyFolders();
+  assert.equal(notes.filter((note) => /MCP approval/.test(note)).length, 2, notes.join('\n'));
+  await assert.rejects(fs.access(oldHome));
+  await assert.rejects(fs.access(path.join(project, '.hamro-ai')));
+  assert.equal((await store.getChat(chatId))?.title, 'From hamro');
+  for (const ws of [first, second]) {
+    const row = await store.getWorkspace(ws.id);
+    assert.ok(row);
+    assert.equal((await store.mcp(row).read()).isTrusted, true, `${ws.name} stays approved`);
+  }
   assert.deepEqual(await store.moveLegacyFolders(), [], 'nothing to do the second time');
 });
 

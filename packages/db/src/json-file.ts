@@ -1,4 +1,4 @@
-// Reading and writing the app's JSON files: each workspace's .hamro-ai/ and ~/.hamro-ai/.
+// Reading and writing the app's JSON files: each workspace's .code-ai/ and ~/.code-ai/.
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { errorCode, errorMessage, writeFileAtomic } from '@app/agent';

@@ -14,9 +14,9 @@
         ? 'dark'
         : 'light';
   document.documentElement.setAttribute('data-theme', resolved);
-  // In the desktop app (its preload sets hamroDesktop) the window has no title bar: the top
+  // In the desktop app (its preload sets codeAiDesktop) the window has no title bar: the top
   // bars make room for the window buttons and move the window (index.css, data-desktop).
-  if (window.hamroDesktop && window.hamroDesktop.platform) {
-    document.documentElement.setAttribute('data-desktop', window.hamroDesktop.platform);
+  if (window.codeAiDesktop && window.codeAiDesktop.platform) {
+    document.documentElement.setAttribute('data-desktop', window.codeAiDesktop.platform);
   }
 })();

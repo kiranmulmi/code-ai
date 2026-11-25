@@ -5,7 +5,7 @@
 // which a page can't read by itself (the message box inserts it).
 import { contextBridge, webUtils } from 'electron';
 
-contextBridge.exposeInMainWorld('hamroDesktop', {
+contextBridge.exposeInMainWorld('codeAiDesktop', {
   platform: process.platform,
   /** The dropped file's or folder's absolute path; empty when it has none (made in the page). */
   pathForFile: (file: File): string => webUtils.getPathForFile(file),

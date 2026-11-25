@@ -60,7 +60,7 @@ export async function testPluginCode({
   timeoutMs = PLUGIN_LIMITS.testTimeoutMs,
 }: PluginTestOptions): Promise<PluginTestResult> {
   const started = Date.now();
-  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'hamro-plugin-'));
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'code-ai-plugin-'));
   const stderr: string[] = [];
   let client: Client | null = null;
   const result = (part: Omit<PluginTestResult, 'ms'>): PluginTestResult => ({
@@ -84,7 +84,7 @@ export async function testPluginCode({
         if (line.trim()) stderr.push(line.slice(0, 400));
       stderr.splice(0, Math.max(0, stderr.length - 40));
     });
-    client = new Client({ name: 'hamro-ai-plugin-test', version: '1.0.0' });
+    client = new Client({ name: 'code-ai-plugin-test', version: '1.0.0' });
     await client.connect(transport, { timeout: Math.min(timeoutMs, 20_000) });
     const listed = await client.listTools(undefined, { timeout: timeoutMs });
     tools = listed.tools.map((t) => ({

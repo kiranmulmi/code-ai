@@ -117,10 +117,10 @@ test('read_file, search_files, copy_path and move_path keep secret files out', a
 
 test("run_command can't touch the app's data folders; the user's own terminal check is unchanged", async () => {
   for (const command of [
-    'cat ~/.hamro-ai/models.json',
-    'cat $HOME/.hamro-ai/mcp-servers.json',
-    'ls -la .hamro-ai',
-    'grep -r token ~/.Hamro-AI/',
+    'cat ~/.code-ai/models.json',
+    'cat $HOME/.code-ai/mcp-servers.json',
+    'ls -la .code-ai',
+    'grep -r token ~/.Code-AI/',
     'cat ~/.nimbrio-ai/models.json',
   ]) {
     assert.ok(refuseSecretAccess(command), command);
@@ -134,7 +134,7 @@ test("run_command can't touch the app's data folders; the user's own terminal ch
     assert.equal(refuseSecretAccess(command), null, command);
   }
   const { ctx } = await workspace();
-  await assert.rejects(runCommand.run({ command: 'cat ~/.hamro-ai/models.json' }, ctx), /not run/);
+  await assert.rejects(runCommand.run({ command: 'cat ~/.code-ai/models.json' }, ctx), /not run/);
 });
 
 test('redactSecrets masks known token formats anywhere', () => {

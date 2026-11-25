@@ -516,7 +516,7 @@ export function WorkspaceFormPage() {
                       it too. The agent can read and change anything inside it, asking before each
                       change. Its chats and memories are kept in{' '}
                       <span className="font-mono text-[12px]">
-                        .hamro-ai/{workspaceSlug(name.trim() || 'workspace')}/
+                        .code-ai/{workspaceSlug(name.trim() || 'workspace')}/
                       </span>{' '}
                       there, named after the workspace.
                     </>
@@ -684,7 +684,7 @@ export function WorkspaceFormPage() {
               All chats, memories and instructions of{' '}
               <strong className="text-ink">{loaded?.name}</strong> are deleted (its{' '}
               <code className="font-mono text-[12px]">
-                .hamro-ai/{workspaceSlug(loaded?.name ?? '')}
+                .code-ai/{workspaceSlug(loaded?.name ?? '')}
               </code>{' '}
               folder). Its other files, and other workspaces using the folder, stay in{' '}
               <code className="font-mono text-[12px]">{loaded?.path}</code>.

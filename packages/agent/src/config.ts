@@ -1,6 +1,7 @@
 import os from 'node:os';
 import path from 'node:path';
 import { z } from 'zod';
+import { APP_DATA_FOLDER } from './guardrails.js';
 import { DEFAULT_AGENT_SETTINGS, LOG_LEVELS, type AgentSettings, type LogLevel } from '@app/shared';
 
 export { LOG_LEVELS, type LogLevel };
@@ -40,7 +41,7 @@ export function loadAgentConfig(env: NodeJS.ProcessEnv = process.env): AgentConf
   const e = envSchema.parse(env);
   return {
     ...DEFAULT_AGENT_SETTINGS,
-    logDir: e.AGENT_LOG_DIR ?? path.join(os.homedir(), '.hamro-ai', 'logs'),
+    logDir: e.AGENT_LOG_DIR ?? path.join(os.homedir(), APP_DATA_FOLDER, 'logs'),
     maxPlanChecks: 1,
     maxReviews: 1,
   };

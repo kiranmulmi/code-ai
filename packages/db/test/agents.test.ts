@@ -1,4 +1,4 @@
-// Offline tests for a workspace's own specialist sub-agents: .hamro-ai/<workspace>/agents/<name>.md.
+// Offline tests for a workspace's own specialist sub-agents: .code-ai/<workspace>/agents/<name>.md.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
@@ -146,7 +146,7 @@ test('a saved specialist is written with every field and reads back the same', a
     "---\nname: security-auditor\ndescription: Checking code for security problems.\ntools: files, web\nread_only: true\nmodel: review\n---\n\nYou are the team's security auditor.\n",
   );
   // The data folder ignores itself in git, as for skills.
-  await fs.access(path.join(agents.folder, '.hamro-ai', '.gitignore'));
+  await fs.access(path.join(agents.folder, '.code-ai', '.gitignore'));
   // What the file says is what the agent gets.
   const parsed = parseAgentFile('x', formatAgentFile(input({ name: 'x', instructions: '' })));
   assert.ok(!('problem' in parsed));

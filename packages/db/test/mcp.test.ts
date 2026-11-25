@@ -1,4 +1,4 @@
-// Offline tests for which MCP servers a workspace turns on (.hamro-ai/<workspace>/mcp.json) and the
+// Offline tests for which MCP servers a workspace turns on (.code-ai/<workspace>/mcp.json) and the
 // approvals kept outside it.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -19,7 +19,7 @@ async function setup() {
   return { folder, trust, data, mcp: new WorkspaceMcp(data, trust) };
 }
 
-/** The app's servers (they live in ~/.hamro-ai/mcp-servers.json; here just a list). */
+/** The app's servers (they live in ~/.code-ai/mcp-servers.json; here just a list). */
 const servers: McpServerEntry[] = [
   { name: 'github', server: { url: 'https://example.com/mcp' } },
   { name: 'docs', server: { command: 'node', args: ['docs.js'] } },
@@ -28,7 +28,7 @@ const servers: McpServerEntry[] = [
 test('a workspace starts with every server off, and turning one on saves just its name', async () => {
   const { folder, mcp } = await setup();
   assert.deepEqual(await mcp.read(), {
-    file: path.join(folder, '.hamro-ai', 'project', 'mcp.json'),
+    file: path.join(folder, '.code-ai', 'project', 'mcp.json'),
     allowed: [],
     enabled: [],
     isTrusted: true,
@@ -38,7 +38,7 @@ test('a workspace starts with every server off, and turning one on saves just it
   const state = await mcp.setEnabled('github', true);
   assert.equal(state.isTrusted, true);
   assert.deepEqual(
-    JSON.parse(await fs.readFile(path.join(folder, '.hamro-ai', 'project', 'mcp.json'), 'utf8')),
+    JSON.parse(await fs.readFile(path.join(folder, '.code-ai', 'project', 'mcp.json'), 'utf8')),
     { allowed: ['github'], enabled: ['github'] },
     'no settings or tokens in the workspace folder',
   );

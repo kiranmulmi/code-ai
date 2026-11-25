@@ -1,6 +1,6 @@
 // A workspace's skills, in one of two layouts:
 //
-//   <folder>/.hamro-ai/<workspace>/skills/
+//   <folder>/.code-ai/<workspace>/skills/
 //     <name>.md               written in the Skills tab
 //
 //     <name>/SKILL.md         uploaded as a folder, with files of its
@@ -17,7 +17,7 @@
 // The file (or folder) name is the skill's name (the `name:` line is written for readers and
 // other tools, and ignored when it disagrees; an upload takes its name from it). Written from
 // the Skills tab; the agent reads them through the SkillStore interface, and its file tools
-// can't reach .hamro-ai/. Links are never followed, so a skill folder can't lead outside.
+// can't reach .code-ai/. Links are never followed, so a skill folder can't lead outside.
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -51,7 +51,7 @@ export interface SkillUploadFile {
 }
 
 export class WorkspaceSkills implements SkillStore {
-  /** <folder>/.hamro-ai/<workspace>/skills */
+  /** <folder>/.code-ai/<workspace>/skills */
   readonly dir: string;
 
   /** `name`: the workspace's, which names its data subfolder in `folder` */

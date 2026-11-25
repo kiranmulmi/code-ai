@@ -137,14 +137,18 @@ export class Budget {
  * reachable through the app, so the model can't rewrite or wipe them. That refusal is
  * switched by GUARDRAILS.protectAppData (@app/shared constants); listings always leave it out.
  */
-export const APP_DATA_FOLDER = '.hamro-ai';
+export const APP_DATA_FOLDER = '.code-ai';
 
 /**
- * The data folder's names before the app was renamed (agentic-ai, then Nimbrio AI), newest
- * first. @app/db moves them to APP_DATA_FOLDER on start; until then (or when both existed)
+ * The data folder's names before the app was renamed (agentic-ai, then Nimbrio AI, then Hamro
+ * AI), newest first. @app/db moves them to APP_DATA_FOLDER on start; until then (or when both existed)
  * file tools can't reach them either.
  */
-export const LEGACY_APP_DATA_FOLDERS: readonly string[] = ['.nimbrio-ai', '.agentic-ai'];
+export const LEGACY_APP_DATA_FOLDERS: readonly string[] = [
+  '.hamro-ai',
+  '.nimbrio-ai',
+  '.agentic-ai',
+];
 
 /**
  * Whether a relative path goes through an APP_DATA_FOLDER (or an old name), at any depth (a
@@ -371,7 +375,7 @@ export function assertNotSecretFile(shownPath: string): void {
 
 /**
  * For the agent's run_command only (the user's own terminal tab isn't limited): commands that
- * name this app's data folders are refused. ~/.hamro-ai/ holds every model API key and MCP
+ * name this app's data folders are refused. ~/.code-ai/ holds every model API key and MCP
  * token in plain JSON. A backstop like refuseCommand, not a sandbox: a command
  * that builds the path at run time gets through, and redactSecrets catches what it prints.
  * Off when GUARDRAILS.protectAppData (@app/shared constants) is false.

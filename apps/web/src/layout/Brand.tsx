@@ -8,8 +8,8 @@ export function Brand({ isHiddenInDesktopApp = false }: { isHiddenInDesktopApp?:
   return (
     <span
       role="img"
-      aria-label="Hamro AI"
-      title="Hamro AI"
+      aria-label="Code AI"
+      title="Code AI"
       className={`brand-mark shrink-0 ${isHiddenInDesktopApp ? '[[data-desktop]_&]:hidden' : ''}`}
     >
       <LogoIcon />

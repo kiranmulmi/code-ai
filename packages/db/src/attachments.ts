@@ -1,10 +1,10 @@
 // Files users attach in a workspace's chats, kept privately next to its chats:
 //
-//   <folder>/.hamro-ai/<workspace>/uploads/<id>/meta.json   name, type, size, kind, createdAt
-//   <folder>/.hamro-ai/<workspace>/uploads/<id>/file        the bytes as uploaded
+//   <folder>/.code-ai/<workspace>/uploads/<id>/meta.json   name, type, size, kind, createdAt
+//   <folder>/.code-ai/<workspace>/uploads/<id>/file        the bytes as uploaded
 //
 // The agent reads them through the AttachmentStore interface (read_attachment, view_image,
-// save_attachment); its file tools can't reach .hamro-ai/.
+// save_attachment); its file tools can't reach .code-ai/.
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -35,7 +35,7 @@ export function cleanFileName(name: string): string {
 }
 
 export class WorkspaceAttachments implements AttachmentStore {
-  /** <folder>/.hamro-ai/<workspace>/uploads */
+  /** <folder>/.code-ai/<workspace>/uploads */
   readonly dir: string;
 
   /** `name`: the workspace's, which names its data subfolder in `folder` */

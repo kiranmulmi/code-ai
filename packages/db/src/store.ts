@@ -1,8 +1,8 @@
 // All storage, so the rest of the app never touches the data files. There is no database:
 // the app's own data (the list of workspaces, models, agent settings, MCP servers, mcp.json
-// approvals) lives in ~/.hamro-ai/ (app-home.ts). Everything about one
+// approvals) lives in ~/.code-ai/ (app-home.ts). Everything about one
 // workspace (including which MCP servers are on), chats, messages, runs, memory and its
-// instructions, lives in the workspace folder under .hamro-ai/<workspace>/ (workspace-data.ts),
+// instructions, lives in the workspace folder under .code-ai/<workspace>/ (workspace-data.ts),
 // so several workspaces can share a folder.
 import fs from 'node:fs/promises';
 import nodePath from 'node:path';
@@ -67,7 +67,7 @@ export class Store {
   /** Tool plugins made in the Tools tab (plugins/ in the app home), each also one of `mcpServers`. */
   readonly plugins: PluginStore;
 
-  /** `appHome`: the folder for the app's own settings files (default ~/.hamro-ai). */
+  /** `appHome`: the folder for the app's own settings files (default ~/.code-ai). */
   constructor({ appHome = DEFAULT_APP_HOME }: { appHome?: string } = {}) {
     this.#appHome = appHome;
     this.#workspaces = new WorkspaceList(appHomeFile(appHome, 'workspaces'));
@@ -98,9 +98,9 @@ export class Store {
 
   /**
    * The folder is created if it doesn't exist yet. Other workspaces may use it too, under
-   * names with another slug (workspaceSlug). Data already in its .hamro-ai/<slug>/ (from a
+   * names with another slug (workspaceSlug). Data already in its .code-ai/<slug>/ (from a
    * workspace of that name deleted from the list) brings its chats back, as does data in
-   * the old layout (right in .hamro-ai/) when no other workspace uses the folder.
+   * the old layout (right in .code-ai/) when no other workspace uses the folder.
    */
   async createWorkspace({
     name,
@@ -260,7 +260,7 @@ export class Store {
   }
 
   /**
-   * Deletes the workspace's chats, memory and settings (its .hamro-ai/<workspace> folder).
+   * Deletes the workspace's chats, memory and settings (its .code-ai/<workspace> folder).
    * Its other files, and other workspaces' data in the folder, stay.
    */
   async deleteWorkspace(id: string): Promise<boolean> {
@@ -390,22 +390,22 @@ export class Store {
 
   // ---------- Memories ----------
 
-  /** The long-term memory of one workspace: .hamro-ai/<workspace>/memory.json in its folder. */
+  /** The long-term memory of one workspace: .code-ai/<workspace>/memory.json in its folder. */
   memory(workspace: Pick<Workspace, 'path' | 'name'>): MemoryStore {
     return new WorkspaceData(workspace.path, workspace.name).memory();
   }
 
-  /** Files attached in one workspace's chats: .hamro-ai/<workspace>/uploads/. */
+  /** Files attached in one workspace's chats: .code-ai/<workspace>/uploads/. */
   attachments(workspace: Pick<Workspace, 'path' | 'name'>): WorkspaceAttachments {
     return new WorkspaceAttachments(workspace.path, workspace.name);
   }
 
-  /** One workspace's skills: .hamro-ai/<workspace>/skills/<name>.md, or <name>/SKILL.md with its files. */
+  /** One workspace's skills: .code-ai/<workspace>/skills/<name>.md, or <name>/SKILL.md with its files. */
   skills(workspace: Pick<Workspace, 'path' | 'name'>): WorkspaceSkills {
     return new WorkspaceSkills(workspace.path, workspace.name);
   }
 
-  /** One workspace's own specialist sub-agents: .hamro-ai/<workspace>/agents/<name>.md. */
+  /** One workspace's own specialist sub-agents: .code-ai/<workspace>/agents/<name>.md. */
   agents(workspace: Pick<Workspace, 'path' | 'name'>): WorkspaceAgents {
     return new WorkspaceAgents(workspace.path, workspace.name);
   }
@@ -415,7 +415,7 @@ export class Store {
     return new WorkspaceNotes(workspace.path, workspace.name);
   }
 
-  /** Which MCP servers one workspace turned on: .hamro-ai/<workspace>/mcp.json, and whether it's approved. */
+  /** Which MCP servers one workspace turned on: .code-ai/<workspace>/mcp.json, and whether it's approved. */
   mcp(workspace: Pick<Workspace, 'path' | 'name'>): WorkspaceMcp {
     return new WorkspaceMcp(new WorkspaceData(workspace.path, workspace.name), this.#mcpTrust);
   }
@@ -433,10 +433,10 @@ export class Store {
   }
 
   /**
-   * The app's data folders had other names: move ~/.nimbrio-ai, ~/.agentic-ai and each listed
-   * workspace's .nimbrio-ai and .agentic-ai to the new one; then move a workspace's data kept
-   * right in .hamro-ai/ (before several workspaces could share a folder) into its
-   * .hamro-ai/<workspace>/, with its MCP approval (legacy-folders.ts). Call it on start, before
+   * The app's data folders had other names: move ~/.hamro-ai, ~/.nimbrio-ai, ~/.agentic-ai and
+   * each listed workspace's .hamro-ai, .nimbrio-ai and .agentic-ai to the new one; then move a workspace's data kept
+   * right in .code-ai/ (before several workspaces could share a folder) into its
+   * .code-ai/<workspace>/, with its MCP approval (legacy-folders.ts). Call it on start, before
    * anything reads or writes them. Returns what happened, for the log.
    */
   async moveLegacyFolders(): Promise<string[]> {

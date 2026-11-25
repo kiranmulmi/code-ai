@@ -2,7 +2,7 @@
 // workspaces can share a folder: each has its own subfolder, named after it (workspaceSlug
 // in @app/shared).
 //
-//   <folder>/.hamro-ai/
+//   <folder>/.code-ai/
 //     .gitignore                  "*", so chat history never ends up in the project's git
 //     <workspace>/                one workspace's data, e.g. "Client Site / v2" -> client-site-v2/
 //       .gitignore                  "*" again, so the subfolder stays out of git if moved on its own
@@ -16,7 +16,7 @@
 //       skills/<name>.md            the user's skills (WorkspaceSkills, workspace-skills.ts)
 //       agents/<name>.md            its own sub-agents (WorkspaceAgents, workspace-agents.ts)
 //
-// Before, one workspace per folder kept these right in .hamro-ai/; moveFlatWorkspaceData
+// Before, one workspace per folder kept these right in .code-ai/; moveFlatWorkspaceData
 // (legacy-folders.ts) moves them into the workspace's subfolder on start.
 //
 // File tools can't reach this folder (APP_DATA_FOLDER in @app/agent's guardrails).
@@ -291,7 +291,7 @@ function withEstimatedCalls(run: z.infer<typeof runSchema>): z.infer<typeof runS
 
 // ---------- Where a workspace's data lives ----------
 
-/** <folder>/.hamro-ai/<slug>: where the workspace named `name` keeps its data in `folder`. */
+/** <folder>/.code-ai/<slug>: where the workspace named `name` keeps its data in `folder`. */
 export function workspaceDataDir(folder: string, name: string): string {
   return path.join(folder, APP_DATA_FOLDER, workspaceSlug(name));
 }
@@ -299,9 +299,9 @@ export function workspaceDataDir(folder: string, name: string): string {
 // ---------- One workspace's data ----------
 
 export class WorkspaceData {
-  /** <folder>/.hamro-ai/<slug>: this workspace's own data */
+  /** <folder>/.code-ai/<slug>: this workspace's own data */
   readonly dir: string;
-  /** <folder>/.hamro-ai: the data of every workspace using the folder */
+  /** <folder>/.code-ai: the data of every workspace using the folder */
   readonly root: string;
 
   constructor(
@@ -376,7 +376,7 @@ export class WorkspaceData {
     return parseOrExplain(mcpConfigSchema, raw, this.mcpFile);
   }
 
-  /** Keeps the old file next to the new one (it may hold tokens; .hamro-ai stays out of git). */
+  /** Keeps the old file next to the new one (it may hold tokens; .code-ai stays out of git). */
   async keepLegacyMcp(): Promise<void> {
     await fs.copyFile(this.mcpFile, path.join(this.dir, 'mcp.imported.json'));
   }
@@ -536,7 +536,7 @@ export class WorkspaceData {
 
   /**
    * Delete all of this workspace's chats, memory and settings; other workspaces' data in the
-   * folder stays. .hamro-ai itself goes once nothing but its .gitignore is left.
+   * folder stays. .code-ai itself goes once nothing but its .gitignore is left.
    */
   async remove(): Promise<void> {
     await fs.rm(this.dir, { recursive: true, force: true });

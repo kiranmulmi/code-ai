@@ -1,9 +1,9 @@
 // Which mcp.json each workspace has approved, keyed by the workspace's data folder
-// (<folder>/.hamro-ai/<workspace>, as several workspaces can share a folder; before, by the
+// (<folder>/.code-ai/<workspace>, as several workspaces can share a folder; before, by the
 // folder itself). A stdio MCP server is a command this app runs, and mcp.json can arrive with
 // a cloned project or be edited by hand, so servers only start from a file whose fingerprint
 // the user approved in the app. The fingerprints live outside every workspace
-// (~/.hamro-ai/mcp-trust.json), so a file can't approve itself.
+// (~/.code-ai/mcp-trust.json), so a file can't approve itself.
 import { createHash } from 'node:crypto';
 import path from 'node:path';
 import fs from 'node:fs/promises';

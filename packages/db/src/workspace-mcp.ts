@@ -1,5 +1,5 @@
 // Which of the app's MCP servers one workspace uses and has turned on:
-// <folder>/.hamro-ai/<workspace>/mcp.json, `{ "allowed": ["Github", "JIRA"], "enabled": ["Github"] }`.
+// <folder>/.code-ai/<workspace>/mcp.json, `{ "allowed": ["Github", "JIRA"], "enabled": ["Github"] }`.
 // `allowed` is chosen in the workspace settings; `enabled` (always among them) is switched
 // in the MCP tab. The file comes with the folder (a cloned project could
 // carry one), so it only takes effect once approved in the app (McpTrust); changes made in

@@ -3,7 +3,7 @@ import { SKILL_LIMITS, WRITER_LIMITS } from './constants.js';
 
 /**
  * A skill: instructions for one kind of task (a workflow, a checklist, a house style),
- * written by the user in the Skills tab and kept in the workspace's `.hamro-ai/<workspace>/skills/`,
+ * written by the user in the Skills tab and kept in the workspace's `.code-ai/<workspace>/skills/`,
  * either as one file (`<name>.md`) or, when uploaded with files of its own, as a folder
  * (`<name>/SKILL.md` plus e.g. `references/…` and `assets/…`). The agent sees every skill's
  * name and description and loads one with `use_skill` when a task matches it, then reads its

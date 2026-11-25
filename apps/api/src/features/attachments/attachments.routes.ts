@@ -38,7 +38,7 @@ export function attachmentsRouter(attachments: AttachmentsService): Router {
         param(req, 'workspaceId'),
         param(req, 'attachmentId'),
       );
-      // The file sits under .hamro-ai/, so dotfiles must be allowed for this one path.
+      // The file sits under .code-ai/, so dotfiles must be allowed for this one path.
       await new Promise<void>((resolve, reject) => {
         res.sendFile(
           filePath,

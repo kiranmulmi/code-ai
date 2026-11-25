@@ -66,7 +66,7 @@ async function fetchPublic(startUrl: string): Promise<{ response: Response; fina
         redirect: 'manual',
         signal: AbortSignal.timeout(TIMEOUT_MS),
         headers: {
-          'user-agent': 'Mozilla/5.0 (compatible; hamro-ai/0.1; +local agent)',
+          'user-agent': 'Mozilla/5.0 (compatible; code-ai/0.1; +local agent)',
           accept: 'text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.5',
           'accept-language': 'en;q=0.9,*;q=0.5',
         },

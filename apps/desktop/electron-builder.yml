@@ -1,6 +1,6 @@
 # Packs apps/desktop/.stage (laid out by scripts/stage.ts) into installers in release/.
-appId: ai.hamro.desktop
-productName: Hamro AI
+appId: ai.codeai.desktop
+productName: Code AI
 copyright: Copyright © 2026 Kiran Mulmi
 directories:
   app: .stage

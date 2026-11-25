@@ -1,6 +1,6 @@
 // A workspace's own specialist sub-agents, one Markdown file each:
 //
-//   <folder>/.hamro-ai/<workspace>/agents/<name>.md
+//   <folder>/.code-ai/<workspace>/agents/<name>.md
 //
 //   ---
 //   name: security-auditor
@@ -54,7 +54,7 @@ type ReadFile =
   { file: string; specialist: Specialist; updatedAt: string } | { file: string; problem: string };
 
 export class WorkspaceAgents {
-  /** <folder>/.hamro-ai/<workspace>/agents */
+  /** <folder>/.code-ai/<workspace>/agents */
   readonly dir: string;
 
   /** `name`: the workspace's, which names its data subfolder in `folder` */

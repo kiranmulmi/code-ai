@@ -1,4 +1,4 @@
-// Offline tests for the files each workspace keeps in <folder>/.hamro-ai/<workspace> (no server
+// Offline tests for the files each workspace keeps in <folder>/.code-ai/<workspace> (no server
 // needed).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -53,7 +53,7 @@ const run = {
   startedAt: new Date(),
 };
 
-test('settings, chats, messages and runs are saved under .hamro-ai', async () => {
+test('settings, chats, messages and runs are saved under .code-ai', async () => {
   const folder = await tempFolder();
   const data = new WorkspaceData(folder, 'Test');
   const defaults = {
@@ -85,7 +85,7 @@ test('settings, chats, messages and runs are saved under .hamro-ai', async () =>
   });
   // Hand-edited values the app doesn't know fall back instead of breaking the workspace.
   await fs.writeFile(
-    path.join(folder, '.hamro-ai', 'test', 'settings.json'),
+    path.join(folder, '.code-ai', 'test', 'settings.json'),
     JSON.stringify({
       instructions: 'x',
       planning: 'sometimes',
@@ -105,7 +105,7 @@ test('settings, chats, messages and runs are saved under .hamro-ai', async () =>
   });
   // An older file's single hasCodingTabs switch turns on both tabs, and isn't written back.
   await fs.writeFile(
-    path.join(folder, '.hamro-ai', 'test', 'settings.json'),
+    path.join(folder, '.code-ai', 'test', 'settings.json'),
     JSON.stringify({ instructions: 'x', hasCodingTabs: true }),
   );
   assert.deepEqual(await data.readSettings(), {
@@ -118,18 +118,18 @@ test('settings, chats, messages and runs are saved under .hamro-ai', async () =>
   });
   await data.writeSettings({ hasGitTab: false });
   const rewritten = JSON.parse(
-    await fs.readFile(path.join(folder, '.hamro-ai', 'test', 'settings.json'), 'utf8'),
+    await fs.readFile(path.join(folder, '.code-ai', 'test', 'settings.json'), 'utf8'),
   ) as Record<string, unknown>;
   assert.equal(rewritten.hasTerminalTab, true);
   assert.equal(rewritten.hasGitTab, false);
   assert.ok(!('hasCodingTabs' in rewritten), 'the old key is dropped on save');
   await data.writeSettings({ instructions: 'Be brief.', planning: 'default', disabledTools: [] });
   assert.equal(
-    await fs.readFile(path.join(folder, '.hamro-ai', '.gitignore'), 'utf8'),
+    await fs.readFile(path.join(folder, '.code-ai', '.gitignore'), 'utf8'),
     "# This app's chats, memory and settings. Keep them out of git.\n*\n",
     'the folder keeps itself out of git',
   );
-  await fs.access(path.join(folder, '.hamro-ai', 'test', '.gitignore'));
+  await fs.access(path.join(folder, '.code-ai', 'test', '.gitignore'));
 
   const chat = await data.createChat('First');
   const messages: ChatMessage[] = [
@@ -195,7 +195,7 @@ test('settings, chats, messages and runs are saved under .hamro-ai', async () =>
   assert.equal(meta.calls.length, 2, 'the chat gets each call for the usage breakdown');
 
   // A record saved before calls were kept still loads, with none.
-  const runsFile = path.join(folder, '.hamro-ai', 'test', 'chats', chat.id, 'runs.jsonl');
+  const runsFile = path.join(folder, '.code-ai', 'test', 'chats', chat.id, 'runs.jsonl');
   const { calls: _calls, ...older } = JSON.parse((await fs.readFile(runsFile, 'utf8')).trim()) as {
     calls: unknown;
   };
@@ -231,7 +231,7 @@ test('settings, chats, messages and runs are saved under .hamro-ai', async () =>
   assert.deepEqual([repaired?.inputTokens, repaired?.outputTokens], [9000, 100]);
 
   const lines = await fs.readFile(
-    path.join(folder, '.hamro-ai', 'test', 'chats', chat.id, 'messages.jsonl'),
+    path.join(folder, '.code-ai', 'test', 'chats', chat.id, 'messages.jsonl'),
     'utf8',
   );
   assert.equal(lines.trimEnd().split('\n').length, 5, 'one line per message');
@@ -341,7 +341,7 @@ test('a workspace slug is a readable, safe folder name', () => {
   const long = workspaceSlug(`${'a'.repeat(63)}-b-c`);
   assert.equal(long, 'a'.repeat(63), 'capped at 64, without a trailing -');
   assert.ok(workspaceSlug('x'.repeat(200)).length <= 64);
-  assert.equal(workspaceDataDir('/p', 'My App'), path.join('/p', '.hamro-ai', 'my-app'));
+  assert.equal(workspaceDataDir('/p', 'My App'), path.join('/p', '.code-ai', 'my-app'));
 });
 
 test('workspaces sharing a folder keep separate data, and removing one leaves the other', async () => {
@@ -358,7 +358,7 @@ test('workspaces sharing a folder keep separate data, and removing one leaves th
   );
   assert.equal((await beta.readSettings()).instructions, '');
   assert.deepEqual(await alpha.memory().all(), []);
-  assert.deepEqual((await fs.readdir(path.join(folder, '.hamro-ai'))).sort(), [
+  assert.deepEqual((await fs.readdir(path.join(folder, '.code-ai'))).sort(), [
     '.gitignore',
     'alpha',
     'beta-site',
@@ -372,11 +372,11 @@ test('workspaces sharing a folder keep separate data, and removing one leaves th
 
   await renamed.remove();
   assert.equal((await beta.listChats()).length, 1, "the other workspace's data stays");
-  await fs.access(path.join(folder, '.hamro-ai', '.gitignore'));
+  await fs.access(path.join(folder, '.code-ai', '.gitignore'));
   await beta.remove();
   await assert.rejects(
-    fs.access(path.join(folder, '.hamro-ai')),
-    '.hamro-ai goes once only its .gitignore is left',
+    fs.access(path.join(folder, '.code-ai')),
+    '.code-ai goes once only its .gitignore is left',
   );
 });
 
@@ -400,9 +400,9 @@ test('attachments are kept privately in uploads/ and saved with the message they
   assert.equal(pdf.kind, 'pdf');
   assert.deepEqual(await uploads.get(pdf.id), pdf);
   assert.equal((await uploads.read(pdf.id)).toString(), '%PDF');
-  assert.ok(uploads.filePath(pdf.id).startsWith(path.join(folder, '.hamro-ai', 'test', 'uploads')));
+  assert.ok(uploads.filePath(pdf.id).startsWith(path.join(folder, '.code-ai', 'test', 'uploads')));
   assert.ok(
-    await fs.stat(path.join(folder, '.hamro-ai', '.gitignore')),
+    await fs.stat(path.join(folder, '.code-ai', '.gitignore')),
     'the data folder keeps itself out of git',
   );
   assert.equal(await uploads.get('not-a-uuid'), null);

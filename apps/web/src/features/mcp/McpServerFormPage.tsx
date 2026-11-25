@@ -221,7 +221,7 @@ export function McpServerFormPage() {
               A local server runs its command in the folder of each workspace that turns it on, with
               only the variables in <span className="font-mono">env</span> plus basics like PATH and
               HOME, never this app&apos;s own keys. Keys and tokens in it are saved in
-              ~/.hamro-ai/mcp-servers.json, readable only by you, not in your project folders.
+              ~/.code-ai/mcp-servers.json, readable only by you, not in your project folders.
             </p>
           </div>
         </div>

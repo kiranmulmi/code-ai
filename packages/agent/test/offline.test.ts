@@ -259,27 +259,27 @@ async function sampleProject(): Promise<ToolContext> {
   await write('node_modules/lib/index.js', 'export function add() {}');
   await write('.git/HEAD', 'ref: refs/heads/main');
   // The app's own data: never listed, searched, read or changed by file tools.
-  await write('.hamro-ai/chats/c1/messages.jsonl', '{"content":"export function add"}\n');
-  await write('.hamro-ai/memory.json', '[]');
+  await write('.code-ai/chats/c1/messages.jsonl', '{"content":"export function add"}\n');
+  await write('.code-ai/memory.json', '[]');
   return toolContext({ workspace: filesDir });
 }
 
-test("file tools can't see or touch the app's own .hamro-ai data", async () => {
+test("file tools can't see or touch the app's own .code-ai data", async () => {
   const ctx = await sampleProject();
   const refused = /holds this app's own chats/;
-  await assert.rejects(readFile.run({ path: '.hamro-ai/memory.json' }, ctx), refused);
-  await assert.rejects(readFile.run({ path: '.Hamro-AI/memory.json' }, ctx), refused);
-  await assert.rejects(listFiles.run({ path: '.hamro-ai' }, ctx), refused);
+  await assert.rejects(readFile.run({ path: '.code-ai/memory.json' }, ctx), refused);
+  await assert.rejects(readFile.run({ path: '.Code-AI/memory.json' }, ctx), refused);
+  await assert.rejects(listFiles.run({ path: '.code-ai' }, ctx), refused);
   // The folder's names before the app was renamed, in case an old copy is left.
   await assert.rejects(readFile.run({ path: '.nimbrio-ai/memory.json' }, ctx), refused);
   await assert.rejects(readFile.run({ path: '.agentic-ai/memory.json' }, ctx), refused);
   await assert.rejects(
-    writeFile.run({ path: '.hamro-ai/memory.json', content: '[]' }, ctx),
+    writeFile.run({ path: '.code-ai/memory.json', content: '[]' }, ctx),
     refused,
   );
-  await assert.rejects(deletePath.run({ path: '.hamro-ai' }, ctx), refused);
+  await assert.rejects(deletePath.run({ path: '.code-ai' }, ctx), refused);
   await assert.rejects(
-    movePath.run({ from: 'package.json', to: 'sub/.hamro-ai/x.json' }, ctx),
+    movePath.run({ from: 'package.json', to: 'sub/.code-ai/x.json' }, ctx),
     refused,
   );
   assert.match(String(await findFiles.run({ pattern: '*.json*' }, ctx)), /^package\.json$/);
@@ -1553,7 +1553,7 @@ test('config reads only the bootstrap values from env; saved settings fall back 
   assert.equal(config.maxSteps, DEFAULT_AGENT_SETTINGS.maxSteps);
   assert.equal(config.approval, 'ask');
   assert.equal(config.logDir, path.join(os.homedir(), 'agent-logs'));
-  assert.equal(loadAgentConfig({}).logDir, path.join(os.homedir(), '.hamro-ai', 'logs'));
+  assert.equal(loadAgentConfig({}).logDir, path.join(os.homedir(), '.code-ai', 'logs'));
 
   const saved = readAgentSettings({
     maxSteps: 'lots',
@@ -1650,7 +1650,7 @@ test('save_attachment copies a file into the workspace and never overwrites', as
     saveAttachment.run({ attachment_id: id, path: 'public/logo.png' }, ctx),
     /already exists/,
   );
-  await assert.rejects(saveAttachment.run({ attachment_id: id, path: '.hamro-ai/x.png' }, ctx));
+  await assert.rejects(saveAttachment.run({ attachment_id: id, path: '.code-ai/x.png' }, ctx));
 });
 
 test('attached files are listed for the model and view_image shows the image next', async () => {
@@ -1802,7 +1802,7 @@ test('the Files panel reads one folder: folders first, generated ones marked, ap
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'agent-folder-'));
   await fs.mkdir(path.join(dir, 'src'));
   await fs.mkdir(path.join(dir, 'node_modules', 'dep'), { recursive: true });
-  await fs.mkdir(path.join(dir, '.hamro-ai'));
+  await fs.mkdir(path.join(dir, '.code-ai'));
   await fs.writeFile(path.join(dir, 'README.md'), '');
   await fs.writeFile(path.join(dir, '.env'), '');
   await fs.writeFile(path.join(dir, '.DS_Store'), '');
@@ -1832,14 +1832,14 @@ test('the Files panel search finds names and lines, skipping generated and app f
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'agent-search-'));
   await fs.mkdir(path.join(dir, 'src'));
   await fs.mkdir(path.join(dir, 'node_modules', 'dep'), { recursive: true });
-  await fs.mkdir(path.join(dir, '.hamro-ai'));
+  await fs.mkdir(path.join(dir, '.code-ai'));
   await fs.writeFile(
     path.join(dir, 'src', 'Greeting.ts'),
     'export const hello = 1;\nconst x = HELLO;\n',
   );
   await fs.writeFile(path.join(dir, 'greeting-notes.md'), 'nothing here\n');
   await fs.writeFile(path.join(dir, 'node_modules', 'dep', 'greeting.js'), 'hello');
-  await fs.writeFile(path.join(dir, '.hamro-ai', 'greeting.json'), '"hello"');
+  await fs.writeFile(path.join(dir, '.code-ai', 'greeting.json'), '"hello"');
   await fs.writeFile(path.join(dir, 'image.bin'), Buffer.from([0, 1, 2, 104, 101, 108, 108, 111]));
 
   const names = await findFilesByName(dir, 'GREET', 10);
@@ -2041,7 +2041,7 @@ test('copy_skill_file asks first, copies the bytes into the workspace and never 
   );
   await assert.rejects(
     copySkillFile.run(
-      { skill: 'corporate-navy-teal', path: 'assets/design-system.css', to: '.hamro-ai/x.css' },
+      { skill: 'corporate-navy-teal', path: 'assets/design-system.css', to: '.code-ai/x.css' },
       ctx,
     ),
     /can't reach it/,

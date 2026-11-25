@@ -1,4 +1,4 @@
-// Safe writes for the JSON files the app keeps in each workspace folder and in ~/.hamro-ai.
+// Safe writes for the JSON files the app keeps in each workspace folder and in ~/.code-ai.
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';

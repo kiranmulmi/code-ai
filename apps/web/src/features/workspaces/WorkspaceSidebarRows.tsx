@@ -15,7 +15,7 @@ import {
 import { WorkspaceAvatar } from './WorkspaceAvatar';
 
 /** What a dragged workspace row carries; folders and the top-level list accept it. */
-export const WORKSPACE_DRAG_TYPE = 'application/x-hamro-workspace';
+export const WORKSPACE_DRAG_TYPE = 'application/x-code-ai-workspace';
 
 export const isWorkspaceDrag = (event: DragEvent) =>
   event.dataTransfer.types.includes(WORKSPACE_DRAG_TYPE);

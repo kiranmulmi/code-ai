@@ -12,7 +12,7 @@ import type { WorkspacesService } from '../workspaces/workspaces.service.js';
 /** Base64 of the largest skill folder, plus room for the paths and the rest of the JSON. */
 export const SKILL_UPLOAD_BODY_LIMIT = `${Math.ceil((SKILL_LIMITS.totalBytes * 4) / 3 / (1024 * 1024)) + 1}mb`;
 
-/** A workspace's skills (its .hamro-ai/<workspace>/skills/), written or uploaded from the Skills tab. */
+/** A workspace's skills (its .code-ai/<workspace>/skills/), written or uploaded from the Skills tab. */
 export function createSkillsService({ store }: AppContext, workspaces: WorkspacesService) {
   const skillsOf = async (workspaceId: string) =>
     store.skills(await workspaces.require(workspaceId));
