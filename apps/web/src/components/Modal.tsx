@@ -15,6 +15,7 @@ export function Modal({
   footer,
   size = 'md',
   titleFont = 'mono',
+  header,
 }: {
   title: string;
   onClose: () => void;
@@ -30,6 +31,11 @@ export function Modal({
   size?: 'md' | 'lg' | 'xl' | 'wide';
   /** `mono` for a file path, `sans` for a plain title */
   titleFont?: 'mono' | 'sans';
+  /**
+   * Replaces the standard title bar (title, `actions`, Close) with a custom one, which then
+   * brings its own Close button. `title` still names the dialog for screen readers.
+   */
+  header?: ReactNode;
 }) {
   const dialog = useRef<HTMLDivElement>(null);
 
@@ -62,31 +68,33 @@ export function Modal({
       <div
         className={`relative flex animate-dialog-in flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-dialog ${
           size === 'wide'
-            ? 'h-[86vh] w-[min(1200px,calc(100%-32px))]'
+            ? 'h-[92vh] w-[min(1440px,calc(100%-32px))]'
             : size === 'xl'
-              ? 'h-[min(820px,88vh)] w-[min(1240px,calc(100%-32px))]'
+              ? 'h-[min(900px,92vh)] w-[min(1360px,calc(100%-32px))]'
               : size === 'lg'
-                ? 'max-h-[88vh] w-[min(1040px,calc(100%-32px))]'
-                : 'max-h-[80vh] w-[min(760px,calc(100%-32px))]'
+                ? 'max-h-[92vh] w-[min(1160px,calc(100%-32px))]'
+                : 'max-h-[86vh] w-[min(860px,calc(100%-32px))]'
         }`}
       >
-        <div className="flex items-center justify-between gap-3 border-b border-line bg-subtle py-2 pl-4 pr-2">
-          <strong
-            className={`min-w-0 truncate ${
-              titleFont === 'mono'
-                ? 'font-mono text-[13px] font-medium'
-                : 'pl-1 text-[14.5px] font-bold text-ink'
-            }`}
-          >
-            {title}
-          </strong>
-          <div className="flex shrink-0 items-center gap-1">
-            {actions}
-            <IconButton onClick={onClose} aria-label="Close" autoFocus>
-              <CrossIcon />
-            </IconButton>
+        {header ?? (
+          <div className="flex items-center justify-between gap-3 border-b border-line bg-subtle py-2 pl-4 pr-2">
+            <strong
+              className={`min-w-0 truncate ${
+                titleFont === 'mono'
+                  ? 'font-mono text-[13px] font-medium'
+                  : 'pl-1 text-[14.5px] font-bold text-ink'
+              }`}
+            >
+              {title}
+            </strong>
+            <div className="flex shrink-0 items-center gap-1">
+              {actions}
+              <IconButton onClick={onClose} aria-label="Close" autoFocus>
+                <CrossIcon />
+              </IconButton>
+            </div>
           </div>
-        </div>
+        )}
         <div className="min-h-0 flex-1 overflow-auto">{children}</div>
         {footer && (
           <div className="flex shrink-0 flex-wrap items-center gap-2 border-t border-line bg-subtle px-4 py-3 has-[>div:only-child:empty]:hidden">

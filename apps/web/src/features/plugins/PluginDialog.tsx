@@ -6,15 +6,31 @@ import {
   type Plugin,
   type PluginTestResult,
 } from '@app/shared';
-import { AiWritingEditor, type AiChip } from '../../components/AiWritingEditor';
+import type { AiChip } from '../../components/AiWritingEditor';
+import { Badge } from '../../components/Badge';
 import { Button } from '../../components/Button';
 import { ConfirmDeleteDialog } from '../../components/ConfirmDeleteDialog';
-import { ERROR, HINT, INPUT, INPUT_ERROR, INPUT_OK, LABEL } from '../../components/form';
+import { ERROR, INPUT, INPUT_ERROR, INPUT_OK } from '../../components/form';
+import { IconButton } from '../../components/IconButton';
 import { Modal } from '../../components/Modal';
 import { PageLoader } from '../../components/PageLoader';
 import { Spinner } from '../../components/Spinner';
 import { ApiError, errorMessage, isNotFound } from '../../lib/api';
-import { PlayIcon, TrashIcon, WandIcon } from '../../lib/icons';
+import {
+  CheckIcon,
+  CrossIcon,
+  FolderIcon,
+  GlobeIcon,
+  PlayIcon,
+  RefreshIcon,
+  ShieldIcon,
+  SunIcon,
+  TerminalIcon,
+  TrashIcon,
+  WandIcon,
+  WarnIcon,
+  WrenchIcon,
+} from '../../lib/icons';
 import { useToast } from '../../lib/toast';
 import {
   createPlugin,
@@ -24,7 +40,9 @@ import {
   updatePlugin,
   writePluginCode,
 } from './api';
+import { EnvEditor } from './EnvEditor';
 import { envToText, parseEnvText, sampleArgs } from './envText';
+import { PluginCodePane, type Starter } from './PluginCodePane';
 
 type Field = 'name' | 'description' | 'code' | 'env';
 type Errors = Partial<Record<Field, string>>;
@@ -36,9 +54,7 @@ interface Draft {
 }
 
 const EMPTY: Draft = { name: '', description: '', code: '', env: '' };
-const SECTION = 'px-5 py-4';
-const CODE_HEIGHT = 'h-[max(160px,calc(88vh-640px))] sm:h-[max(200px,calc(88vh-560px))]';
-const CODE_PLACEHOLDER = `// Describe your tool below and AI writes this file (tools.mjs).
+const CODE_PLACEHOLDER = `// Describe your tool above and AI writes this file (tools.mjs).
 export const tools = [
   {
     name: 'my_tool',
@@ -51,10 +67,25 @@ export const tools = [
 ];`;
 
 /** One click: a request sent as it is. */
-const STARTERS = [
-  'Get the current weather for a city from the free Open-Meteo API (no key needed)',
-  'Look up a country by name with restcountries.com: capital, population, currency',
-  'Count lines of code per file extension in the workspace folder',
+const STARTERS: readonly Starter[] = [
+  {
+    title: 'Weather',
+    detail: 'Current weather for a city, Open-Meteo, no key',
+    icon: <SunIcon size={15} />,
+    request: 'Get the current weather for a city from the free Open-Meteo API (no key needed)',
+  },
+  {
+    title: 'Country facts',
+    detail: 'Capital, population, currency from restcountries.com',
+    icon: <GlobeIcon size={15} />,
+    request: 'Look up a country by name with restcountries.com: capital, population, currency',
+  },
+  {
+    title: 'Code stats',
+    detail: 'Lines of code per file type in this workspace',
+    icon: <FolderIcon size={15} />,
+    request: 'Count lines of code per file extension in the workspace folder',
+  },
 ];
 const REFINEMENTS: readonly AiChip[] = [
   { label: 'Fix bugs', request: '' },
@@ -350,10 +381,68 @@ export function PluginDialog({
   };
   const cancelDelete = useCallback(() => setIsDeleteOpen(false), []);
 
+  const slug = toPluginName(draft.name);
+  const hasCode = draft.code.trim() !== '';
+  const hasPassed = Boolean(test && !test.error);
+  const steps = [
+    { label: 'Name it', done: slug !== '' },
+    { label: 'Write the code', done: hasCode },
+    { label: 'Test it', done: hasPassed },
+  ];
+
+  const header = (
+    <div className="flex shrink-0 items-center gap-4 border-b border-line bg-surface py-3 pl-5 pr-3">
+      <span className="brand-mark h-10 w-10 rounded-xl">
+        <WrenchIcon size={18} />
+      </span>
+      <div className="min-w-0">
+        <div className="flex items-center gap-2">
+          <h2 className="truncate text-[16px] font-bold text-ink">
+            {isEdit ? 'Edit tool plugin' : 'New tool plugin'}
+          </h2>
+          {isDirty && isEdit && <Badge tone="yellow">Unsaved</Badge>}
+        </div>
+        <p className="truncate text-[12.5px] text-ink-3">
+          Describe a tool, AI writes it, you test it, then turn it on in a workspace.
+        </p>
+      </div>
+      <ol className="ml-auto hidden items-center gap-1 md:flex" aria-label="Progress">
+        {steps.map((step, index) => (
+          <li key={step.label} className="flex items-center gap-1">
+            {index > 0 && (
+              <span
+                aria-hidden
+                className={`h-px w-5 ${steps[index - 1]?.done ? 'bg-accent' : 'bg-line-strong'}`}
+              />
+            )}
+            <span
+              className={`inline-flex h-7 items-center gap-1.5 rounded-full px-2.5 text-[12px] font-semibold transition-colors ${
+                step.done ? 'bg-accent-soft text-accent-2' : 'text-ink-3'
+              }`}
+            >
+              <span
+                className={`grid h-4 w-4 place-items-center rounded-full text-[10px] tabular-nums ${
+                  step.done ? 'bg-accent text-on-accent' : 'border border-line-strong'
+                }`}
+              >
+                {step.done ? <CheckIcon size={9} /> : index + 1}
+              </span>
+              {step.label}
+              <span className="sr-only">{step.done ? '(done)' : '(to do)'}</span>
+            </span>
+          </li>
+        ))}
+      </ol>
+      <IconButton onClick={requestClose} aria-label="Close" className="ml-2 md:ml-3">
+        <CrossIcon />
+      </IconButton>
+    </div>
+  );
+
   const footer = isClosing ? (
     <>
-      <span role="alert" className="mr-auto text-[13px] text-ink-2">
-        You have unsaved changes.
+      <span role="alert" className="mr-auto flex items-center gap-2 text-[13px] text-ink-2">
+        <WarnIcon className="text-warn" /> You have unsaved changes.
       </span>
       <Button size="sm" onClick={() => setIsClosing(false)}>
         Keep editing
@@ -374,7 +463,12 @@ export function PluginDialog({
           <TrashIcon /> Delete
         </Button>
       )}
-      <span className="ml-auto" />
+      <span className="mr-auto hidden items-center gap-1.5 text-[12px] text-ink-3 sm:flex">
+        <ShieldIcon size={13} />
+        {hasPassed
+          ? 'Tested. Each call still asks for your approval.'
+          : 'Saving without a test is fine; each call asks for your approval.'}
+      </span>
       <Button size="sm" onClick={requestClose} disabled={isSaving}>
         Cancel
       </Button>
@@ -385,8 +479,8 @@ export function PluginDialog({
         form="plugin-form"
         disabled={isBusy || isLoading}
       >
-        {isSaving && <Spinner size={12} />}
-        {isSaving ? 'Saving…' : isEdit ? 'Save' : 'Create plugin'}
+        {isSaving ? <Spinner size={12} /> : <CheckIcon size={12} />}
+        {isSaving ? 'Saving…' : isEdit ? 'Save changes' : 'Create plugin'}
       </Button>
     </>
   );
@@ -394,10 +488,10 @@ export function PluginDialog({
   return (
     <>
       <Modal
-        title={isEdit ? 'Edit tool plugin' : 'New tool plugin'}
-        titleFont="sans"
-        size="lg"
+        title={isEdit ? `Edit tool plugin ${pluginName}` : 'New tool plugin'}
+        size="wide"
         onClose={requestClose}
+        header={header}
         footer={footer}
       >
         {isLoading ? (
@@ -407,11 +501,16 @@ export function PluginDialog({
             id="plugin-form"
             onSubmit={(event) => void submit(event)}
             noValidate
-            className="divide-y divide-line-2"
+            className="flex flex-col lg:grid lg:h-full lg:grid-cols-[320px_minmax(0,1fr)]"
           >
-            <div className={`${SECTION} grid gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)]`}>
-              <div className="min-w-0">
-                <label htmlFor="plugin-name" className={LABEL}>
+            {/* ---------- Left rail: what it is, and its secrets ---------- */}
+            <aside className="flex flex-col gap-6 border-b border-line bg-subtle p-5 lg:min-h-0 lg:overflow-y-auto lg:border-b-0 lg:border-r">
+              <section>
+                <h3 className="eyebrow">Identity</h3>
+                <label
+                  htmlFor="plugin-name"
+                  className="mt-3 block text-[13px] font-semibold text-ink"
+                >
                   Name
                 </label>
                 <input
@@ -420,46 +519,88 @@ export function PluginDialog({
                   maxLength={40}
                   placeholder="weather"
                   autoFocus={!isEdit}
+                  spellCheck={false}
                   aria-invalid={errors.name ? true : undefined}
+                  aria-describedby="plugin-name-hint"
                   onChange={(event) => change('name', event.target.value)}
                   onBlur={() => change('name', toPluginName(draft.name))}
-                  className={`${INPUT} ${errors.name ? INPUT_ERROR : INPUT_OK} font-mono`}
+                  className={`${INPUT} ${errors.name ? INPUT_ERROR : INPUT_OK} font-mono text-[13.5px]`}
                 />
                 {errors.name && (
                   <p role="alert" className={ERROR}>
                     {errors.name}
                   </p>
                 )}
-                <p className={HINT}>
-                  Lower-case words joined by hyphens. Its tools reach the agent as{' '}
-                  <span className="break-all font-mono text-[12px]">
-                    mcp__{toPluginName(draft.name) || 'name'}__&lt;tool&gt;
-                  </span>
-                </p>
-              </div>
-              <div className="min-w-0">
-                <label htmlFor="plugin-description" className={LABEL}>
+                <div id="plugin-name-hint" className="mt-2 text-[12px] leading-snug text-ink-3">
+                  Lower-case words joined by hyphens. The agent sees its tools as
+                  <code className="mt-1.5 block truncate rounded-lg border border-line bg-surface px-2 py-1 font-mono text-[11.5px] text-ink-2">
+                    mcp__<span className="font-semibold text-accent-2">{slug || 'name'}</span>
+                    __&lt;tool&gt;
+                  </code>
+                </div>
+
+                <label
+                  htmlFor="plugin-description"
+                  className="mt-5 flex items-baseline justify-between text-[13px] font-semibold text-ink"
+                >
                   What it&apos;s for
+                  <span className="text-[11px] font-normal tabular-nums text-ink-3">
+                    {draft.description.length}/300
+                  </span>
                 </label>
                 <textarea
                   id="plugin-description"
-                  rows={2}
+                  rows={3}
                   value={draft.description}
                   maxLength={300}
                   placeholder="Weather lookups for any city."
                   onChange={(event) => change('description', event.target.value)}
-                  className={`${INPUT} ${INPUT_OK} resize-y leading-relaxed`}
+                  className={`${INPUT} ${INPUT_OK} resize-y text-[13.5px] leading-relaxed`}
                 />
-                <p className={HINT}>For you, in the Tools tab. AI fills it in when empty.</p>
-              </div>
-            </div>
+                <p className="mt-1.5 text-[12px] leading-snug text-ink-3">
+                  Shown in the Tools tab. Leave it empty and AI fills it in.
+                </p>
+              </section>
 
-            <div className={SECTION}>
-              <label htmlFor="plugin-code" className={LABEL}>
-                Code <span className="font-normal text-ink-3">· tools.mjs, written by AI</span>
-              </label>
-              <AiWritingEditor
-                id="plugin-code"
+              <section>
+                <h3 className="eyebrow">Secrets &amp; settings</h3>
+                <div className="mt-3">
+                  <EnvEditor
+                    value={draft.env}
+                    onChange={(value) => change('env', value)}
+                    hasError={Boolean(errors.env)}
+                  />
+                </div>
+                {errors.env && (
+                  <p role="alert" className={ERROR}>
+                    {errors.env}
+                  </p>
+                )}
+                <p className="mt-2 text-[12px] leading-snug text-ink-3">
+                  The code reads them as <code className="font-mono">ctx.env</code>. Values stay in
+                  the app&apos;s private settings; the AI writer only sees the names.
+                </p>
+              </section>
+
+              <section
+                id="plugin-code-hint"
+                className="mt-auto rounded-xl border border-line border-l-4 border-l-accent bg-surface p-3.5"
+              >
+                <h3 className="flex items-center gap-1.5 text-[12.5px] font-semibold text-ink">
+                  <ShieldIcon size={13} className="text-accent-2" /> How it runs
+                </h3>
+                <ul className="mt-2 space-y-1.5 text-[12px] leading-snug text-ink-2">
+                  <li>Node, in its own process, in the workspace folder.</li>
+                  <li>Only the variables above, nothing else from your setup.</li>
+                  <li>Every call asks for approval unless you allow it in the MCP tab.</li>
+                  <li className="font-semibold text-ink">Read the code before you turn it on.</li>
+                </ul>
+              </section>
+            </aside>
+
+            {/* ---------- Main: AI prompt, code, test console ---------- */}
+            <div className="flex min-w-0 flex-col gap-4 p-5 lg:min-h-0 lg:overflow-y-auto">
+              <PluginCodePane
                 value={draft.code}
                 onChange={(value) => change('code', value)}
                 write={writeCode}
@@ -468,81 +609,40 @@ export function PluginDialog({
                 hasError={Boolean(errors.code)}
                 describedBy="plugin-code-hint"
                 placeholder={CODE_PLACEHOLDER}
-                maxLength={100_000}
                 requestMaxLength={PLUGIN_REQUEST_MAX_CHARS}
                 starters={STARTERS}
                 refinements={REFINEMENTS}
-                askPlaceholder={{
-                  empty:
-                    'Describe the tool and AI writes it, e.g. "convert currencies with frankfurter.app"',
-                  filled: 'Ask AI to change it, e.g. "add a tool that lists forecasts for 7 days"',
-                }}
-                heightClass={CODE_HEIGHT}
-                textClassName="font-mono text-[12.5px] [tab-size:2] whitespace-pre"
-                failMessage="Couldn't write the code."
               />
               {errors.code && (
-                <p role="alert" className={ERROR}>
+                <p role="alert" className="-mt-2 text-[13px] text-danger">
                   {errors.code}
                 </p>
               )}
-              <p id="plugin-code-hint" className={HINT}>
-                Runs with Node in its own process when the agent calls a tool, in the workspace
-                folder, with only the variables below. Every call asks for your approval unless you
-                allow the tool in the MCP tab. Read the code before you turn it on.
-              </p>
-            </div>
 
-            <div className={SECTION}>
-              <label htmlFor="plugin-env" className={LABEL}>
-                Environment variables{' '}
-                <span className="font-normal text-ink-3">· NAME=value per line, optional</span>
-              </label>
-              <textarea
-                id="plugin-env"
-                rows={2}
-                value={draft.env}
-                spellCheck={false}
-                placeholder="WEATHER_API_KEY=…"
-                aria-invalid={errors.env ? true : undefined}
-                onChange={(event) => change('env', event.target.value)}
-                className={`${INPUT} ${errors.env ? INPUT_ERROR : INPUT_OK} resize-y font-mono text-[12.5px]`}
+              <TestConsole
+                test={test}
+                isTesting={isTesting}
+                isFixing={isFixing}
+                disabled={isBusy || !hasCode}
+                tool={tool}
+                args={args}
+                argsError={argsError}
+                canUndoFix={codeBeforeFix !== null}
+                onCheck={() => void runTest(false)}
+                onRun={() => void runTest(true)}
+                onPickTool={pickTool}
+                onArgs={(value) => {
+                  setArgs(value);
+                  setArgsError(null);
+                }}
+                onFix={() => void fixWithAi()}
+                onUndoFix={() => {
+                  if (codeBeforeFix === null) return;
+                  setDraft((current) => ({ ...current, code: codeBeforeFix }));
+                  setCodeBeforeFix(null);
+                }}
               />
-              {errors.env && (
-                <p role="alert" className={ERROR}>
-                  {errors.env}
-                </p>
-              )}
-              <p className={HINT}>
-                API keys and settings the code reads as <span className="font-mono">ctx.env</span>.
-                Kept in the app&apos;s private MCP server settings, never sent to the AI writer
-                (only their names are).
-              </p>
             </div>
-
-            <TestBench
-              test={test}
-              isTesting={isTesting}
-              isFixing={isFixing}
-              disabled={isBusy || !draft.code.trim()}
-              tool={tool}
-              args={args}
-              argsError={argsError}
-              canUndoFix={codeBeforeFix !== null}
-              onCheck={() => void runTest(false)}
-              onRun={() => void runTest(true)}
-              onPickTool={pickTool}
-              onArgs={(value) => {
-                setArgs(value);
-                setArgsError(null);
-              }}
-              onFix={() => void fixWithAi()}
-              onUndoFix={() => {
-                if (codeBeforeFix === null) return;
-                setDraft((current) => ({ ...current, code: codeBeforeFix }));
-                setCodeBeforeFix(null);
-              }}
-            />
           </form>
         )}
       </Modal>
@@ -566,8 +666,11 @@ export function PluginDialog({
   );
 }
 
-/** Check the code loads, pick a tool, call it with arguments, and send a failure to the AI. */
-function TestBench({
+/**
+ * The test console: check the code loads, pick one of its tools, call it with JSON arguments,
+ * and see the result, or send a failure to the AI to fix.
+ */
+function TestConsole({
   test,
   isTesting,
   isFixing,
@@ -601,12 +704,26 @@ function TestBench({
   const tools = test?.tools ?? [];
   const picked = tools.find((t) => t.name === tool);
   return (
-    <div className={SECTION}>
-      <div className="flex flex-wrap items-center gap-2">
-        <span className={LABEL}>Test</span>
-        <span className="text-[12.5px] text-ink-3">
-          Runs the code above (unsaved is fine) in the workspace folder.
-        </span>
+    <section
+      aria-labelledby="plugin-test-title"
+      className="shrink-0 overflow-hidden rounded-2xl border border-line bg-surface shadow-card"
+    >
+      <div className="flex flex-wrap items-center gap-2 border-b border-line bg-subtle px-4 py-2.5">
+        <TerminalIcon size={15} className="text-ink-2" />
+        <h3 id="plugin-test-title" className="text-[13px] font-semibold text-ink">
+          Test console
+        </h3>
+        {test &&
+          (test.error ? (
+            <Badge tone="red">Failed · {formatMs(test.ms)}</Badge>
+          ) : (
+            <Badge tone="green" icon={<CheckIcon size={9} />}>
+              {test.output === null
+                ? `${test.tools.length} tool${test.tools.length === 1 ? '' : 's'} loaded`
+                : 'Ran'}{' '}
+              · {formatMs(test.ms)}
+            </Badge>
+          ))}
         <span className="ml-auto" />
         {canUndoFix && (
           <Button size="sm" variant="plain" onClick={onUndoFix}>
@@ -614,44 +731,75 @@ function TestBench({
           </Button>
         )}
         <Button size="sm" onClick={onCheck} disabled={disabled}>
-          {isTesting && !tools.length ? <Spinner size={12} /> : null}
-          Check it loads
+          {isTesting && !tools.length ? <Spinner size={12} /> : <RefreshIcon size={12} />}
+          {tools.length ? 'Reload' : 'Check it loads'}
         </Button>
       </div>
 
+      {!test && !tools.length && (
+        <p className="px-4 py-4 text-[12.5px] leading-relaxed text-ink-3">
+          {disabled && !isTesting
+            ? 'Write or generate the code above, then check it loads here.'
+            : 'Runs the code above (unsaved is fine) in the workspace folder and lists its tools.'}
+        </p>
+      )}
+
       {tools.length > 0 && (
-        <div className="mt-3 grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)]">
+        <div className="grid gap-4 p-4 md:grid-cols-[minmax(0,0.9fr)_minmax(0,1.4fr)]">
           <div className="min-w-0">
-            <label htmlFor="plugin-test-tool" className="text-[12.5px] font-semibold text-ink">
+            <span id="plugin-test-tool" className="text-[12px] font-semibold text-ink">
               Tool
-            </label>
-            <select
-              id="plugin-test-tool"
-              value={tool}
-              onChange={(event) => onPickTool(event.target.value)}
-              className={`${INPUT} ${INPUT_OK} h-9 py-0 font-mono text-[12.5px]`}
-            >
-              {tools.map((t) => (
-                <option key={t.name} value={t.name}>
-                  {t.name}
-                </option>
-              ))}
-            </select>
-            {picked?.description && (
-              <p className="mt-1.5 text-[12px] leading-snug text-ink-3">{picked.description}</p>
-            )}
+            </span>
+            <div role="radiogroup" aria-labelledby="plugin-test-tool" className="mt-1.5 space-y-1">
+              {tools.map((t) => {
+                const isPicked = t.name === tool;
+                return (
+                  <button
+                    key={t.name}
+                    type="button"
+                    role="radio"
+                    aria-checked={isPicked}
+                    onClick={() => onPickTool(t.name)}
+                    className={`flex w-full items-start gap-2 rounded-xl border px-3 py-2 text-left transition-colors ${
+                      isPicked
+                        ? 'border-accent bg-accent-soft'
+                        : 'border-line hover:border-line-strong hover:bg-subtle'
+                    }`}
+                  >
+                    <span
+                      aria-hidden
+                      className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full border-2 ${
+                        isPicked ? 'border-accent bg-accent' : 'border-line-strong'
+                      }`}
+                    />
+                    <span className="min-w-0">
+                      <span className="block truncate font-mono text-[12.5px] font-semibold text-ink">
+                        {t.name}
+                      </span>
+                      {t.description && (
+                        <span className="mt-0.5 line-clamp-2 block text-[11.5px] leading-snug text-ink-3">
+                          {t.description}
+                        </span>
+                      )}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
-          <div className="min-w-0">
-            <label htmlFor="plugin-test-args" className="text-[12.5px] font-semibold text-ink">
+          <div className="flex min-w-0 flex-col">
+            <label htmlFor="plugin-test-args" className="text-[12px] font-semibold text-ink">
               Arguments <span className="font-normal text-ink-3">· JSON</span>
             </label>
             <textarea
               id="plugin-test-args"
-              rows={4}
+              rows={5}
               value={args}
               spellCheck={false}
               onChange={(event) => onArgs(event.target.value)}
-              className={`${INPUT} ${argsError ? INPUT_ERROR : INPUT_OK} resize-y font-mono text-[12.5px]`}
+              className={`mt-1.5 w-full flex-1 resize-y rounded-xl border bg-subtle px-3 py-2 font-mono text-[12px] leading-relaxed text-ink outline-none transition-colors focus:border-accent focus:ring-1 focus:ring-accent ${
+                argsError ? 'border-danger-line' : 'border-line hover:border-line-strong'
+              }`}
             />
             {argsError && (
               <p role="alert" className={ERROR}>
@@ -659,50 +807,43 @@ function TestBench({
               </p>
             )}
             <div className="mt-2 flex justify-end">
-              <Button size="sm" variant="soft" onClick={onRun} disabled={disabled || !tool}>
-                {isTesting ? <Spinner size={12} /> : <PlayIcon size={12} />}
-                {isTesting ? 'Running…' : `Run ${tool}`}
+              <Button size="sm" variant="primary" onClick={onRun} disabled={disabled || !tool}>
+                {isTesting ? <Spinner size={12} /> : <PlayIcon size={11} />}
+                {isTesting ? 'Running…' : `Run ${picked?.name ?? tool}`}
               </Button>
             </div>
           </div>
         </div>
       )}
 
-      {test && (
-        <div className="mt-3" aria-live="polite">
-          {test.error ? (
-            <div className="rounded-xl border border-l-4 border-line border-l-danger-line bg-danger-bg p-3">
-              <div className="flex flex-wrap items-center gap-2">
-                <strong className="text-[12.5px] text-danger">
-                  Failed after {formatMs(test.ms)}
-                </strong>
-                <span className="ml-auto" />
-                <Button size="sm" variant="primary" onClick={onFix} disabled={isFixing}>
-                  {isFixing ? <Spinner size={12} /> : <WandIcon size={12} />}
-                  {isFixing ? 'Fixing…' : 'Ask AI to fix'}
-                </Button>
-              </div>
-              <pre className="mt-2 max-h-56 overflow-auto whitespace-pre-wrap break-words font-mono text-[12px] leading-relaxed text-ink">
-                {test.error}
-              </pre>
-            </div>
-          ) : (
-            <div className="rounded-xl border border-l-4 border-line border-l-accent bg-subtle p-3">
-              <strong className="text-[12.5px] text-ink">
-                {test.output === null
-                  ? `Loaded ${test.tools.length} tool${test.tools.length === 1 ? '' : 's'} in ${formatMs(test.ms)}`
-                  : `Result in ${formatMs(test.ms)}`}
-              </strong>
-              {test.output !== null && (
-                <pre className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap break-words font-mono text-[12px] leading-relaxed text-ink">
-                  {test.output}
-                </pre>
-              )}
-            </div>
-          )}
+      {test && (test.error || test.output !== null) && (
+        <div aria-live="polite" className="border-t border-line">
+          <div className="flex items-center gap-2 px-4 pt-3">
+            <span
+              className={`text-[11px] font-bold uppercase tracking-[0.12em] ${
+                test.error ? 'text-danger' : 'text-accent-2'
+              }`}
+            >
+              {test.error ? 'Error' : 'Output'}
+            </span>
+            <span className="ml-auto" />
+            {test.error && (
+              <Button size="sm" variant="primary" onClick={onFix} disabled={isFixing}>
+                {isFixing ? <Spinner size={12} /> : <WandIcon size={12} />}
+                {isFixing ? 'Fixing…' : 'Ask AI to fix'}
+              </Button>
+            )}
+          </div>
+          <pre
+            className={`m-4 mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-xl border border-l-4 bg-subtle p-3 font-mono text-[12px] leading-relaxed text-ink ${
+              test.error ? 'border-line border-l-danger-line' : 'border-line border-l-accent'
+            }`}
+          >
+            {test.error ?? test.output}
+          </pre>
         </div>
       )}
-    </div>
+    </section>
   );
 }
 

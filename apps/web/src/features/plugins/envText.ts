@@ -22,6 +22,34 @@ export function parseEnvText(text: string): Record<string, string> {
   return env;
 }
 
+/** One row of the variables editor. */
+export interface EnvRow {
+  key: string;
+  value: string;
+}
+
+/** The env text as editable rows (blank lines and # comments left out). */
+export function envTextToRows(text: string): EnvRow[] {
+  return text
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line && !line.startsWith('#'))
+    .map((line) => {
+      const eq = line.indexOf('=');
+      return eq === -1
+        ? { key: line, value: '' }
+        : { key: line.slice(0, eq).trim(), value: line.slice(eq + 1).trim() };
+    });
+}
+
+/** The rows back as KEY=value lines; a row with nothing in it is a blank line. */
+export function envRowsToText(rows: readonly EnvRow[]): string {
+  return rows
+    .map((row) => (row.key.trim() || row.value.trim() ? `${row.key.trim()}=${row.value}` : ''))
+    .join('\n')
+    .replace(/\n+$/, '');
+}
+
 /** Example arguments for a tool, from its input schema: what the test form starts with. */
 export function sampleArgs(schema: Record<string, unknown>): string {
   const properties = (schema.properties ?? {}) as Record<string, Record<string, unknown>>;
