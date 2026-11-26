@@ -161,7 +161,7 @@ export function ActivityCard({
         }`}
       >
         <div className="min-h-0 overflow-hidden">
-          <div className="pb-1 pt-1.5">
+          <div className="pb-1 pl-1 pt-3">
             <Timeline>{children}</Timeline>
           </div>
         </div>

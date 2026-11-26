@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { ElapsedTime } from '../../components/ElapsedTime';
 import { formatElapsed, plural } from '../../lib/format';
-import { BoltIcon, CheckIcon, CopyIcon, FlagIcon, LogoIcon, PulseIcon } from '../../lib/icons';
+import { BoltIcon, CheckIcon, CopyIcon, LogoIcon, PulseIcon } from '../../lib/icons';
 import { useToast } from '../../lib/toast';
 import { APP_NAME } from '../../lib/brand';
 import { EarlierPlan } from '../panel/plan/EarlierPlan';
@@ -120,15 +120,7 @@ export function AgentMessage({
         if (!placed) return null;
         if (placed.hasInlineSteps) return <PlanGoalEntry key={block.key} goal={placed.plan.goal} />;
         return (
-          <TimelineEntry
-            key={block.key}
-            className="py-1"
-            node={
-              <span className="grid h-[22px] w-[22px] place-items-center rounded-full bg-accent text-on-accent">
-                <FlagIcon size={11} />
-              </span>
-            }
-          >
+          <TimelineEntry key={block.key}>
             <EarlierPlan plan={placed.plan} />
           </TimelineEntry>
         );

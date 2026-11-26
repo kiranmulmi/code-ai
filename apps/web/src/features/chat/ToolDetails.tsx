@@ -217,11 +217,7 @@ export function ToolDetails({
 
   return (
     <div
-      className="mb-2 ml-3 mt-0.5 animate-enter border-l-2 pl-3.5 motion-reduce:animate-none"
-      style={{
-        borderColor: `color-mix(in srgb, ${isError ? 'var(--danger)' : color} 45%, transparent)`,
-      }}
-    >
+      className="mb-1.5 animate-enter motion-reduce:animate-none">
       <div className="flex h-8 items-center gap-4 border-b border-line-2">
         <div
           role="tablist"
