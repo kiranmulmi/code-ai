@@ -304,6 +304,7 @@ async function main(): Promise<void> {
           for (const m of await store.models.list()) {
             const mark = m.id === model.id ? '*' : ' ';
             const tags = [
+              m.category !== 'chat' && m.category,
               m.isDefault && 'default',
               m.supportsReasoning && 'reasoning',
               !m.supportsImages && 'text only',

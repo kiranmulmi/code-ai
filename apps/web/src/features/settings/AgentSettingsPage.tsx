@@ -10,6 +10,7 @@ import {
   type AgentSettings,
   type ApprovalMode,
   type LogLevel,
+  type ModelCategory,
   type ModelProfile,
   type ReviewMode,
 } from '@app/shared';
@@ -23,6 +24,7 @@ import { errorMessage } from '../../lib/api';
 import { compactNumber } from '../../lib/format';
 import { fromPath } from '../../lib/routerState';
 import { useToast } from '../../lib/toast';
+import { ModelOptions } from '../models/ModelOptions';
 import { useModels } from '../models/useModels';
 import { fetchSettings, saveSettings } from './api';
 import { SettingsTabs } from './SettingsTabs';
@@ -306,6 +308,7 @@ export function AgentSettingsPage() {
               hint="A cheaper or faster model often does well on delegated parts."
               value={draft.subagentModelId}
               models={models.data}
+              category="chat"
               error={errors.subagentModelId}
               onChange={(id) => set('subagentModelId', id)}
             />
@@ -335,6 +338,7 @@ export function AgentSettingsPage() {
               hint="A different model from the agent's catches more of its blind spots."
               value={draft.reviewModelId}
               models={models.data}
+              category="chat"
               error={errors.reviewModelId}
               onChange={(id) => set('reviewModelId', id)}
             />
@@ -348,10 +352,11 @@ export function AgentSettingsPage() {
           <ModelPicker
             id="setting-vision-model"
             label="Image model"
-            hint="For chat models that can't read images (Reads images turned off in Models): this model looks at images (view_image) and describes them in text. Without one, such a model can't see images at all."
+            hint="For chat models that can't read images (Reads images turned off in Models): this model looks at images (view_image) and describes them in text. Without one, such a model can't see images at all. Lists the Image models from Settings → Models."
             emptyLabel="None"
             value={draft.visionModelId}
             models={models.data?.filter((m) => m.supportsImages) ?? null}
+            category="image"
             error={errors.visionModelId}
             onChange={(id) => set('visionModelId', id)}
           />
@@ -525,6 +530,7 @@ function ModelPicker({
   emptyLabel = 'Same as the chat',
   value,
   models,
+  category,
   error,
   onChange,
 }: {
@@ -535,6 +541,8 @@ function ModelPicker({
   emptyLabel?: string;
   value: string | null;
   models: readonly ModelProfile[] | null;
+  /** Listed first; any model can still be picked. */
+  category: ModelCategory;
   error: string | undefined;
   onChange: (id: string | null) => void;
 }) {
@@ -550,11 +558,7 @@ function ModelPicker({
         className={`${CONTROL} ${error ? INPUT_ERROR : INPUT_OK} w-56 pr-7`}
       >
         <option value="">{emptyLabel}</option>
-        {models?.map((model) => (
-          <option key={model.id} value={model.id}>
-            {model.name}
-          </option>
-        ))}
+        <ModelOptions models={models} category={category} selectedId={value} />
         {isMissing && (
           <option value={value}>
             {emptyLabel === 'None'

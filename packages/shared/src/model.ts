@@ -18,6 +18,15 @@ export const MODEL_PROVIDERS = ['openai'] as const;
 export type ModelProvider = (typeof MODEL_PROVIDERS)[number];
 
 /**
+ * What a model is for: `chat` runs the agent (the composer's picker, sub-agents, the reviewer),
+ * `voice` is a speech server for workspace voice settings, `image` looks at images for chat
+ * models that can't (Settings → Agent → Image model).
+ */
+export const MODEL_CATEGORIES = ['chat', 'voice', 'image'] as const;
+
+export type ModelCategory = (typeof MODEL_CATEGORIES)[number];
+
+/**
  * A model the agent can run on, set up once for the whole app (not per workspace).
  * The API key never leaves the server: the UI only learns whether one is saved.
  */
@@ -28,6 +37,8 @@ export interface ModelProfile {
   /** The model name exactly as the server lists it, e.g. "gpt-4.1". */
   model: string;
   provider: ModelProvider;
+  /** What the model is for; groups the Models page and filters the pickers. */
+  category: ModelCategory;
   /** Any OpenAI-compatible server. Null means api.openai.com. */
   baseUrl: string | null;
   hasApiKey: boolean;
@@ -46,7 +57,10 @@ export interface ModelProfile {
    * has the image model (Settings → Agent) describe them instead.
    */
   supportsImages: boolean;
-  /** Used when no model is chosen, e.g. by the CLI. Exactly one model is the default. */
+  /**
+   * Used when no model is chosen, e.g. by the CLI. Exactly one chat model is the default
+   * (voice and image models never are).
+   */
   isDefault: boolean;
   createdAt: string | null;
   updatedAt: string | null;
@@ -102,6 +116,7 @@ export const modelInputSchema = z.object({
   name,
   model: modelId,
   provider: z.enum(MODEL_PROVIDERS).default('openai'),
+  category: z.enum(MODEL_CATEGORIES).default('chat'),
   baseUrl: baseUrl.default(null),
   /** Empty or left out: no key (local servers like Ollama don't need one). */
   apiKey: apiKey.default(''),
@@ -114,11 +129,12 @@ export const modelInputSchema = z.object({
 
 /**
  * Like the input, but a left-out `apiKey` keeps the saved one (an empty one removes it), and a
- * left-out `provider` keeps the model's.
+ * left-out `provider` or `category` keeps the model's.
  */
 export const modelUpdateSchema = modelInputSchema.extend({
   apiKey: apiKey.optional(),
   provider: z.enum(MODEL_PROVIDERS).optional(),
+  category: z.enum(MODEL_CATEGORIES).optional(),
 });
 
 export type ModelInput = z.input<typeof modelInputSchema>;

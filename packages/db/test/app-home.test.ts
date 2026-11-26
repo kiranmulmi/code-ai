@@ -79,6 +79,47 @@ test('models: the first is the default, keys stay private, the default moves on'
   assert.equal(await models.update('not-a-uuid', { name: 'x', model: 'x' }), null);
 });
 
+test('models: categories; only a chat model is ever the default', async () => {
+  const dir = await home();
+  const models = new ModelStore(appHomeFile(dir, 'models'));
+
+  // A voice or image model added first doesn't become the default.
+  const voice = await models.create({ name: 'Whisper', model: 'whisper-1', category: 'voice' });
+  assert.equal(voice.category, 'voice');
+  assert.equal(voice.isDefault, false);
+  const image = await models.create({
+    name: 'Eyes',
+    model: 'gpt-4.1-mini',
+    category: 'image',
+    isDefault: true,
+  });
+  assert.equal(image.isDefault, false);
+  assert.equal(await models.settingsFor(), null);
+
+  const chat = await models.create({ name: 'GPT', model: 'gpt-4.1' });
+  assert.equal(chat.category, 'chat');
+  assert.equal(chat.isDefault, true);
+  await assert.rejects(models.setDefault(voice.id), /Only a chat model/);
+  // Any model can be picked by name; the category is only a suggestion.
+  assert.equal((await models.findByName('whisper-1'))?.id, voice.id);
+
+  // A left-out category keeps the model's.
+  assert.equal(
+    (await models.update(voice.id, { name: 'Whisper', model: 'whisper-1' }))?.category,
+    'voice',
+  );
+
+  // The default moved to another category hands the default on to the next chat model.
+  const other = await models.create({ name: 'Llama', model: 'llama3.1:8b' });
+  const moved = await models.update(chat.id, {
+    name: 'GPT',
+    model: 'gpt-4.1',
+    category: 'image',
+  });
+  assert.equal(moved?.isDefault, false);
+  assert.equal((await models.settingsFor())?.profile.id, other.id);
+});
+
 test('models: concurrent changes are all kept, and a damaged file is reported, not replaced', async () => {
   const dir = await home();
   const models = new ModelStore(appHomeFile(dir, 'models'));

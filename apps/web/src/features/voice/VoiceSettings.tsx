@@ -11,6 +11,7 @@ import { Spinner } from '../../components/Spinner';
 import { Switch } from '../../components/Switch';
 import { ERROR, HINT, INPUT, INPUT_ERROR, INPUT_OK, LABEL } from '../../components/form';
 import { MicIcon, RefreshIcon, SpeakerIcon, StopIcon } from '../../lib/icons';
+import { ModelOptions } from '../models/ModelOptions';
 import { useModels } from '../models/useModels';
 import { synthesize, transcribe } from './api';
 import { playAudio } from './speechPlayer';
@@ -194,6 +195,7 @@ export function VoiceSettings({
     writeMicId(id);
   };
 
+  // The select lists voice models only (ModelOptions); every model is kept here to spot a deleted one.
   const modelList = models.data ?? [];
   const isModelMissing =
     value.modelId !== '' && models.data && !modelList.some((m) => m.id === value.modelId);
@@ -245,11 +247,12 @@ export function VoiceSettings({
             className={`${INPUT} ${errors.modelId ? INPUT_ERROR : INPUT_OK} pr-8`}
           >
             <option value="">{models.isLoading ? 'Loading models…' : 'Pick a saved model…'}</option>
-            {modelList.map((model) => (
-              <option key={model.id} value={model.id}>
-                {model.name} — {serverOf(model)}
-              </option>
-            ))}
+            <ModelOptions
+              models={modelList}
+              category="voice"
+              selectedId={value.modelId}
+              describe={(model) => `${model.name} — ${serverOf(model)}`}
+            />
             {isModelMissing && <option value={value.modelId}>Deleted model (pick another)</option>}
           </select>
           {errors.modelId && (
@@ -257,11 +260,11 @@ export function VoiceSettings({
               {errors.modelId}
             </p>
           )}
-          {models.data && modelList.length === 0 && (
+          {models.data && !modelList.some((m) => m.category === 'voice') && (
             <p className={HINT}>
-              No models yet.{' '}
+              No voice models yet.{' '}
               <Link
-                to="/settings/models"
+                to="/settings/models/new?category=voice"
                 state={{ from: pathname }}
                 className="text-accent-2 hover:underline"
               >

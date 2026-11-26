@@ -17,7 +17,8 @@ export interface ModelChoice {
 
 /**
  * The model and reasoning effort the next message uses. Remembered in this browser as a
- * UI preference; a model that was deleted falls back to the default one.
+ * UI preference; a model that was deleted falls back to the default one. Any saved model can
+ * be picked (chat models are only listed first).
  */
 export function useModelChoice() {
   const models = useModels();
@@ -28,6 +29,7 @@ export function useModelChoice() {
   const model =
     list.find((item) => item.id === storedId) ??
     list.find((item) => item.isDefault) ??
+    list.find((item) => item.category === 'chat') ??
     list[0] ??
     null;
 

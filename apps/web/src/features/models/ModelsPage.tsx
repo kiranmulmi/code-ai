@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import type { ModelProfile } from '@app/shared';
+import { MODEL_CATEGORIES, type ModelCategory, type ModelProfile } from '@app/shared';
 import { Badge } from '../../components/Badge';
 import { Button } from '../../components/Button';
 import { ConfirmDeleteDialog } from '../../components/ConfirmDeleteDialog';
@@ -21,6 +21,7 @@ import { fromPath } from '../../lib/routerState';
 import { useToast } from '../../lib/toast';
 import { SettingsTabs } from '../settings/SettingsTabs';
 import { deleteModel, makeDefaultModel } from './api';
+import { CATEGORY_INFO } from './categories';
 import { serverLabel } from './servers';
 import { useModels } from './useModels';
 import { APP_NAME } from '../../lib/brand';
@@ -45,11 +46,14 @@ export function ModelsPage() {
   usePageHeader({
     title: 'Settings',
     subtitle:
-      'The models the agent can run on, in every workspace. Pick one per message in the chat.',
+      'The models the app uses, in every workspace: chat models run the agent, voice models handle speech, image models look at images.',
     breadcrumbs: [{ label: APP_NAME, to: backTo }, { label: 'Settings' }],
   });
 
-  const addModel = () => navigate(`${LIST_PATH}/new`, { state: { from: LIST_PATH } });
+  const addModel = (category: ModelCategory = 'chat') =>
+    navigate(`${LIST_PATH}/new${category === 'chat' ? '' : `?category=${category}`}`, {
+      state: { from: LIST_PATH },
+    });
 
   const makeDefault = async (model: ModelProfile) => {
     setPendingDefault(model.id);
@@ -90,7 +94,7 @@ export function ModelsPage() {
     <div className="w-full">
       <SettingsTabs />
       <TopbarActions>
-        <Button variant="primary" onClick={addModel}>
+        <Button variant="primary" onClick={() => addModel()}>
           <PlusIcon /> Add model
         </Button>
       </TopbarActions>
@@ -115,90 +119,137 @@ export function ModelsPage() {
             Ollama or LM Studio. Any server that speaks the OpenAI API works, as long as the model
             supports tool calling.
           </p>
-          <Button variant="primary" onClick={addModel}>
+          <Button variant="primary" onClick={() => addModel()}>
             <PlusIcon /> Add your first model
           </Button>
         </div>
       ) : (
-        <ul className="divide-y divide-line-2">
-          {list.map((model) => (
-            <li
-              key={model.id}
-              className="group flex min-w-0 items-center gap-x-2 px-3 py-2.5 text-[13px] text-ink transition-colors hover:bg-subtle"
-            >
-              <span
-                className={`grid h-6 w-6 shrink-0 place-items-center rounded-md ${
-                  model.isDefault ? 'bg-accent-soft text-accent' : 'bg-surface-2 text-ink-3'
-                }`}
-              >
-                <SparkIcon size={12} />
-              </span>
-              <div className="min-w-0 flex-1">
-                <div className="flex min-w-0 items-center gap-1 overflow-hidden">
-                  <span className="truncate text-[12px] font-medium text-ink">{model.name}</span>
-                  {model.isDefault && <Badge tone="blue">default</Badge>}
-                  {model.supportsReasoning && <Badge>reasoning</Badge>}
-                  {!model.supportsImages && <Badge>text only</Badge>}
-                  {!model.hasApiKey && model.baseUrl === null && (
-                    <Badge tone="yellow">no API key</Badge>
-                  )}
+        <div className="flex flex-col gap-5">
+          {MODEL_CATEGORIES.map((category) => {
+            const inCategory = list.filter((model) => model.category === category);
+            return (
+              <section key={category} aria-labelledby={`models-${category}`}>
+                <div className="flex items-end justify-between gap-3 border-b border-line-2 px-3 pb-1.5">
+                  <div className="min-w-0">
+                    <h2 id={`models-${category}`} className="text-[12.5px] font-semibold text-ink">
+                      {CATEGORY_INFO[category].title}
+                      <span className="ml-1.5 font-normal text-ink-3">{inCategory.length}</span>
+                    </h2>
+                    <p className="text-[11.5px] leading-snug text-ink-3">
+                      {CATEGORY_INFO[category].detail}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => addModel(category)}
+                    className="flex h-6 shrink-0 items-center gap-1 rounded-md px-1.5 text-[11.5px] font-medium text-accent-2 transition-colors hover:bg-subtle"
+                  >
+                    <PlusIcon size={12} /> Add
+                  </button>
                 </div>
-                <p
-                  className="truncate font-mono text-[10.5px] leading-tight text-ink-3"
-                  title={`${model.model} · ${serverLabel(model)}`}
-                >
-                  {model.model} · {serverLabel(model)}
-                </p>
-              </div>
-              {pendingDefault === model.id && <Spinner size={13} label="Making it the default" />}
-              <button
-                type="button"
-                onClick={(event) =>
-                  setMenu(
-                    menu?.id === model.id ? null : { id: model.id, anchor: event.currentTarget },
-                  )
-                }
-                aria-label={`More for ${model.name}`}
-                aria-haspopup="menu"
-                aria-expanded={menu?.id === model.id}
-                title="Edit, make default, delete…"
-                className={`ml-auto grid h-6 w-6 shrink-0 place-items-center rounded-md transition-colors hover:bg-subtle hover:text-ink ${
-                  menu?.id === model.id ? 'bg-subtle text-ink' : 'text-ink-3'
-                }`}
-              >
-                <DotsVerticalIcon size={13} />
-              </button>
-              {menu?.id === model.id && (
-                <RowMenu
-                  anchor={menu.anchor}
-                  onClose={closeMenu}
-                  items={[
-                    {
-                      label: 'Edit',
-                      icon: <EditIcon size={13} />,
-                      onSelect: () => editModel(model),
-                    },
-                    ...(model.isDefault || pendingDefault !== null
-                      ? []
-                      : [
-                          {
-                            label: 'Make default',
-                            icon: <CheckIcon size={13} />,
-                            onSelect: () => void makeDefault(model),
-                          },
-                        ]),
-                    {
-                      label: 'Delete',
-                      icon: <TrashIcon size={13} />,
-                      onSelect: () => setToDelete(model),
-                      isDanger: true,
-                    },
-                  ]}
-                />
-              )}
-            </li>
-          ))}
-        </ul>
+                {inCategory.length === 0 ? (
+                  <p className="px-3 py-2.5 text-[12px] text-ink-3">
+                    {CATEGORY_INFO[category].empty}
+                  </p>
+                ) : (
+                  <ul className="divide-y divide-line-2">
+                    {inCategory.map((model) => (
+                      <li
+                        key={model.id}
+                        className="group flex min-w-0 items-center gap-x-2 px-3 py-2.5 text-[13px] text-ink transition-colors hover:bg-subtle"
+                      >
+                        <span
+                          className={`grid h-6 w-6 shrink-0 place-items-center rounded-md ${
+                            model.isDefault
+                              ? 'bg-accent-soft text-accent'
+                              : 'bg-surface-2 text-ink-3'
+                          }`}
+                        >
+                          <SparkIcon size={12} />
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex min-w-0 items-center gap-1 overflow-hidden">
+                            <span className="truncate text-[12px] font-medium text-ink">
+                              {model.name}
+                            </span>
+                            {model.isDefault && <Badge tone="blue">default</Badge>}
+                            {model.category === 'chat' && model.supportsReasoning && (
+                              <Badge>reasoning</Badge>
+                            )}
+                            {model.category === 'chat' && !model.supportsImages && (
+                              <Badge>text only</Badge>
+                            )}
+                            {!model.hasApiKey && model.baseUrl === null && (
+                              <Badge tone="yellow">no API key</Badge>
+                            )}
+                          </div>
+                          <p
+                            className="truncate font-mono text-[10.5px] leading-tight text-ink-3"
+                            title={`${model.model} · ${serverLabel(model)}`}
+                          >
+                            {model.model} · {serverLabel(model)}
+                          </p>
+                        </div>
+                        {pendingDefault === model.id && (
+                          <Spinner size={13} label="Making it the default" />
+                        )}
+                        <button
+                          type="button"
+                          onClick={(event) =>
+                            setMenu(
+                              menu?.id === model.id
+                                ? null
+                                : { id: model.id, anchor: event.currentTarget },
+                            )
+                          }
+                          aria-label={`More for ${model.name}`}
+                          aria-haspopup="menu"
+                          aria-expanded={menu?.id === model.id}
+                          title="Edit, make default, delete…"
+                          className={`ml-auto grid h-6 w-6 shrink-0 place-items-center rounded-md transition-colors hover:bg-subtle hover:text-ink ${
+                            menu?.id === model.id ? 'bg-subtle text-ink' : 'text-ink-3'
+                          }`}
+                        >
+                          <DotsVerticalIcon size={13} />
+                        </button>
+                        {menu?.id === model.id && (
+                          <RowMenu
+                            anchor={menu.anchor}
+                            onClose={closeMenu}
+                            items={[
+                              {
+                                label: 'Edit',
+                                icon: <EditIcon size={13} />,
+                                onSelect: () => editModel(model),
+                              },
+                              ...(model.category !== 'chat' ||
+                              model.isDefault ||
+                              pendingDefault !== null
+                                ? []
+                                : [
+                                    {
+                                      label: 'Make default',
+                                      icon: <CheckIcon size={13} />,
+                                      onSelect: () => void makeDefault(model),
+                                    },
+                                  ]),
+                              {
+                                label: 'Delete',
+                                icon: <TrashIcon size={13} />,
+                                onSelect: () => setToDelete(model),
+                                isDanger: true,
+                              },
+                            ]}
+                          />
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </section>
+            );
+          })}
+        </div>
       )}
 
       <ConfirmDeleteDialog
@@ -208,7 +259,7 @@ export function ModelsPage() {
           <>
             <strong className="text-ink">{toDelete?.name}</strong> and its saved API key are
             removed. Chats keep their history.
-            {toDelete?.isDefault && ' The oldest remaining model becomes the default.'}
+            {toDelete?.isDefault && ' The oldest remaining chat model becomes the default.'}
           </>
         }
         busy={isDeleting}

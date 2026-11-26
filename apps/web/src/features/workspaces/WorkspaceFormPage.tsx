@@ -51,6 +51,7 @@ import {
 import { fetchMcpEnabled, fetchMcpServers, saveMcpEnabled } from '../mcp/api';
 import { APP_NAME } from '../../lib/brand';
 import { EMPTY_VOICE_DRAFT, VoiceSettings, type VoiceDraft } from '../voice/VoiceSettings';
+import { ModelOptions } from '../models/ModelOptions';
 import { useModels } from '../models/useModels';
 
 type FieldErrors = {
@@ -434,7 +435,7 @@ export function WorkspaceFormPage() {
     setIsPickerOpen(false);
   }, []);
   const isFolderChanged = loaded !== null && folderPath.trim() !== loaded.path;
-  const defaultModel = models.data?.find((model) => model.isDefault) ?? models.data?.[0] ?? null;
+  const defaultModel = models.data?.find((model) => model.isDefault) ?? null;
   const isQuickChatModelMissing =
     quickChatModelId !== '' &&
     models.data !== undefined &&
@@ -591,11 +592,11 @@ export function WorkspaceFormPage() {
                       ? 'Loading models…'
                       : `Default model${defaultModel ? ` (${defaultModel.name})` : ''}`}
                   </option>
-                  {(models.data ?? []).map((model) => (
-                    <option key={model.id} value={model.id}>
-                      {model.name}
-                    </option>
-                  ))}
+                  <ModelOptions
+                    models={models.data}
+                    category="chat"
+                    selectedId={quickChatModelId}
+                  />
                   {isQuickChatModelMissing && (
                     <option value={quickChatModelId}>Deleted model (uses the default)</option>
                   )}

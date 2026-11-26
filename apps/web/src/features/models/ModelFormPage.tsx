@@ -1,6 +1,13 @@
 import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from 'react';
-import { useLocation, useNavigate, useParams } from 'react-router-dom';
-import { DEFAULT_CONTEXT_WINDOW, LIMITS, modelInputSchema, modelUpdateSchema } from '@app/shared';
+import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import {
+  DEFAULT_CONTEXT_WINDOW,
+  LIMITS,
+  MODEL_CATEGORIES,
+  modelInputSchema,
+  modelUpdateSchema,
+  type ModelCategory,
+} from '@app/shared';
 import { Button } from '../../components/Button';
 import { ConfirmDeleteDialog } from '../../components/ConfirmDeleteDialog';
 import { InfoTip } from '../../components/InfoTip';
@@ -14,6 +21,7 @@ import { TrashIcon } from '../../lib/icons';
 import { fromPath } from '../../lib/routerState';
 import { useToast } from '../../lib/toast';
 import { createModel, deleteModel, fetchModel, updateModel } from './api';
+import { CATEGORY_INFO, parseCategory } from './categories';
 import { SERVER_PRESETS } from './servers';
 import { APP_NAME } from '../../lib/brand';
 
@@ -56,7 +64,12 @@ export function ModelFormPage() {
   const location = useLocation();
   const toast = useToast();
   const backTo = fromPath(location.state) ?? '/settings/models';
+  const [searchParams] = useSearchParams();
 
+  // A new model starts in the section its Add button was in (`?category=voice`).
+  const [category, setCategory] = useState<ModelCategory>(() =>
+    parseCategory(searchParams.get('category')),
+  );
   const [name, setName] = useState('');
   const [model, setModel] = useState('');
   const [baseUrl, setBaseUrl] = useState('');
@@ -77,8 +90,7 @@ export function ModelFormPage() {
 
   usePageHeader({
     title: isEdit ? 'Edit model' : 'Add model',
-    subtitle:
-      'Any server that speaks the OpenAI API; the model must support tool calling. Shared by every workspace.',
+    subtitle: `Any server that speaks the OpenAI API. ${CATEGORY_INFO[category].detail} Shared by every workspace.`,
     breadcrumbs: [
       { label: APP_NAME, to: '/' },
       { label: 'Models', to: '/settings/models' },
@@ -93,6 +105,7 @@ export function ModelFormPage() {
     fetchModel(modelId)
       .then((saved) => {
         if (!isCurrent) return;
+        setCategory(saved.category);
         setName(saved.name);
         setModel(saved.model);
         setBaseUrl(saved.baseUrl ?? '');
@@ -124,16 +137,21 @@ export function ModelFormPage() {
     const tokens = maxTokens.trim();
     const window = contextWindow.trim();
     const typedKey = apiKey.trim();
+    const isChat = category === 'chat';
+    const isVoice = category === 'voice';
     const body = {
+      category,
       // A blank name takes the model's own name.
       name: name.trim() || model.trim(),
       model,
       baseUrl,
-      maxTokens: tokens === '' ? null : Number(tokens),
-      contextWindow: window === '' ? null : Number(window),
-      supportsReasoning,
-      supportsImages,
-      isDefault,
+      // A voice model only lends its server (URL and key) to the voice settings.
+      maxTokens: isVoice || tokens === '' ? null : Number(tokens),
+      contextWindow: isVoice || window === '' ? null : Number(window),
+      supportsReasoning: isChat && supportsReasoning,
+      // An image model is there to read images.
+      supportsImages: category === 'image' ? true : supportsImages,
+      isDefault: isChat && isDefault,
     };
     // Editing: an untouched key field keeps the saved key.
     const apiKeyChange = typedKey ? typedKey : isKeyRemoved || !isEdit ? '' : undefined;
@@ -191,6 +209,42 @@ export function ModelFormPage() {
         onSubmit={(event) => void submit(event)}
         className="panel grid gap-x-3 gap-y-2 px-3 py-2.5 sm:grid-cols-6"
       >
+        <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-2 gap-y-1 sm:col-span-6">
+          <span className="flex items-center gap-1">
+            <span id="model-category" className={LABEL}>
+              Category
+            </span>
+            <InfoTip text={CATEGORY_INFO[category].detail} />
+          </span>
+          <div role="radiogroup" aria-labelledby="model-category" className="flex flex-wrap gap-1">
+            {MODEL_CATEGORIES.map((option) => {
+              const isOn = category === option;
+              return (
+                <button
+                  key={option}
+                  type="button"
+                  role="radio"
+                  aria-checked={isOn}
+                  onClick={() => setCategory(option)}
+                  className={`${PRESET} ${
+                    isOn
+                      ? 'border-accent bg-accent-soft text-accent-2'
+                      : 'border-line bg-surface text-ink-2 hover:border-line-strong hover:text-ink'
+                  }`}
+                >
+                  {CATEGORY_INFO[option].label}
+                </button>
+              );
+            })}
+          </div>
+          {wasDefault && category !== 'chat' && (
+            <p className="w-full text-[11.5px] leading-snug text-ink-3">
+              This is the default chat model. Saving it as another category makes the oldest chat
+              model the default.
+            </p>
+          )}
+        </div>
+
         <div className="min-w-0 sm:col-span-6">
           <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
             <span className="flex items-center gap-1">
@@ -258,7 +312,13 @@ export function ModelFormPage() {
             autoComplete="off"
             spellCheck={false}
             maxLength={LIMITS.modelId}
-            placeholder="gpt-4.1, llama3.1:8b, …"
+            placeholder={
+              category === 'voice'
+                ? 'whisper-1, gpt-4o-mini-tts, …'
+                : category === 'image'
+                  ? 'gpt-4.1-mini, llava, …'
+                  : 'gpt-4.1, llama3.1:8b, …'
+            }
             aria-invalid={errors.model ? true : undefined}
             onChange={(event) => {
               setModel(event.target.value);
@@ -346,119 +406,125 @@ export function ModelFormPage() {
             </p>
           )}
         </div>
-        <div className="min-w-0 sm:col-span-3">
-          <span className="flex items-center gap-1">
-            <label htmlFor="model-max-tokens" className={LABEL}>
-              Max output tokens <span className={OPTIONAL}>· optional</span>
-            </label>
-            <InfoTip text="Empty uses the server's default." />
-          </span>
-          <input
-            id="model-max-tokens"
-            inputMode="numeric"
-            value={maxTokens}
-            autoComplete="off"
-            placeholder="Server default"
-            aria-invalid={errors.maxTokens ? true : undefined}
-            onChange={(event) => {
-              setMaxTokens(event.target.value.replace(/[^\d]/g, ''));
-              clearError('maxTokens');
-            }}
-            className={`${FIELD} ${errors.maxTokens ? INPUT_ERROR : INPUT_OK} tabular-nums`}
-          />
-          {errors.maxTokens && (
-            <p role="alert" className={ERROR}>
-              {errors.maxTokens}
-            </p>
-          )}
-        </div>
-
-        <div className="min-w-0 sm:col-span-6">
-          <span className="flex items-center gap-1">
-            <label htmlFor="model-context-window" className={LABEL}>
-              Context window <span className={OPTIONAL}>· tokens, optional</span>
-            </label>
-            <InfoTip
-              text={`Input and output together; long chats are summarized near it. Empty assumes ${windowLabel(DEFAULT_CONTEXT_WINDOW)}.`}
-            />
-          </span>
-          <div className="mt-1 flex flex-wrap items-center gap-1">
+        {category !== 'voice' && (
+          <div className="min-w-0 sm:col-span-3">
+            <span className="flex items-center gap-1">
+              <label htmlFor="model-max-tokens" className={LABEL}>
+                Max output tokens <span className={OPTIONAL}>· optional</span>
+              </label>
+              <InfoTip text="Empty uses the server's default." />
+            </span>
             <input
-              id="model-context-window"
+              id="model-max-tokens"
               inputMode="numeric"
-              value={contextWindow}
+              value={maxTokens}
               autoComplete="off"
-              placeholder={`${DEFAULT_CONTEXT_WINDOW.toLocaleString('en')} (default)`}
-              aria-invalid={errors.contextWindow ? true : undefined}
+              placeholder="Server default"
+              aria-invalid={errors.maxTokens ? true : undefined}
               onChange={(event) => {
-                setContextWindow(event.target.value.replace(/[^\d]/g, ''));
-                clearError('contextWindow');
+                setMaxTokens(event.target.value.replace(/[^\d]/g, ''));
+                clearError('maxTokens');
               }}
-              className={`${FIELD_BOX} ${errors.contextWindow ? INPUT_ERROR : INPUT_OK} min-w-0 flex-1 basis-[16ch] tabular-nums`}
+              className={`${FIELD} ${errors.maxTokens ? INPUT_ERROR : INPUT_OK} tabular-nums`}
             />
-            {WINDOW_PRESETS.map((preset) => {
-              const isOn = contextWindow === String(preset);
-              return (
-                <button
-                  key={preset}
-                  type="button"
-                  onClick={() => {
-                    setContextWindow(String(preset));
-                    clearError('contextWindow');
-                  }}
-                  aria-pressed={isOn}
-                  className={`${PRESET} tabular-nums ${
-                    isOn
-                      ? 'border-accent bg-accent-soft text-accent-2'
-                      : 'border-line bg-surface text-ink-2 hover:border-line-strong hover:text-ink'
-                  }`}
-                >
-                  {windowLabel(preset)}
-                </button>
-              );
-            })}
+            {errors.maxTokens && (
+              <p role="alert" className={ERROR}>
+                {errors.maxTokens}
+              </p>
+            )}
           </div>
-          {errors.contextWindow && (
-            <p role="alert" className={ERROR}>
-              {errors.contextWindow}
-            </p>
-          )}
-        </div>
+        )}
 
-        <div className="grid gap-x-3 gap-y-1 border-t border-line-2 pt-2 sm:col-span-6 sm:grid-cols-3">
-          <ToggleRow
-            label="Reasoning effort"
-            hint="Offers Low, Medium or High per message (o-series, GPT-5, DeepSeek R1, …)."
-          >
-            <Switch
-              isOn={supportsReasoning}
-              onChange={setSupportsReasoning}
-              label="Supports reasoning effort"
-            />
-          </ToggleRow>
-          <ToggleRow
-            label="Reads images"
-            hint="Turn off for text-only models: images then go to the image model set in Settings → Agent, which describes them in text."
-          >
-            <Switch isOn={supportsImages} onChange={setSupportsImages} label="Reads images" />
-          </ToggleRow>
-          <ToggleRow
-            label="Default model"
-            align="end"
-            hint={
-              wasDefault
-                ? 'This is the default. Make another model the default to change it.'
-                : 'Used when no model is picked, and by the terminal chat.'
-            }
-          >
-            <Switch
-              isOn={isDefault}
-              onChange={setIsDefault}
-              disabled={wasDefault}
+        {category !== 'voice' && (
+          <div className="min-w-0 sm:col-span-6">
+            <span className="flex items-center gap-1">
+              <label htmlFor="model-context-window" className={LABEL}>
+                Context window <span className={OPTIONAL}>· tokens, optional</span>
+              </label>
+              <InfoTip
+                text={`Input and output together; long chats are summarized near it. Empty assumes ${windowLabel(DEFAULT_CONTEXT_WINDOW)}.`}
+              />
+            </span>
+            <div className="mt-1 flex flex-wrap items-center gap-1">
+              <input
+                id="model-context-window"
+                inputMode="numeric"
+                value={contextWindow}
+                autoComplete="off"
+                placeholder={`${DEFAULT_CONTEXT_WINDOW.toLocaleString('en')} (default)`}
+                aria-invalid={errors.contextWindow ? true : undefined}
+                onChange={(event) => {
+                  setContextWindow(event.target.value.replace(/[^\d]/g, ''));
+                  clearError('contextWindow');
+                }}
+                className={`${FIELD_BOX} ${errors.contextWindow ? INPUT_ERROR : INPUT_OK} min-w-0 flex-1 basis-[16ch] tabular-nums`}
+              />
+              {WINDOW_PRESETS.map((preset) => {
+                const isOn = contextWindow === String(preset);
+                return (
+                  <button
+                    key={preset}
+                    type="button"
+                    onClick={() => {
+                      setContextWindow(String(preset));
+                      clearError('contextWindow');
+                    }}
+                    aria-pressed={isOn}
+                    className={`${PRESET} tabular-nums ${
+                      isOn
+                        ? 'border-accent bg-accent-soft text-accent-2'
+                        : 'border-line bg-surface text-ink-2 hover:border-line-strong hover:text-ink'
+                    }`}
+                  >
+                    {windowLabel(preset)}
+                  </button>
+                );
+              })}
+            </div>
+            {errors.contextWindow && (
+              <p role="alert" className={ERROR}>
+                {errors.contextWindow}
+              </p>
+            )}
+          </div>
+        )}
+
+        {category === 'chat' && (
+          <div className="grid gap-x-3 gap-y-1 border-t border-line-2 pt-2 sm:col-span-6 sm:grid-cols-3">
+            <ToggleRow
+              label="Reasoning effort"
+              hint="Offers Low, Medium or High per message (o-series, GPT-5, DeepSeek R1, …)."
+            >
+              <Switch
+                isOn={supportsReasoning}
+                onChange={setSupportsReasoning}
+                label="Supports reasoning effort"
+              />
+            </ToggleRow>
+            <ToggleRow
+              label="Reads images"
+              hint="Turn off for text-only models: images then go to the image model set in Settings → Agent, which describes them in text."
+            >
+              <Switch isOn={supportsImages} onChange={setSupportsImages} label="Reads images" />
+            </ToggleRow>
+            <ToggleRow
               label="Default model"
-            />
-          </ToggleRow>
-        </div>
+              align="end"
+              hint={
+                wasDefault
+                  ? 'This is the default. Make another model the default to change it.'
+                  : 'Used when no model is picked, and by the terminal chat.'
+              }
+            >
+              <Switch
+                isOn={isDefault}
+                onChange={setIsDefault}
+                disabled={wasDefault}
+                label="Default model"
+              />
+            </ToggleRow>
+          </div>
+        )}
       </form>
 
       <FormActions>
@@ -487,7 +553,7 @@ export function ModelFormPage() {
             <>
               <strong className="text-ink">{name || model}</strong> and its saved API key are
               removed. Chats keep their history.
-              {wasDefault && ' The oldest remaining model becomes the default.'}
+              {wasDefault && ' The oldest remaining chat model becomes the default.'}
             </>
           }
           busy={isDeleting}

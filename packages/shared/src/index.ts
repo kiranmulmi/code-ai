@@ -66,10 +66,12 @@ export {
 
 export {
   DEFAULT_CONTEXT_WINDOW,
+  MODEL_CATEGORIES,
   MODEL_PROVIDERS,
   REASONING_EFFORTS,
   modelInputSchema,
   modelUpdateSchema,
+  type ModelCategory,
   type ModelInput,
   type ModelProfile,
   type ModelProvider,

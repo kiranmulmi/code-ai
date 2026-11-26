@@ -38,6 +38,7 @@ import { ModelControls } from './ModelControls';
 import { useChats } from './useChats';
 import { onRunNews, useLiveRuns } from './liveRuns';
 import { useConversation } from './useConversation';
+import { useHelperModels } from './useHelperModels';
 import { useModelChoice } from './useModelChoice';
 import { useSidebarWidth } from './useSidebarWidth';
 import { APP_NAME } from '../../lib/brand';
@@ -74,6 +75,22 @@ export function ChatScreen({
   const skills = useSkills(workspaceId);
   const files = useFiles(workspaceId);
   const { models, choice, chooseModel, chooseEffort } = useModelChoice();
+  const helperModels = useHelperModels(workspaceId, workspace);
+  const { chooseVoiceModel, chooseImageModel } = helperModels;
+  const helpers = {
+    voiceModelId: helperModels.voiceModelId,
+    imageModelId: helperModels.imageModelId,
+    chooseVoiceModel: (id: string | null) =>
+      void chooseVoiceModel(id).then(
+        () => toast(id ? 'Voice model saved for this workspace' : 'Voice turned off'),
+        (cause: unknown) => toast(errorMessage(cause, "Couldn't save the voice model."), 'error'),
+      ),
+    chooseImageModel: (id: string | null) =>
+      void chooseImageModel(id).then(
+        () => toast(id ? 'Image model saved' : 'Image model turned off'),
+        (cause: unknown) => toast(errorMessage(cause, "Couldn't save the image model."), 'error'),
+      ),
+  };
   // Like the model, a choice for the messages from here on (shown in warning colours while on).
   const [autoApprove, setAutoApprove] = useStoredState('agent.autoApprove', parseFlag);
 
@@ -387,6 +404,7 @@ export function ChatScreen({
                     <ModelControls
                       models={models.data}
                       choice={choice}
+                      helpers={helpers}
                       disabled={isBusy}
                       onChooseModel={(id) => {
                         chooseModel(id);

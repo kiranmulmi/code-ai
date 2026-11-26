@@ -4,6 +4,7 @@
 import { randomUUID } from 'node:crypto';
 import { serialized, type ModelSettings } from '@app/agent';
 import {
+  MODEL_CATEGORIES,
   MODEL_PROVIDERS,
   modelInputSchema,
   modelUpdateSchema,
@@ -22,6 +23,7 @@ const savedModelSchema = z.object({
   name: z.string().min(1),
   model: z.string().min(1),
   provider: z.enum(MODEL_PROVIDERS).default('openai'),
+  category: z.enum(MODEL_CATEGORIES).default('chat'),
   baseUrl: z.string().nullable().default(null),
   apiKey: z.string().nullable().default(null),
   maxTokens: z.number().int().positive().nullable().default(null),
@@ -75,23 +77,28 @@ export class ModelStore {
     return saved ? toProfile(saved) : null;
   }
 
-  /** The first model becomes the default, whatever the input says. */
+  /**
+   * The first chat model becomes the default, whatever the input says. Voice and image
+   * models are never the default.
+   */
   async create(input: ModelInput): Promise<ModelProfile> {
     const clean = check(modelInputSchema, input);
     return this.#change((models) => {
       const now = new Date().toISOString();
+      const isChat = clean.category === 'chat';
       const created: SavedModel = {
         id: randomUUID(),
         name: clean.name,
         model: clean.model,
         provider: clean.provider,
+        category: clean.category,
         baseUrl: clean.baseUrl,
         apiKey: clean.apiKey || null,
         maxTokens: clean.maxTokens,
         contextWindow: clean.contextWindow,
         supportsReasoning: clean.supportsReasoning,
         supportsImages: clean.supportsImages,
-        isDefault: clean.isDefault || models.length === 0,
+        isDefault: isChat && (clean.isDefault || !models.some((m) => m.category === 'chat')),
         createdAt: now,
         updatedAt: now,
       };
@@ -102,38 +109,48 @@ export class ModelStore {
 
   /**
    * Replaces the model's settings. A left-out `apiKey` keeps the saved key. The default
-   * stays the default until another model takes over, so there is always one.
+   * stays the default until another chat model takes over, so there is always one; a default
+   * moved to another category hands it to the oldest chat model left (see `#read`).
    */
   async update(id: string, changes: ModelUpdate): Promise<ModelProfile | null> {
     const clean = check(modelUpdateSchema, changes);
     return this.#change((models) => {
       const current = models.find((m) => m.id === id);
       if (!current) return { models, result: null };
+      const category = clean.category ?? current.category;
+      const isChat = category === 'chat';
       const updated: SavedModel = {
         ...current,
         name: clean.name,
         model: clean.model,
         provider: clean.provider ?? current.provider,
+        category,
         baseUrl: clean.baseUrl,
         apiKey: clean.apiKey === undefined ? current.apiKey : clean.apiKey || null,
         maxTokens: clean.maxTokens,
         contextWindow: clean.contextWindow,
         supportsReasoning: clean.supportsReasoning,
         supportsImages: clean.supportsImages,
-        isDefault: clean.isDefault || current.isDefault,
+        isDefault: isChat && (clean.isDefault || current.isDefault),
         updatedAt: new Date().toISOString(),
       };
-      return {
-        models: models.map((m) => (m.id === id ? updated : updated.isDefault ? notDefault(m) : m)),
-        result: toProfile(updated),
-      };
+      const next = models.map((m) =>
+        m.id === id ? updated : updated.isDefault ? notDefault(m) : m,
+      );
+      // Read back with the default settled, as the next `list` will show it.
+      const settled = withOneDefault(next).find((m) => m.id === id) ?? updated;
+      return { models: next, result: toProfile(settled) };
     });
   }
 
+  /** Only a chat model can be the default. */
   async setDefault(id: string): Promise<ModelProfile | null> {
     return this.#change((models) => {
       const current = models.find((m) => m.id === id);
       if (!current) return { models, result: null };
+      if (current.category !== 'chat') {
+        throw new InputError('Only a chat model can be the default.');
+      }
       const updated = { ...current, isDefault: true, updatedAt: new Date().toISOString() };
       return {
         models: models.map((m) => (m.id === id ? updated : notDefault(m))),
@@ -142,7 +159,7 @@ export class ModelStore {
     });
   }
 
-  /** Deleting the default hands it to the oldest model left (see `#read`). */
+  /** Deleting the default hands it to the oldest chat model left (see `#read`). */
   async remove(id: string): Promise<boolean> {
     return this.#change((models) => {
       const left = models.filter((m) => m.id !== id);
@@ -151,10 +168,17 @@ export class ModelStore {
     });
   }
 
-  /** A model by its name or model name, ignoring case (for the CLI's /model command). */
+  /**
+   * A model by its name or model name, ignoring case (for the CLI's /model command). Chat
+   * models win a tie, but any model can be picked.
+   */
   async findByName(name: string): Promise<ModelProfile | null> {
     const wanted = name.trim().toLowerCase();
-    const models = await this.#read();
+    const all = await this.#read();
+    const models = [
+      ...all.filter((m) => m.category === 'chat'),
+      ...all.filter((m) => m.category !== 'chat'),
+    ];
     const found =
       models.find((m) => m.name.toLowerCase() === wanted) ??
       models.find((m) => m.model.toLowerCase() === wanted);
@@ -218,7 +242,7 @@ export class ModelStore {
     };
   }
 
-  /** The saved models, with exactly one default whenever there are any. */
+  /** The saved models, with exactly one default whenever there are chat models. */
   async #read(): Promise<SavedModel[]> {
     const raw = await readJson(this.file);
     if (raw === null) return [];
@@ -229,12 +253,7 @@ export class ModelStore {
         `${this.file} is damaged: ${issue?.path.join('.') ?? ''} ${issue?.message ?? ''}`.trim(),
       );
     }
-    const { models } = parsed.data;
-    const defaultIndex = Math.max(
-      0,
-      models.findIndex((m) => m.isDefault),
-    );
-    return models.map((m, index) => ({ ...m, isDefault: index === defaultIndex }));
+    return withOneDefault(parsed.data.models);
   }
 
   /** Read, change and write the file as one step, so concurrent changes can't lose each other. */
@@ -259,12 +278,23 @@ function check<S extends z.ZodTypeAny>(schema: S, value: unknown): z.output<S> {
 const notDefault = (model: SavedModel): SavedModel =>
   model.isDefault ? { ...model, isDefault: false } : model;
 
+/**
+ * Exactly one chat model is the default (the first marked one, else the oldest); voice and
+ * image models never are. No chat models: no default.
+ */
+function withOneDefault(models: SavedModel[]): SavedModel[] {
+  const marked = models.findIndex((m) => m.isDefault && m.category === 'chat');
+  const defaultIndex = marked >= 0 ? marked : models.findIndex((m) => m.category === 'chat');
+  return models.map((m, index) => ({ ...m, isDefault: index === defaultIndex }));
+}
+
 function toProfile(saved: SavedModel): ModelProfile {
   return {
     id: saved.id,
     name: saved.name,
     model: saved.model,
     provider: saved.provider,
+    category: saved.category,
     baseUrl: saved.baseUrl,
     hasApiKey: Boolean(saved.apiKey),
     maxTokens: saved.maxTokens,
