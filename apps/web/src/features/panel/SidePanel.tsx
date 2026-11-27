@@ -1,12 +1,11 @@
 import type { ReactNode } from 'react';
-import type { Memory, Skill, WorkspaceFiles } from '@app/shared';
+import type { WorkspaceFiles } from '@app/shared';
 import { IconButton } from '../../components/IconButton';
 import { ExpandIcon, FolderIcon, PanelIcon, PulseIcon } from '../../lib/icons';
 import type { AsyncResource } from '../../lib/useAsync';
 import { FilesPanel } from './files/FilesPanel';
 import { TasksPanel } from './tasks/TasksPanel';
 import { useRunningTasks } from './tasks/useRunningTasks';
-import { LowerPanel } from './LowerPanel';
 import { PANEL_TABS, PANEL_TAB_LABEL, type PanelTab } from './panelTabs';
 import { PanelResizer } from './PanelResizer';
 import { PanelTabButton } from './PanelTabButton';
@@ -30,17 +29,14 @@ export function TabCount({ title, children }: { title: string; children: ReactNo
 }
 
 /**
- * Files or the background tasks on top (the terminal, git diff and notes are tabs beside the
- * chat), Memory, MCP servers and
- * Skills in a section below (LowerPanel). A resizable column on wide screens (collapsed from
- * the header's Panel button), a drawer on small ones.
+ * Files or the background tasks, using the whole height (the terminal, git diff, Customize and
+ * notes are tabs beside the chat). A resizable column on wide screens (collapsed from the
+ * header's Panel button), a drawer on small ones.
  */
 export function SidePanel({
   tab,
   onTab,
   workspaceId,
-  memories,
-  skills,
   files,
   width,
   isDrawerOpen,
@@ -54,8 +50,6 @@ export function SidePanel({
   tab: PanelTab;
   onTab: (tab: PanelTab) => void;
   workspaceId: string;
-  memories: AsyncResource<Memory[]>;
-  skills: AsyncResource<Skill[]>;
   files: AsyncResource<WorkspaceFiles>;
   width: ReturnType<typeof usePanelWidth>;
   isDrawerOpen: boolean;
@@ -82,7 +76,7 @@ export function SidePanel({
       )}
       <aside
         id="side-panel"
-        aria-label="Files, tasks, memory and MCP servers"
+        aria-label="Files and tasks"
         // Wide screens: the column's width animates (ChatScreen) while the content keeps its
         // width and fades, so it slides in and out instead of squashing.
         className={`fixed inset-y-0 right-0 z-40 flex min-h-0 w-[min(440px,92vw)] flex-col border-l border-line bg-surface shadow-dialog transition-[transform,visibility,opacity] duration-300 lg:relative lg:inset-auto lg:z-10 lg:w-auto lg:translate-x-0 lg:overflow-hidden lg:border-line-2 lg:shadow-none ${
@@ -148,7 +142,6 @@ export function SidePanel({
           {tab === 'files' && <FilesPanel workspaceId={workspaceId} files={files} />}
           {tab === 'tasks' && <TasksPanel workspaceId={workspaceId} running={running} />}
         </div>
-        <LowerPanel workspaceId={workspaceId} memories={memories} skills={skills} isBusy={isBusy} />
         {footer && (
           <footer className="flex h-8 shrink-0 items-center justify-end gap-1 border-t border-line-2 bg-subtle px-2 lg:min-w-[var(--panel-w)]">
             {footer}

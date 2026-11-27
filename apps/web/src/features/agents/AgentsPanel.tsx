@@ -4,12 +4,31 @@ import { Badge } from '../../components/Badge';
 import { Button } from '../../components/Button';
 import { ConfirmDeleteDialog } from '../../components/ConfirmDeleteDialog';
 import { errorMessage } from '../../lib/api';
-import { plural } from '../../lib/format';
-import { CopyIcon, CrossIcon, PlusIcon, WarnIcon, WrenchIcon } from '../../lib/icons';
+import {
+  CopyIcon,
+  CrossIcon,
+  EditIcon,
+  PlusIcon,
+  TrashIcon,
+  WarnIcon,
+  WrenchIcon,
+} from '../../lib/icons';
 import { useToast } from '../../lib/toast';
 import type { AsyncResource } from '../../lib/useAsync';
 import { specialistTitle } from '../chat/tools';
 import { PanelMessage } from '../panel/PanelMessage';
+import {
+  CardAction,
+  CardGrid,
+  EmptyHero,
+  GroupHeading,
+  ItemCard,
+  SearchBox,
+  SectionHeader,
+  SectionNote,
+  SectionPage,
+  matches,
+} from '../customize/SectionLayout';
 import { AgentDialog, type AgentDialogTarget } from './AgentDialog';
 import { describeAccess, draftFrom, fixTarget } from './agentDraft';
 import { deleteAgent } from './api';
@@ -18,7 +37,7 @@ import { deleteAgent } from './api';
 type PendingDelete = { kind: 'specialist'; name: string } | { kind: 'file'; file: string };
 
 /**
- * The Agents tab: the specialists the agent can hand work to (with sub-agents on in Settings →
+ * The Agents page (Customize tab): the specialists the agent can hand work to (with sub-agents on in Settings →
  * Agent). The workspace's own come first and can be edited; the built-ins can be copied to
  * start one. Files in the agents folder that couldn't be used show with why, to fix or delete.
  */
@@ -33,6 +52,7 @@ export function AgentsPanel({
   const [dialog, setDialog] = useState<AgentDialogTarget | null>(null);
   const [pending, setPending] = useState<PendingDelete | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [query, setQuery] = useState('');
   const closeDialog = useCallback(() => setDialog(null), []);
   const cancelDelete = useCallback(() => setPending(null), []);
   const { reload } = agents;
@@ -55,22 +75,33 @@ export function AgentsPanel({
   const own = agents.data?.specialists.filter((s) => !s.isBuiltIn) ?? [];
   const builtIns = agents.data?.specialists.filter((s) => s.isBuiltIn) ?? [];
   const problems = agents.data?.problems ?? [];
+  const shownOwn = own.filter((s) => matches(query, s.name, s.description));
+  const shownBuiltIns = builtIns.filter((s) => matches(query, s.name, s.description));
+  const copyBuiltIn = (specialist: SpecialistInfo) =>
+    setDialog({ kind: 'new', start: { ...draftFrom(specialist), name: `my-${specialist.name}` } });
 
   return (
-    <>
-      <div className="mb-2 flex min-h-7 items-center justify-between gap-2">
-        <span className="eyebrow">
-          {own.length ? plural(own.length, 'specialist') : 'Specialists'}
-        </span>
-        <Button size="sm" onClick={() => setDialog({ kind: 'new' })}>
-          <PlusIcon size={11} /> New specialist
-        </Button>
-      </div>
+    <SectionPage>
+      <SectionHeader
+        icon={<WrenchIcon size={18} />}
+        title="Agents"
+        description={
+          <>
+            Specialists the agent hands parts of a task to (with sub-agents on in Settings → Agent).
+            Each works with only its own tools and reports back.
+          </>
+        }
+        actions={
+          <Button variant="primary" onClick={() => setDialog({ kind: 'new' })}>
+            <PlusIcon size={12} /> New specialist
+          </Button>
+        }
+      />
 
       {!agents.data ? (
         <PanelMessage isLoading={agents.isLoading} error={agents.error} onRetry={reload} />
       ) : (
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-8">
           {problems.length > 0 && (
             <ProblemList
               problems={problems}
@@ -81,51 +112,112 @@ export function AgentsPanel({
             />
           )}
 
-          <ul className={own.length ? 'panel divide-y divide-line-2' : ''}>
-            {own.length === 0 && (
-              <li className="border border-dashed border-line px-4 py-5 text-center text-[13px] text-ink-3">
-                None of your own yet. Make one for work you hand off often, like a security review,
-                or copy a built-in below and change it.
-              </li>
-            )}
-            {own.map((specialist) => (
-              <SpecialistRow
-                key={specialist.name}
-                specialist={specialist}
-                onOpen={() => setDialog({ kind: 'edit', name: specialist.name })}
-                onDelete={() => setPending({ kind: 'specialist', name: specialist.name })}
+          {own.length + builtIns.length > 6 && (
+            <div className="-mb-4">
+              <SearchBox
+                value={query}
+                onChange={setQuery}
+                placeholder="Search specialists"
+                count={shownOwn.length + shownBuiltIns.length}
               />
-            ))}
-          </ul>
+            </div>
+          )}
 
-          <section aria-labelledby="built-in-agents">
-            <h3 id="built-in-agents" className="eyebrow mb-2">
-              Built in
-            </h3>
-            <ul className="panel divide-y divide-line-2">
-              {builtIns.map((specialist) => (
-                <SpecialistRow
-                  key={specialist.name}
-                  specialist={specialist}
-                  onOpen={() =>
-                    setDialog({
-                      kind: 'new',
-                      start: { ...draftFrom(specialist), name: `my-${specialist.name}` },
-                    })
-                  }
-                />
-              ))}
-            </ul>
+          <section aria-labelledby="own-agents">
+            <GroupHeading id="own-agents" count={own.length || undefined}>
+              Yours
+            </GroupHeading>
+            {own.length === 0 ? (
+              <EmptyHero
+                icon={<WrenchIcon size={20} />}
+                title="No specialists of your own yet"
+                actions={
+                  <Button size="sm" onClick={() => setDialog({ kind: 'new' })}>
+                    <PlusIcon size={11} /> Create one
+                  </Button>
+                }
+              >
+                Make one for work you hand off often, like a security review, or start from a copy
+                of a built-in below.
+              </EmptyHero>
+            ) : (
+              <CardGrid label="Your specialists">
+                {shownOwn.map((specialist) => (
+                  <ItemCard
+                    key={specialist.name}
+                    icon={<WrenchIcon size={15} />}
+                    name={specialist.name}
+                    openTitle="Edit this specialist"
+                    onOpen={() => setDialog({ kind: 'edit', name: specialist.name })}
+                    badges={
+                      specialist.replacesBuiltIn && (
+                        <Badge tone="coral" className="h-4 px-1.5 text-[10.5px]">
+                          replaces built-in
+                        </Badge>
+                      )
+                    }
+                    description={specialist.description}
+                    meta={describeAccess(specialist)}
+                    corner={
+                      <>
+                        <CardAction
+                          label={`Edit ${specialistTitle(specialist.name)}`}
+                          onClick={() => setDialog({ kind: 'edit', name: specialist.name })}
+                        >
+                          <EditIcon size={13} />
+                        </CardAction>
+                        <CardAction
+                          tone="danger"
+                          label={`Delete the specialist ${specialistTitle(specialist.name)}`}
+                          onClick={() => setPending({ kind: 'specialist', name: specialist.name })}
+                        >
+                          <TrashIcon size={13} />
+                        </CardAction>
+                      </>
+                    }
+                  />
+                ))}
+              </CardGrid>
+            )}
           </section>
+
+          {builtIns.length > 0 && (
+            <section aria-labelledby="built-in-agents">
+              <GroupHeading
+                id="built-in-agents"
+                count={builtIns.length}
+                hint="Use one as a starting point for your own"
+              >
+                Built in
+              </GroupHeading>
+              <CardGrid label="Built-in specialists">
+                {shownBuiltIns.map((specialist) => (
+                  <ItemCard
+                    key={specialist.name}
+                    isMuted
+                    icon={<WrenchIcon size={15} />}
+                    name={specialist.name}
+                    openTitle="Make your own copy of this specialist"
+                    onOpen={() => copyBuiltIn(specialist)}
+                    description={specialist.description}
+                    meta={describeAccess(specialist)}
+                    footerEnd={
+                      <span className="flex items-center gap-1 text-[11.5px] font-semibold text-accent-2 opacity-0 transition-opacity group-hover:opacity-100 [@media(hover:none)]:opacity-100">
+                        <CopyIcon size={11} /> Copy
+                      </span>
+                    }
+                  />
+                ))}
+              </CardGrid>
+            </section>
+          )}
         </div>
       )}
 
-      <p className="mt-3 text-[12px] leading-relaxed text-ink-3">
-        With sub-agents on (Settings → Agent), the agent hands parts of a task to these specialists.
-        Each one works with only its tools and reports back. Yours are kept in{' '}
-        <span className="font-mono">.code-ai/{'<workspace>'}/agents/</span> and used from your next
-        message.
-      </p>
+      <SectionNote>
+        Yours are kept in <span className="font-mono">.code-ai/{'<workspace>'}/agents/</span> and
+        used from your next message. One named like a built-in replaces it.
+      </SectionNote>
 
       {dialog && (
         <AgentDialog
@@ -157,67 +249,7 @@ export function AgentsPanel({
         onCancel={cancelDelete}
         onConfirm={() => void confirmDelete()}
       />
-    </>
-  );
-}
-
-/** One specialist: its name, what it's for and what it may do. Built-ins open as a copy. */
-function SpecialistRow({
-  specialist,
-  onOpen,
-  onDelete,
-}: {
-  specialist: SpecialistInfo;
-  onOpen: () => void;
-  onDelete?: () => void;
-}) {
-  const { isBuiltIn } = specialist;
-  return (
-    <li className="group relative flex items-start gap-2.5 px-3 py-2.5 transition-colors hover:bg-subtle">
-      <WrenchIcon
-        size={14}
-        className={`mt-0.5 shrink-0 ${isBuiltIn ? 'text-ink-3' : 'text-accent'}`}
-      />
-      <button
-        type="button"
-        onClick={onOpen}
-        title={isBuiltIn ? 'Make your own copy of this specialist' : 'Edit this specialist'}
-        className="min-w-0 flex-1 text-left outline-none after:absolute after:inset-0 focus-visible:after:rounded-md focus-visible:after:ring-1 focus-visible:after:ring-accent"
-      >
-        <span className="flex min-w-0 flex-wrap items-center gap-1.5">
-          <span className="truncate font-mono text-[12.5px] font-semibold text-ink">
-            {specialist.name}
-          </span>
-          {specialist.replacesBuiltIn && (
-            <Badge tone="coral" className="h-4 px-1.5 text-[10.5px]">
-              replaces built-in
-            </Badge>
-          )}
-        </span>
-        <span className="mt-0.5 line-clamp-2 text-[12px] leading-snug text-ink-3">
-          {specialist.description}
-        </span>
-        <span className="mt-1 block text-[11.5px] text-ink-3">{describeAccess(specialist)}</span>
-      </button>
-      {isBuiltIn ? (
-        <span
-          aria-hidden="true"
-          className="relative z-10 grid h-6 w-6 shrink-0 place-items-center text-ink-3 opacity-0 transition group-hover:opacity-100 [@media(hover:none)]:opacity-100"
-        >
-          <CopyIcon size={12} />
-        </span>
-      ) : (
-        <button
-          type="button"
-          title="Delete this specialist"
-          aria-label={`Delete the specialist ${specialistTitle(specialist.name)}`}
-          onClick={onDelete}
-          className="relative z-10 grid h-6 w-6 shrink-0 place-items-center rounded-md text-ink-3 opacity-0 transition hover:bg-danger-bg hover:text-danger focus-visible:opacity-100 group-hover:opacity-100 [@media(hover:none)]:opacity-100"
-        >
-          <CrossIcon size={12} />
-        </button>
-      )}
-    </li>
+    </SectionPage>
   );
 }
 

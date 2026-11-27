@@ -7,6 +7,15 @@ import { plural, shorten } from '../../../lib/format';
 import { useToast } from '../../../lib/toast';
 import type { AsyncResource } from '../../../lib/useAsync';
 import { PanelMessage } from '../PanelMessage';
+import { BrainIcon, TrashIcon } from '../../../lib/icons';
+import {
+  EmptyHero,
+  GroupHeading,
+  SearchBox,
+  SectionHeader,
+  SectionPage,
+  matches,
+} from '../../customize/SectionLayout';
 import { clearMemories, deleteMemory } from './api';
 import { MemoryItem } from './MemoryItem';
 
@@ -15,7 +24,7 @@ type PendingDelete = { kind: 'one'; memory: Memory } | { kind: 'all' };
 const newestFirst = (a: Memory, b: Memory) =>
   (b.updatedAt ?? b.createdAt ?? '').localeCompare(a.updatedAt ?? a.createdAt ?? '');
 
-/** The Memory tab: what the agent remembers in this workspace. */
+/** The Memory page (Customize tab): what the agent remembers in this workspace. */
 export function MemoryPanel({
   workspaceId,
   memories,
@@ -26,6 +35,7 @@ export function MemoryPanel({
   const toast = useToast();
   const [pending, setPending] = useState<PendingDelete | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [query, setQuery] = useState('');
   const { data, setData } = memories;
   const list = data ? [...data].sort(newestFirst) : [];
 
@@ -53,16 +63,22 @@ export function MemoryPanel({
 
   const cancel = useCallback(() => setPending(null), []);
 
+  const shown = list.filter((memory) => matches(query, memory.fact));
+
   return (
-    <>
-      <div className="mb-2 flex min-h-7 items-center justify-between">
-        <span className="eyebrow">{list.length ? `${list.length} saved` : 'Memories'}</span>
-        {list.length > 0 && (
-          <Button size="sm" variant="danger-ghost" onClick={() => setPending({ kind: 'all' })}>
-            Clear all
-          </Button>
-        )}
-      </div>
+    <SectionPage>
+      <SectionHeader
+        icon={<BrainIcon size={18} />}
+        title="Memory"
+        description="Facts and preferences the agent saved in this workspace. It reads them at the start of every chat and follows them. Ask it in a chat to change or forget one, or delete it here."
+        actions={
+          list.length > 0 && (
+            <Button variant="danger-outline" onClick={() => setPending({ kind: 'all' })}>
+              <TrashIcon size={12} /> Clear all
+            </Button>
+          )
+        }
+      />
 
       {!data ? (
         <PanelMessage
@@ -70,27 +86,35 @@ export function MemoryPanel({
           error={memories.error}
           onRetry={memories.reload}
         />
+      ) : list.length === 0 ? (
+        <EmptyHero icon={<BrainIcon size={20} />} title="Nothing remembered yet">
+          Tell the agent something to remember in a chat, like &quot;remember that I prefer short
+          answers&quot;, and it shows up here.
+        </EmptyHero>
       ) : (
-        <ul className={list.length ? 'panel divide-y divide-line-2' : ''}>
-          {list.length === 0 && (
-            <li className="border border-dashed border-line px-4 py-6 text-center text-[13px] text-ink-3">
-              Nothing saved yet. Tell the agent something to remember.
-            </li>
-          )}
-          {list.map((memory) => (
-            <MemoryItem
-              key={memory.id}
-              memory={memory}
-              onDelete={() => setPending({ kind: 'one', memory })}
+        <>
+          {list.length > 5 && (
+            <SearchBox
+              value={query}
+              onChange={setQuery}
+              placeholder="Search memories"
+              count={shown.length}
             />
-          ))}
-        </ul>
+          )}
+          <GroupHeading count={list.length} hint="Newest first">
+            Saved
+          </GroupHeading>
+          <ul className="panel divide-y divide-line-2 overflow-hidden">
+            {shown.map((memory) => (
+              <MemoryItem
+                key={memory.id}
+                memory={memory}
+                onDelete={() => setPending({ kind: 'one', memory })}
+              />
+            ))}
+          </ul>
+        </>
       )}
-
-      <p className="mt-3 text-[12px] leading-relaxed text-ink-3">
-        The agent reads these at the start of every chat and follows them. Ask it to change or
-        forget one, or delete it here.
-      </p>
 
       <ConfirmDeleteDialog
         open={pending !== null}
@@ -105,6 +129,6 @@ export function MemoryPanel({
         onCancel={cancel}
         onConfirm={() => void confirm()}
       />
-    </>
+    </SectionPage>
   );
 }

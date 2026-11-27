@@ -8,7 +8,8 @@ import { updateWorkspace } from '../../workspaces/api';
 import { writeInstructions } from '../../workspaces/api';
 import { announceWorkspaceSaved } from '../../workspaces/workspaceEvents';
 import { PanelMessage } from '../PanelMessage';
-import { WandIcon, SparkIcon, CheckIcon, InstructionsIcon, BrainIcon } from '../../../lib/icons';
+import { SectionHeader, SectionPage } from '../../customize/SectionLayout';
+import { WandIcon, CheckIcon, InstructionsIcon, BrainIcon } from '../../../lib/icons';
 
 const STARTERS = [
   { label: 'Coding assistant', desc: 'Expert on this project codebase', request: 'Coding assistant for this project' },
@@ -113,41 +114,41 @@ export function InstructionsPanel({
   };
 
   return (
-    <div className="mx-auto max-w-4xl p-6 lg:p-8">
-      {/* Header */}
-      <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <div className="inline-flex items-center gap-2 rounded-full bg-accent-soft px-3 py-1 text-[11.5px] font-bold uppercase tracking-[0.1em] text-accent-2">
-            <SparkIcon size={13} />
-            Workspace Behavioral Control
-          </div>
-          <h1 className="mt-2 text-2xl font-extrabold tracking-tight text-ink">
-            Agent Instructions
-          </h1>
-          <p className="mt-1 text-[14px] text-ink-3">
-            Define how the agent behaves across every conversation in <span className="font-semibold text-ink">{workspace.name}</span>.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2.5">
-          {isDirty && (
-            <Button size="md" variant="ghost" onClick={() => { onDraftChange(null); setFieldError(null); }} disabled={isSaving}>
-              Discard changes
+    <SectionPage>
+      <SectionHeader
+        icon={<InstructionsIcon size={18} />}
+        title="Instructions"
+        description={
+          <>
+            How the agent behaves in every chat in{' '}
+            <span className="font-semibold text-ink">{workspace.name}</span>: its role, the
+            project&apos;s rules and what to check before a task is done.
+          </>
+        }
+        actions={
+          <>
+            {isDirty && (
+              <Button
+                onClick={() => {
+                  onDraftChange(null);
+                  setFieldError(null);
+                }}
+                disabled={isSaving}
+              >
+                Discard
+              </Button>
+            )}
+            <Button
+              variant="primary"
+              onClick={(e) => void save(e)}
+              disabled={isSaving || !isDirty}
+            >
+              {isSaving ? <Spinner size={14} /> : <CheckIcon size={14} />}
+              {isSaving ? 'Saving…' : isDirty ? 'Save changes' : 'Saved'}
             </Button>
-          )}
-          <Button
-            size="md"
-            variant="primary"
-            onClick={(e) => void save(e)}
-            disabled={isSaving || !isDirty}
-            className="shadow-accent"
-          >
-            {isSaving && <Spinner size={14} />}
-            <CheckIcon size={15} />
-            {isSaving ? 'Saving…' : isDirty ? 'Save changes' : 'Saved'}
-          </Button>
-        </div>
-      </div>
+          </>
+        }
+      />
 
       {/* Single Column Layout */}
       <div className="flex flex-col gap-6">
@@ -286,6 +287,6 @@ export function InstructionsPanel({
           </div>
         </div>
       </div>
-    </div>
+    </SectionPage>
   );
 }

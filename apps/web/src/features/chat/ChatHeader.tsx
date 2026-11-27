@@ -3,7 +3,7 @@ import { IconButton } from '../../components/IconButton';
 import {
   ConversationIcon,
   GitDiffIcon,
-  InstructionsIcon,
+  GearIcon,
   NoteIcon,
   PanelIcon,
   TerminalIcon,
@@ -15,12 +15,12 @@ const TAB_ICON: Record<CenterTab, ReactNode> = {
   chat: <ConversationIcon size={15} />,
   terminal: <TerminalIcon size={15} />,
   git: <GitDiffIcon size={15} />,
-  instructions: <InstructionsIcon size={15} />,
+  customize: <GearIcon size={15} />,
   notes: <NoteIcon size={15} />,
 };
 
 /**
- * The middle section's toolbar: a tab strip with Chat (its title as the tooltip) first, then the workspace's terminal, git diff, instructions and notes. While a side is hidden, a
+ * The middle section's toolbar: a tab strip with Chat (its title as the tooltip) first, then the workspace's terminal, git diff, Customize and notes. While a side is hidden, a
  * button brings it back: the chats sidebar (wide screens) in front of the tabs, the panel at the end.
  */
 export function ChatHeader({
@@ -118,8 +118,8 @@ export function ChatHeader({
             onClick={onTogglePanel}
             aria-controls="side-panel"
             aria-expanded={false}
-            title="Show files, tasks and memory"
-            aria-label="Show files, tasks and memory"
+            title="Show files and tasks"
+            aria-label="Show files and tasks"
           >
             <PanelIcon size={15} />
           </IconButton>

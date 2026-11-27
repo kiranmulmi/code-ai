@@ -20,12 +20,13 @@ import {
 } from '../panel/panelTabs';
 import { GitPanel } from '../panel/git/GitPanel';
 import { useGitChangeCount } from '../panel/git/useGitChangeCount';
-import { InstructionsPanel } from '../panel/instructions/InstructionsPanel';
 import { NotesPanel } from '../panel/notes/NotesPanel';
 import { useNotes } from '../panel/notes/useNotes';
 import { TerminalPanel } from '../panel/terminal/TerminalPanel';
 import { SidePanel } from '../panel/SidePanel';
 import { usePanelWidth } from '../panel/usePanelWidth';
+import { CustomizeView } from '../customize/CustomizeView';
+import { parseCustomizeSection, type CustomizeSection } from '../customize/sections';
 import { useWorkspace } from '../workspaces/useWorkspace';
 import { onWorkspaceSaved } from '../workspaces/workspaceEvents';
 import { rememberLastWorkspace } from '../workspaces/lastWorkspace';
@@ -47,7 +48,7 @@ const parseFlag = (stored: string | null) => stored === 'true';
 
 /**
  * The chat screen for one workspace: the chats sidebar, the open chat, and the side panel
- * (plan, memory, files). `chatId` is null for a new chat. The workspace sidebar is ChatRoute's,
+ * (files, tasks). Customize (instructions, skills, agents, tools, MCP, memory) is a tab beside the chat. `chatId` is null for a new chat. The workspace sidebar is ChatRoute's,
  * to its left, so it stays put while this screen is replaced by another workspace's.
  */
 export function ChatScreen({
@@ -99,6 +100,10 @@ export function ChatScreen({
   const sidebarWidth = useSidebarWidth();
   const [tab, setTab] = useStoredState<PanelTab>('agent.panelTab', parsePanelTab);
   const [centerTab, setCenterTab] = useStoredState<CenterTab>('agent.centerTab', parseCenterTab);
+  const [customizeSection, setCustomizeSection] = useStoredState<CustomizeSection>(
+    'agent.customizeSection',
+    parseCustomizeSection,
+  );
   const [isPanelCollapsed, setIsPanelCollapsed] = useStoredState('agent.panelCollapsed', parseFlag);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useStoredState(
     'agent.sidebarCollapsed',
@@ -245,11 +250,16 @@ export function ChatScreen({
   // Loaded here so an open note's list survives switching tabs; reloaded when picked.
   const notes = useNotes(workspaceId);
   const { reload: reloadNotes } = notes;
-  // The Instructions tab's unsaved text (null: unchanged), kept here so it survives tab switches.
+  // The Instructions page's unsaved text (null: unchanged), kept here so it survives tab switches.
   const [instructionsDraft, setInstructionsDraft] = useState<string | null>(null);
   const selectCenterTab = (next: CenterTab) => {
     if (next === 'notes' && shownCenterTab !== 'notes') reloadNotes();
     setCenterTab(next);
+  };
+  /** Opens one page of the Customize tab, e.g. Instructions from the new chat's card. */
+  const openCustomize = (section: CustomizeSection) => {
+    setCustomizeSection(section);
+    setCenterTab('customize');
   };
 
   const selectTab = (next: PanelTab) => {
@@ -354,22 +364,28 @@ export function ChatScreen({
                 // Keyed by tab, so each tab's content fades in when it's picked.
                 key={shownCenterTab}
                 className={`min-h-0 flex-1 animate-fade-in bg-surface ${
-                  shownCenterTab === 'terminal' ? 'overflow-hidden' : 'overflow-y-auto'
+                  shownCenterTab === 'terminal' || shownCenterTab === 'customize'
+                    ? 'overflow-hidden'
+                    : 'overflow-y-auto'
                 }`}
               >
                 {shownCenterTab === 'terminal' && <TerminalPanel workspaceId={workspaceId} />}
                 {shownCenterTab === 'git' && (
                   <GitPanel workspaceId={workspaceId} isBusy={isWorkspaceBusy} />
                 )}
-                {shownCenterTab === 'instructions' && (
-                  <InstructionsPanel
+                {shownCenterTab === 'customize' && (
+                  <CustomizeView
                     workspaceId={workspaceId}
-                    workspace={workspace.data}
-                    isLoading={workspace.isLoading}
-                    error={workspace.error}
-                    onRetry={reloadWorkspace}
-                    draft={instructionsDraft}
-                    onDraftChange={setInstructionsDraft}
+                    workspace={workspace}
+                    section={customizeSection}
+                    onSection={setCustomizeSection}
+                    memories={memories}
+                    skills={skills}
+                    isBusy={isWorkspaceBusy}
+                    instructions={{
+                      draft: instructionsDraft,
+                      onDraftChange: setInstructionsDraft,
+                    }}
                   />
                 )}
                 {shownCenterTab === 'notes' && (
@@ -461,7 +477,7 @@ export function ChatScreen({
                   conversation.reload();
                   reloadChats();
                 }}
-                onEditInstructions={() => selectCenterTab('instructions')}
+                onEditInstructions={() => openCustomize('instructions')}
               />
             </div>
           </div>
@@ -469,8 +485,6 @@ export function ChatScreen({
             tab={tab}
             onTab={selectTab}
             workspaceId={workspaceId}
-            memories={memories}
-            skills={skills}
             files={files}
             width={panelWidth}
             isDrawerOpen={isPanelDrawerOpen}

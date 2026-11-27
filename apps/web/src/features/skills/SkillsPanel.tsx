@@ -1,14 +1,26 @@
 import { useCallback, useEffect, useRef, useState, type ChangeEvent } from 'react';
 import { SKILL_LIMITS, SKILL_MAIN_FILE, formatBytes, type Skill } from '@app/shared';
+import { Badge } from '../../components/Badge';
 import { Button } from '../../components/Button';
 import { ConfirmDeleteDialog } from '../../components/ConfirmDeleteDialog';
 import { Spinner } from '../../components/Spinner';
 import { ApiError, errorMessage } from '../../lib/api';
 import { plural } from '../../lib/format';
-import { CrossIcon, FolderIcon, PlusIcon, SkillIcon } from '../../lib/icons';
+import { EditIcon, FolderIcon, PlusIcon, SkillIcon, TrashIcon } from '../../lib/icons';
 import { useToast } from '../../lib/toast';
 import type { AsyncResource } from '../../lib/useAsync';
 import { PanelMessage } from '../panel/PanelMessage';
+import {
+  CardAction,
+  CardGrid,
+  EmptyHero,
+  ItemCard,
+  SearchBox,
+  SectionHeader,
+  SectionNote,
+  SectionPage,
+  matches,
+} from '../customize/SectionLayout';
 import { deleteSkill, uploadSkill, type PickedSkillFile } from './api';
 import { useSkillDialog } from './SkillDialogProvider';
 
@@ -39,7 +51,7 @@ function pickedFiles(list: FileList): PickedSkillFile[] | string {
 }
 
 /**
- * The Skills tab: the workspace's skills, each a name and when to use it. The agent picks
+ * The Skills page (Customize tab): the workspace's skills, each a name and when to use it. The agent picks
  * the ones a task needs; the composer's Skills button adds them to a message by hand.
  * Created and edited in a popup (SkillDialog).
  */
@@ -54,6 +66,7 @@ export function SkillsPanel({
   const { openSkill } = useSkillDialog();
   const [pending, setPending] = useState<Skill | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [query, setQuery] = useState('');
   const list = skills.data ?? [];
 
   const confirm = async () => {
@@ -113,92 +126,126 @@ export function SkillsPanel({
   };
   const cancelClash = useCallback(() => setClash(null), []);
 
+  const shown = list.filter((skill) => matches(query, skill.name, skill.description));
+  const uploadButton = (
+    <Button
+      onClick={() => folderInput.current?.click()}
+      disabled={isUploading}
+      title={`Upload a skill folder: ${SKILL_MAIN_FILE} plus the files it uses`}
+    >
+      {isUploading ? <Spinner size={12} /> : <FolderIcon size={13} />} Upload folder
+    </Button>
+  );
+
   return (
-    <>
-      <div className="mb-2 flex min-h-7 items-center justify-between gap-2">
-        <span className="eyebrow">{list.length ? plural(list.length, 'skill') : 'Skills'}</span>
-        <div className="flex items-center gap-1.5">
-          <Button
-            size="sm"
-            onClick={() => folderInput.current?.click()}
-            disabled={isUploading}
-            title={`Upload a skill folder: ${SKILL_MAIN_FILE} plus the files it uses`}
-          >
-            {isUploading ? <Spinner size={11} /> : <FolderIcon size={11} />} Upload
-          </Button>
-          <Button size="sm" onClick={() => openSkill(null)}>
-            <PlusIcon size={11} /> New skill
-          </Button>
-        </div>
-        <input
-          ref={folderInput}
-          type="file"
-          multiple
-          hidden
-          aria-hidden="true"
-          tabIndex={-1}
-          onChange={picked}
-        />
-      </div>
+    <SectionPage>
+      <SectionHeader
+        icon={<SkillIcon size={18} />}
+        title="Skills"
+        description="Reusable know-how for tasks you repeat. The agent sees each skill's name and description and loads the ones a task needs; you can also add one to a message from the composer."
+        actions={
+          <>
+            {uploadButton}
+            <Button variant="primary" onClick={() => openSkill(null)}>
+              <PlusIcon size={12} /> New skill
+            </Button>
+          </>
+        }
+      />
+      <input
+        ref={folderInput}
+        type="file"
+        multiple
+        hidden
+        aria-hidden="true"
+        tabIndex={-1}
+        onChange={picked}
+      />
 
       {!skills.data ? (
         <PanelMessage isLoading={skills.isLoading} error={skills.error} onRetry={skills.reload} />
+      ) : list.length === 0 ? (
+        <EmptyHero
+          icon={<SkillIcon size={20} />}
+          title="No skills yet"
+          actions={
+            <>
+              <Button size="sm" variant="primary" onClick={() => openSkill(null)}>
+                <PlusIcon size={11} /> Write a skill
+              </Button>
+              <Button size="sm" onClick={() => folderInput.current?.click()} disabled={isUploading}>
+                <FolderIcon size={11} /> Upload a folder
+              </Button>
+            </>
+          }
+        >
+          Write one for a task you repeat, like a ticket workflow or a review checklist, or upload a
+          skill folder ({SKILL_MAIN_FILE} plus the references or templates it uses).
+        </EmptyHero>
       ) : (
-        <ul className={list.length ? 'panel divide-y divide-line-2' : ''}>
-          {list.length === 0 && (
-            <li className="border border-dashed border-line px-4 py-6 text-center text-[13px] text-ink-3">
-              No skills yet. Write one for a task you repeat, like a ticket workflow or a review
-              checklist.
-            </li>
+        <>
+          {list.length > 6 && (
+            <SearchBox
+              value={query}
+              onChange={setQuery}
+              placeholder="Search skills"
+              count={shown.length}
+            />
           )}
-          {list.map((skill) => (
-            <li
-              key={skill.name}
-              className="group relative flex items-start gap-2.5 px-3 py-2.5 transition-colors hover:bg-subtle"
-            >
-              <SkillIcon size={14} className="mt-0.5 shrink-0 text-accent" />
-              <button
-                type="button"
-                onClick={() => openSkill(skill.name)}
-                title="Edit this skill"
-                className="min-w-0 flex-1 text-left outline-none after:absolute after:inset-0 focus-visible:after:rounded-md focus-visible:after:ring-1 focus-visible:after:ring-accent"
-              >
-                <span className="flex min-w-0 items-baseline gap-1.5">
-                  <span className="truncate font-mono text-[12.5px] font-semibold text-ink">
-                    {skill.name}
-                  </span>
-                  {skill.files && skill.files.length > 0 && (
-                    <span
-                      className="shrink-0 text-[11px] text-ink-3"
-                      title={skill.files.map((f) => f.path).join('\n')}
-                    >
-                      +{plural(skill.files.length, 'file')}
+          <CardGrid label="Skills">
+            {shown.map((skill) => (
+              <ItemCard
+                key={skill.name}
+                icon={<SkillIcon size={15} />}
+                name={skill.name}
+                openTitle="Edit this skill"
+                onOpen={() => openSkill(skill.name)}
+                badges={
+                  !skill.description && (
+                    <Badge tone="yellow" className="h-4 px-1.5 text-[10.5px]">
+                      needs a description
+                    </Badge>
+                  )
+                }
+                description={
+                  skill.description || 'No description: the agent won’t know when to use it.'
+                }
+                meta={
+                  skill.files && skill.files.length > 0 ? (
+                    <span title={skill.files.map((f) => f.path).join('\n')}>
+                      {SKILL_MAIN_FILE} + {plural(skill.files.length, 'file')}
                     </span>
-                  )}
-                </span>
-                <span className="mt-0.5 line-clamp-2 text-[12px] leading-snug text-ink-3">
-                  {skill.description || 'No description: the agent won’t know when to use it.'}
-                </span>
-              </button>
-              <button
-                type="button"
-                title="Delete this skill"
-                aria-label={`Delete the skill ${skill.name}`}
-                onClick={() => setPending(skill)}
-                className="relative z-10 grid h-6 w-6 shrink-0 place-items-center rounded-md text-ink-3 opacity-0 transition hover:bg-danger-bg hover:text-danger focus-visible:opacity-100 group-hover:opacity-100 [@media(hover:none)]:opacity-100"
-              >
-                <CrossIcon size={12} />
-              </button>
-            </li>
-          ))}
-        </ul>
+                  ) : (
+                    SKILL_MAIN_FILE
+                  )
+                }
+                corner={
+                  <>
+                    <CardAction
+                      label={`Edit the skill ${skill.name}`}
+                      onClick={() => openSkill(skill.name)}
+                    >
+                      <EditIcon size={13} />
+                    </CardAction>
+                    <CardAction
+                      tone="danger"
+                      label={`Delete the skill ${skill.name}`}
+                      onClick={() => setPending(skill)}
+                    >
+                      <TrashIcon size={13} />
+                    </CardAction>
+                  </>
+                }
+              />
+            ))}
+          </CardGrid>
+        </>
       )}
 
-      <p className="mt-3 text-[12px] leading-relaxed text-ink-3">
-        The agent sees each skill&apos;s name and description and loads the ones a task needs. Upload a
-        skill folder ({SKILL_MAIN_FILE} plus files it uses, like references or templates) to give
-        the agent those files too.
-      </p>
+      <SectionNote>
+        Skills belong to this workspace. Upload a skill folder to give the agent its extra files
+        too; uploading one with a name that&apos;s taken asks before replacing it.
+      </SectionNote>
 
       <ConfirmDeleteDialog
         open={clash !== null}
@@ -229,6 +276,6 @@ export function SkillsPanel({
         onCancel={cancel}
         onConfirm={() => void confirm()}
       />
-    </>
+    </SectionPage>
   );
 }

@@ -4,7 +4,14 @@ import { Badge, type BadgeTone } from '../../components/Badge';
 import { Spinner } from '../../components/Spinner';
 import { Switch } from '../../components/Switch';
 import { plural } from '../../lib/format';
-import { ChevronRightIcon, EditIcon, RefreshIcon } from '../../lib/icons';
+import {
+  ChevronRightIcon,
+  EditIcon,
+  RefreshIcon,
+  ServerIcon,
+  TerminalIcon,
+  WrenchIcon,
+} from '../../lib/icons';
 
 const STATE: Record<McpServerState, { dot: string; label: string; tone: BadgeTone }> = {
   connected: { dot: 'bg-success-line', label: 'Running', tone: 'green' },
@@ -28,8 +35,8 @@ function launchLine(server: McpServerStatus): string {
 }
 
 /**
- * One MCP server as a single line: status dot, name, on/off. How it starts is in the
- * tooltip (shown in full while it needs review); its tools and "Always allow" fold open.
+ * One MCP server: icon with a status dot, name, state and transport badges, how it starts,
+ * actions and its on/off switch. Its tools fold open as a table with "Always allow" switches.
  */
 export function McpServerRow({
   server,
@@ -39,8 +46,14 @@ export function McpServerRow({
   onRestart,
   onAutoApprove,
   onEdit,
+  isPlugin = false,
+  onOpenTools,
 }: {
   server: McpServerStatus;
+  /** one of the user's own tool plugins */
+  isPlugin?: boolean;
+  /** opens the Tools page */
+  onOpenTools?: () => void;
   /** the agent is working in this workspace: changes wait */
   isBusy: boolean;
   /** the change being saved right now, if any */
@@ -60,8 +73,6 @@ export function McpServerRow({
   const canRestart = server.state === 'connected' || server.state === 'error';
   const needsReview = server.state === 'untrusted';
   const hasTools = server.tools.length > 0;
-  // Running and Off show in the dot and the switch; only states that need you get a badge.
-  const showsBadge = server.state === 'error' || needsReview;
   // Variables can change what a command does (NODE_OPTIONS, PATH...), so a review shows them;
   // header values are usually tokens, so only their names.
   const envLines = [
@@ -73,36 +84,70 @@ export function McpServerRow({
   }`;
 
   return (
-    <li>
-      <div className="group flex min-h-9 items-center gap-2 px-1 py-1 transition-colors hover:bg-subtle">
+    <li className={isOn ? '' : 'bg-subtle'}>
+      <div className="group flex items-start gap-3 px-4 py-3.5">
         <span
           aria-hidden
-          title={state.label}
-          className={`ml-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${state.dot}`}
-        />
-        <span
-          className="min-w-0 truncate font-mono text-[12.5px] text-ink"
-          title={`${state.label} · ${TRANSPORT_LABEL[server.transport]} · ${line}`}
+          className={`relative mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-xl ${
+            isOn ? 'bg-accent-soft text-accent-2' : 'bg-surface-2 text-ink-3'
+          }`}
         >
-          {server.name}
+          {isPlugin ? <TerminalIcon size={15} /> : <ServerIcon size={15} />}
+          <span
+            title={state.label}
+            className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full ring-2 ring-surface ${state.dot}`}
+          />
         </span>
-        {showsBadge && <Badge tone={state.tone}>{state.label}</Badge>}
-        {hasTools && (
-          <button
-            type="button"
-            onClick={() => setIsOpen((open) => !open)}
-            aria-expanded={isOpen}
-            title={toolsTitle}
-            className="flex shrink-0 items-center gap-1 rounded-md px-1 py-0.5 text-[11.5px] tabular-nums text-ink-3 transition-colors hover:bg-surface-2 hover:text-ink"
-          >
-            <ChevronRightIcon
-              size={9}
-              className={`transition-transform ${isOpen ? 'rotate-90' : ''}`}
-            />
-            {server.tools.length}
-          </button>
-        )}
-        <span className="ml-auto flex shrink-0 items-center gap-0.5">
+
+        <div className="min-w-0 flex-1">
+          <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+            <span className="truncate font-mono text-[13px] font-semibold text-ink">
+              {server.name}
+            </span>
+            <Badge tone={state.tone} className="h-4 px-1.5 text-[10.5px]">
+              {state.label}
+            </Badge>
+            <Badge tone="grey" className="h-4 px-1.5 text-[10.5px]">
+              {TRANSPORT_LABEL[server.transport]}
+            </Badge>
+            {isPlugin && (
+              <Badge tone="blue" className="h-4 px-1.5 text-[10.5px]">
+                your tool
+              </Badge>
+            )}
+          </div>
+          <div className="mt-1 truncate font-mono text-[11.5px] text-ink-3" title={line}>
+            {line}
+          </div>
+
+          {hasTools && (
+            <button
+              type="button"
+              onClick={() => setIsOpen((open) => !open)}
+              aria-expanded={isOpen}
+              className="mt-2 inline-flex items-center gap-1.5 rounded-lg px-1.5 py-0.5 -ml-1.5 text-[12px] font-medium text-ink-2 transition-colors hover:bg-surface-2 hover:text-ink"
+            >
+              <ChevronRightIcon
+                size={10}
+                className={`transition-transform ${isOpen ? 'rotate-90' : ''}`}
+              />
+              {toolsTitle}
+            </button>
+          )}
+        </div>
+
+        <span className="flex shrink-0 items-center gap-1">
+          {isPlugin && onOpenTools && (
+            <button
+              type="button"
+              onClick={onOpenTools}
+              className={ACTION}
+              aria-label={`Open ${server.name} in Tools`}
+              title="Open in Tools"
+            >
+              <WrenchIcon size={12} />
+            </button>
+          )}
           {canRestart && (
             <button
               type="button"
@@ -128,27 +173,27 @@ export function McpServerRow({
               type="button"
               onClick={onEdit}
               aria-label={`Edit ${server.name}`}
-              title="Edit"
+              title="Edit (changes it in every workspace)"
               className={ACTION}
             >
               <EditIcon size={12} />
             </button>
           )}
-          <span className="ml-1">
+          <span className="ml-2">
             <Switch
               isOn={isOn}
               onChange={onToggle}
               disabled={isLocked}
               label={isOn ? `Turn ${server.name} off` : `Turn ${server.name} on`}
-              title={isBusy ? BUSY_TITLE : undefined}
+              title={isBusy ? BUSY_TITLE : isOn ? 'Turn off here' : 'Turn on here'}
             />
           </span>
         </span>
       </div>
 
-      {needsReview && (
+      {needsReview && envLines.length > 0 && (
         // Under review, show everything that decides what runs: no truncation.
-        <dl className="flex flex-col gap-0.5 pb-2 pl-5 pr-2 font-mono text-[11.5px] text-ink-2 [overflow-wrap:anywhere]">
+        <dl className="mx-4 mb-3 ml-16 flex flex-col gap-0.5 rounded-lg bg-warn-bg px-3 py-2 font-mono text-[11.5px] text-ink-2 [overflow-wrap:anywhere]">
           <dd>{line}</dd>
           {envLines.map((entry) => (
             <dd key={entry} className="text-ink-3">
@@ -159,27 +204,28 @@ export function McpServerRow({
       )}
 
       {server.error && (
-        <pre className="mb-2 ml-5 mr-1 max-h-24 overflow-auto whitespace-pre-wrap border-l-[3px] border-l-danger-line bg-danger-bg px-2.5 py-1.5 font-mono text-[11px] leading-relaxed text-danger [overflow-wrap:anywhere]">
+        <pre className="mb-3 ml-16 mr-4 max-h-28 overflow-auto whitespace-pre-wrap rounded-lg border-l-[3px] border-l-danger-line bg-danger-bg px-3 py-2 font-mono text-[11px] leading-relaxed text-danger [overflow-wrap:anywhere]">
           {server.error}
         </pre>
       )}
 
       {hasTools && isOpen && (
-        <div className="pb-1.5 pl-5 pr-1">
-          <div className="flex items-center justify-between py-1 text-[11px] text-ink-3">
-            <span>{toolsTitle}</span>
+        <div className="mb-3 ml-16 mr-4 overflow-hidden rounded-xl border border-line-2 bg-surface">
+          <div className="flex items-center justify-between border-b border-line-2 bg-subtle px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-ink-3">
+            <span>Tool</span>
             <span>Always allow</span>
           </div>
-          <ul>
+          <ul className="divide-y divide-line-2">
             {server.tools.map((tool) => (
-              <li
-                key={tool.name}
-                className="flex items-center gap-2 py-1"
-                title={tool.description || undefined}
-              >
-                <span className="min-w-0 flex-1 truncate font-mono text-[11.5px] text-ink-2">
-                  {tool.name}
-                </span>
+              <li key={tool.name} className="flex items-center gap-3 px-3 py-2">
+                <div className="min-w-0 flex-1">
+                  <div className="truncate font-mono text-[12px] text-ink">{tool.name}</div>
+                  {tool.description && (
+                    <div className="truncate text-[11.5px] text-ink-3" title={tool.description}>
+                      {tool.description}
+                    </div>
+                  )}
+                </div>
                 <Switch
                   isOn={tool.isAutoApproved}
                   onChange={(next) => onAutoApprove(tool.name, next)}
