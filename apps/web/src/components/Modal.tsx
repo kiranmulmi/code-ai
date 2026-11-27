@@ -1,23 +1,31 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { CrossIcon } from '../lib/icons';
-import { IconButton } from './IconButton';
 
 /**
- * An overlay for looking at (or editing) one thing, e.g. a file or a skill. App and workspace
- * settings forms don't go in here; they get their own page.
+ * An overlay for looking at (or editing) one thing, e.g. a file or a skill. Laid out like the
+ * quick chat panel: a header (round mark, title, a line under it, then the buttons and Close)
+ * over a soft accent glow, the scrolling body under it, and an optional footer bar.
  */
 export function Modal({
   title,
+  description,
+  icon,
+  aside,
   onClose,
   children,
   actions,
   footer,
   size = 'md',
-  titleFont = 'mono',
-  header,
 }: {
+  /** the heading in the header; also names the dialog for screen readers */
   title: string;
+  /** a short line under the title */
+  description?: ReactNode;
+  /** an icon for the round mark before the title */
+  icon?: ReactNode;
+  /** something beside the title, e.g. an "Unsaved" badge */
+  aside?: ReactNode;
   onClose: () => void;
   children: ReactNode;
   /** buttons in the header, before Close */
@@ -29,13 +37,6 @@ export function Modal({
    * tabs doesn't resize it; `wide`: most of the screen, for reading code
    */
   size?: 'md' | 'lg' | 'xl' | 'wide';
-  /** `mono` for a file path, `sans` for a plain title */
-  titleFont?: 'mono' | 'sans';
-  /**
-   * Replaces the standard title bar (title, `actions`, Close) with a custom one, which then
-   * brings its own Close button. `title` still names the dialog for screen readers.
-   */
-  header?: ReactNode;
 }) {
   const dialog = useRef<HTMLDivElement>(null);
 
@@ -66,7 +67,7 @@ export function Modal({
     >
       <div className="absolute inset-0 animate-fade-in bg-overlay" onClick={onClose} />
       <div
-        className={`relative flex animate-dialog-in flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-dialog ${
+        className={`relative flex animate-dialog-in flex-col overflow-hidden rounded-[22px] border border-line bg-surface shadow-dialog ${
           size === 'wide'
             ? 'h-[92vh] w-[min(1440px,calc(100%-32px))]'
             : size === 'xl'
@@ -76,33 +77,95 @@ export function Modal({
                 : 'max-h-[86vh] w-[min(860px,calc(100%-32px))]'
         }`}
       >
-        {header ?? (
-          <div className="flex items-center justify-between gap-3 border-b border-line bg-subtle py-2 pl-4 pr-2">
-            <strong
-              className={`min-w-0 truncate ${
-                titleFont === 'mono'
-                  ? 'font-mono text-[13px] font-medium'
-                  : 'pl-1 text-[14.5px] font-bold text-ink'
-              }`}
-            >
-              {title}
-            </strong>
-            <div className="flex shrink-0 items-center gap-1">
-              {actions}
-              <IconButton onClick={onClose} aria-label="Close" autoFocus>
-                <CrossIcon />
-              </IconButton>
+        <ModalGlow />
+        <header className="relative flex shrink-0 items-center gap-2.5 px-5 pb-3 pt-4">
+          {icon && <ModalMark>{icon}</ModalMark>}
+          <div className="min-w-0 flex-1">
+            <div className="flex min-w-0 items-center gap-2">
+              <h2 className="truncate text-[14.5px] font-semibold leading-tight tracking-tight text-ink">
+                {title}
+              </h2>
+              {aside}
             </div>
+            {description && (
+              <p className="mt-0.5 line-clamp-2 text-[11.5px] leading-snug text-ink-3">
+                {description}
+              </p>
+            )}
           </div>
-        )}
-        <div className="min-h-0 flex-1 overflow-auto">{children}</div>
+          <div className="flex shrink-0 flex-wrap items-center justify-end gap-1">
+            {actions}
+            <ModalHeaderButton onClick={onClose} label="Close (Esc)" autoFocus>
+              <CrossIcon size={14} />
+            </ModalHeaderButton>
+          </div>
+        </header>
+        <div className="relative min-h-0 flex-1 overflow-auto">{children}</div>
         {footer && (
-          <div className="flex shrink-0 flex-wrap items-center gap-2 border-t border-line bg-subtle px-4 py-3 has-[>div:only-child:empty]:hidden">
+          <div className="relative flex shrink-0 flex-wrap items-center gap-2 border-t border-line bg-subtle px-5 py-3 has-[>div:only-child:empty]:hidden">
             {footer}
           </div>
         )}
       </div>
     </div>,
     document.body,
+  );
+}
+
+/** The soft accent glow behind a modal's header, as on the quick chat panel. */
+export function ModalGlow() {
+  return (
+    <div
+      aria-hidden
+      className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-[radial-gradient(120%_100%_at_0%_0%,var(--glow-1),transparent_70%)]"
+    />
+  );
+}
+
+/** The round mark before a modal's title (the quick chat's assistant mark, with any icon). */
+export function ModalMark({
+  children,
+  tone = 'accent',
+}: {
+  children: ReactNode;
+  tone?: 'accent' | 'danger';
+}) {
+  return (
+    <span
+      aria-hidden
+      className={`grid h-[30px] w-[30px] shrink-0 place-items-center rounded-full ${
+        tone === 'danger'
+          ? 'bg-danger-bg text-danger'
+          : 'bg-gradient-to-br from-accent to-accent-2 text-on-accent shadow-accent'
+      }`}
+    >
+      {children}
+    </span>
+  );
+}
+
+/** A round, borderless icon button for a modal's header, like the quick chat's. */
+export function ModalHeaderButton({
+  onClick,
+  label,
+  autoFocus,
+  children,
+}: {
+  onClick: () => void;
+  label: string;
+  autoFocus?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      title={label}
+      autoFocus={autoFocus}
+      className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-ink-3 transition-colors hover:bg-surface-2 hover:text-ink"
+    >
+      {children}
+    </button>
   );
 }

@@ -4,10 +4,10 @@ import { ChevronRightIcon } from '../lib/icons';
 import { useHeaderState, useTopbarSlotRef } from './pageHeader';
 
 /**
- * The heading of a form page: breadcrumb trail, title, and the page's actions. `inModal`: the
- * popup's own header shows the title, so only the subtitle and the actions are left here.
+ * The heading of a form page: breadcrumb trail, title, and the page's actions. In the settings
+ * popup the modal's own header shows these instead.
  */
-export function Topbar({ inModal = false }: { inModal?: boolean }) {
+export function Topbar() {
   const header = useHeaderState();
   const setActionsNode = useTopbarSlotRef();
 
@@ -15,17 +15,6 @@ export function Topbar({ inModal = false }: { inModal?: boolean }) {
     (node: HTMLDivElement | null) => setActionsNode(node),
     [setActionsNode],
   );
-
-  if (inModal) {
-    return (
-      <div className="flex min-h-8 flex-wrap items-center justify-between gap-x-3 gap-y-1.5 pb-2.5">
-        <p className="min-w-0 flex-1 basis-60 text-[12px] leading-snug text-ink-3">
-          {header?.subtitle}
-        </p>
-        <div ref={actionsRef} className="flex shrink-0 flex-wrap items-center gap-2" />
-      </div>
-    );
-  }
 
   return (
     <div className="flex min-h-[64px] flex-wrap items-end justify-between gap-x-4 gap-y-3 pb-5">

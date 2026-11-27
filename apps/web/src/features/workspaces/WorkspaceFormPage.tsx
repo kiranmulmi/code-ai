@@ -14,10 +14,8 @@ import {
   workspaceInputSchema,
   workspaceSlug,
   workspaceUpdateSchema,
-  type McpServerEntry,
   type ToolGroup,
   type Workspace,
-  type WorkspacePlanning,
 } from '@app/shared';
 import { Button } from '../../components/Button';
 import { ERROR, HINT, INPUT, INPUT_ERROR, INPUT_OK, LABEL } from '../../components/form';
@@ -42,13 +40,7 @@ import {
 } from './api';
 import { FolderPicker } from './FolderPicker';
 import { announceWorkspaceSaved } from './workspaceEvents';
-import {
-  McpServerSwitches,
-  PlanningChoice,
-  PanelTabSwitches,
-  ToolGroupSwitches,
-} from './AgentChoices';
-import { fetchMcpEnabled, fetchMcpServers, saveMcpEnabled } from '../mcp/api';
+import { PanelTabSwitches, ToolGroupSwitches } from './AgentChoices';
 import { APP_NAME } from '../../lib/brand';
 import { EMPTY_VOICE_DRAFT, VoiceSettings, type VoiceDraft } from '../voice/VoiceSettings';
 import { ModelOptions } from '../models/ModelOptions';
@@ -76,8 +68,7 @@ const FOLDER_CHECK_DELAY_MS = WEB_APP.folderCheckDelayMs;
 
 const TABS = [
   { id: 'general', label: 'General' },
-  { id: 'agent', label: 'Planning & tools' },
-  { id: 'mcp', label: 'MCP servers' },
+  { id: 'agent', label: 'Tools' },
   { id: 'voice', label: 'Voice' },
 ] as const;
 type FormTab = (typeof TABS)[number]['id'];
@@ -145,7 +136,6 @@ export function WorkspaceFormPage() {
 
   const [name, setName] = useState('');
   const [folderPath, setFolderPath] = useState('');
-  const [planning, setPlanning] = useState<WorkspacePlanning>('default');
   // A new workspace starts with the shared defaults; editing replaces them with the saved choice.
   const [disabledTools, setDisabledTools] = useState<ToolGroup[]>([...DEFAULT_DISABLED_TOOLS]);
   const [hasTerminalTab, setHasTerminalTab] = useState(true);
@@ -163,14 +153,8 @@ export function WorkspaceFormPage() {
       language: undefined,
     }));
   };
-  // MCP servers: the app's list, and which are on here (saved to mcp.json after the workspace).
-  const [mcpServers, setMcpServers] = useState<McpServerEntry[] | null>(null);
-  const [mcpError, setMcpError] = useState<string | null>(null);
-  const [mcpEnabled, setMcpEnabled] = useState<string[]>([]);
-  const [savedMcp, setSavedMcp] = useState<string[]>([]);
-  const [isMcpTrusted, setIsMcpTrusted] = useState(true);
   const [isPickerOpen, setIsPickerOpen] = useState(false);
-  // A link can open the form on a given tab (e.g. the MCP panel's "Choose servers").
+  // A link can open the form on a given tab (e.g. the voice buttons open Voice).
   const [tab, setTab] = useState<FormTab>(() => {
     const wanted = tabFromState(location.state);
     return TABS.find((entry) => entry.id === wanted)?.id ?? 'general';
@@ -219,7 +203,6 @@ export function WorkspaceFormPage() {
         setLoaded(workspace);
         setName(workspace.name);
         setFolderPath(workspace.path);
-        setPlanning(workspace.planning);
         setDisabledTools(workspace.disabledTools);
         setHasTerminalTab(workspace.hasTerminalTab);
         setHasGitTab(workspace.hasGitTab);
@@ -242,27 +225,6 @@ export function WorkspaceFormPage() {
       isCurrent = false;
     };
   }, [workspaceId, navigate, toast]);
-
-  useEffect(() => {
-    let isCurrent = true;
-    Promise.all([fetchMcpServers(), workspaceId ? fetchMcpEnabled(workspaceId) : null])
-      .then(([servers, state]) => {
-        if (!isCurrent) return;
-        setMcpServers(servers);
-        const known = new Set(servers.map((entry) => entry.name));
-        // The servers this workspace uses; each one's on/off is switched in the MCP tab.
-        const on = (state?.allowed ?? []).filter((name) => known.has(name));
-        setMcpEnabled(on);
-        setSavedMcp(on);
-        setIsMcpTrusted(state?.isTrusted ?? true);
-      })
-      .catch((cause: unknown) => {
-        if (isCurrent) setMcpError(errorMessage(cause, "Couldn't load the MCP servers."));
-      });
-    return () => {
-      isCurrent = false;
-    };
-  }, [workspaceId]);
 
   // Checked as the folder or name is typed or picked (e.g. another workspace there has a too
   // similar name; several can share a folder), so it shows under the field before Save. A
@@ -290,28 +252,11 @@ export function WorkspaceFormPage() {
   }, [folderPath, name, savedPath, savedName, workspaceId]);
   const pathError = errors.path ?? folderProblem;
 
-  const isMcpChanged =
-    mcpServers !== null &&
-    (mcpEnabled.length !== savedMcp.length || mcpEnabled.some((name) => !savedMcp.includes(name)));
-
   const save = async (write: () => Promise<Workspace>, message: string) => {
     setErrors({});
     setIsSaving(true);
     try {
       const workspace = await write();
-      if (isMcpChanged) {
-        try {
-          await saveMcpEnabled(workspace.id, mcpEnabled);
-        } catch (cause) {
-          toast(
-            `${message}, but its MCP servers didn't change: ${errorMessage(cause, 'try again.')}`,
-            'warning',
-          );
-          announceWorkspaceSaved();
-          navigate(isEdit ? backTo : `/workspaces/${workspace.id}`);
-          return;
-        }
-      }
       toast(message);
       announceWorkspaceSaved();
       navigate(isEdit ? backTo : `/workspaces/${workspace.id}`);
@@ -373,7 +318,8 @@ export function WorkspaceFormPage() {
       const parsed = workspaceUpdateSchema.safeParse({
         name,
         path: folderPath,
-        planning,
+        // Planning is chosen in Agent settings; clear any older per-workspace override.
+        planning: 'default',
         disabledTools,
         hasTerminalTab,
         hasGitTab,
@@ -386,7 +332,6 @@ export function WorkspaceFormPage() {
       const parsed = workspaceInputSchema.safeParse({
         name,
         path: folderPath,
-        planning,
         disabledTools,
         hasTerminalTab,
         hasGitTab,
@@ -464,7 +409,6 @@ export function WorkspaceFormPage() {
             {TABS.map((item) => {
               const isActive = tab === item.id;
               const hasError = tabWithError(errors) === item.id;
-              const count = item.id === 'mcp' && mcpEnabled.length > 0 ? mcpEnabled.length : null;
               return (
                 <button
                   key={item.id}
@@ -482,11 +426,6 @@ export function WorkspaceFormPage() {
                   }`}
                 >
                   {item.label}
-                  {count !== null && (
-                    <span className="rounded-full bg-accent-soft px-1.5 text-[11px] tabular-nums text-accent-2">
-                      {count}
-                    </span>
-                  )}
                   {hasError && (
                     <span
                       aria-label="has an error"
@@ -628,19 +567,6 @@ export function WorkspaceFormPage() {
 
             <div {...panelProps('agent')}>
               <Field
-                id="workspace-planning"
-                label="Planning"
-                hint="Agent decides: the agent makes a plan itself when a task has several steps. Planning step: an extra model call before every message decides; steadier with smaller models, but slower."
-              >
-                <PlanningChoice
-                  id="workspace-planning"
-                  value={planning}
-                  onChange={setPlanning}
-                  isPlansOff={disabledTools.includes('plans')}
-                />
-              </Field>
-
-              <Field
                 id="workspace-tools"
                 label="Tools"
                 hint="Turn off what this workspace doesn't need: every message gets smaller. Asking you a question is always on; attachment, skill and MCP tools come when needed."
@@ -672,44 +598,6 @@ export function WorkspaceFormPage() {
                       },
                     ]}
                   />
-                </div>
-              </Field>
-            </div>
-
-            <div {...panelProps('mcp')}>
-              <Field
-                id="workspace-mcp"
-                label="MCP servers"
-                hint="Which of the app's MCP servers this workspace uses. Their tools load only when a task needs them."
-              >
-                <div id="workspace-mcp">
-                  {mcpError ? (
-                    <p role="alert" className={ERROR}>
-                      {mcpError}
-                    </p>
-                  ) : !mcpServers ? (
-                    <div className="mt-2 flex items-center gap-2 text-[13px] text-ink-3">
-                      <Spinner size={13} /> Loading MCP servers…
-                    </div>
-                  ) : mcpServers.length === 0 ? (
-                    <p className="mt-2 rounded-xl border border-dashed border-line px-3.5 py-3 text-[13px] text-ink-3">
-                      No MCP servers set up yet. Add them in Settings → MCP servers, then turn them
-                      on here.
-                    </p>
-                  ) : (
-                    <>
-                      <McpServerSwitches
-                        servers={mcpServers}
-                        enabled={mcpEnabled}
-                        onChange={setMcpEnabled}
-                      />
-                      <p className={HINT}>
-                        {isMcpTrusted
-                          ? 'Set up and edited once for the whole app in Settings → MCP servers.'
-                          : "This workspace's mcp.json changed outside the app: approve it in the MCP tab before these start."}
-                      </p>
-                    </>
-                  )}
                 </div>
               </Field>
             </div>

@@ -64,7 +64,7 @@ export interface PluginSummary {
   name: string;
   description: string;
   updatedAt: string | null;
-  /** false: its MCP server entry is gone (deleted in Settings → MCP servers); saving adds it back */
+  /** false: its MCP server entry is gone (deleted from a workspace's MCP tab); saving adds it back */
   isRegistered: boolean;
 }
 

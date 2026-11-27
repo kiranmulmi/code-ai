@@ -51,6 +51,9 @@ import {
   type SaveRunInput,
 } from './workspace-data.js';
 
+/** A workspace keeps this many chats, its most recently active; older ones go as new ones come. */
+export const MAX_CHATS_PER_WORKSPACE = 15;
+
 export interface Chat extends ChatRecord {
   workspaceId: string;
 }
@@ -62,7 +65,10 @@ export class Store {
   readonly #mcpTrust: McpTrust;
   /** The models the agent can run on, shared by every workspace. */
   readonly models: ModelStore;
-  /** How the agent behaves (limits, approvals, planning, ...), app-wide. */
+  /**
+   * How the agent behaves (limits, approvals, planning, ...), app-wide: the default for
+   * workspaces that haven't saved their own (`agentSettings(workspace)`).
+   */
   readonly settings: SettingsStore;
   /** MCP servers, set up once for every workspace (each turns them on in `mcp(workspace)`). */
   readonly mcpServers: McpServerStore;
@@ -320,7 +326,7 @@ export class Store {
     const chats = await new WorkspaceData(row.path, row.name).listChats();
     for (const chat of chats) this.#chatHome.set(chat.id, row.id);
     return chats
-      .sort((a, b) => (b.updatedAt ?? '').localeCompare(a.updatedAt ?? ''))
+      .sort((a, b) => lastActive(b).localeCompare(lastActive(a)))
       .slice(0, 200)
       .map((chat) => ({ ...chat, workspaceId: row.id }));
   }
@@ -330,12 +336,45 @@ export class Store {
     return found ? { ...found.chat, workspaceId: found.workspaceId } : null;
   }
 
-  async createChat(workspaceId: string, title = 'New chat'): Promise<Chat> {
+  /**
+   * A new chat; the workspace then keeps only its MAX_CHATS_PER_WORKSPACE most recent ones.
+   * `isRunning`: chats with a request in progress, never deleted to make room.
+   */
+  async createChat(
+    workspaceId: string,
+    title = 'New chat',
+    { isRunning }: { isRunning?: (chatId: string) => boolean } = {},
+  ): Promise<Chat> {
     const row = await this.#workspaces.get(workspaceId);
     if (!row) throw new Error("That workspace doesn't exist.");
-    const chat = await new WorkspaceData(row.path, row.name).createChat(checkTitle(title));
+    const data = new WorkspaceData(row.path, row.name);
+    const chat = await data.createChat(checkTitle(title));
     this.#chatHome.set(chat.id, row.id);
+    // The chat is made either way: a chat that can't be read or removed just stays for now.
+    await this.#pruneChats(data, chat.id, isRunning).catch(() => {});
     return { ...chat, workspaceId: row.id };
+  }
+
+  /**
+   * Deletes the oldest chats beyond the limit, never `newId` nor a running one (the next
+   * oldest goes in its place, so only many running chats can keep the workspace over it).
+   */
+  async #pruneChats(
+    data: WorkspaceData,
+    newId: string,
+    isRunning: (chatId: string) => boolean = () => false,
+  ): Promise<void> {
+    const others = (await data.listChats()).filter((chat) => chat.id !== newId);
+    const excess = others.length - (MAX_CHATS_PER_WORKSPACE - 1);
+    if (excess <= 0) return;
+    const oldest = others
+      .filter((chat) => !isRunning(chat.id))
+      .sort((a, b) => lastActive(a).localeCompare(lastActive(b)))
+      .slice(0, excess);
+    for (const chat of oldest) {
+      this.#chatHome.delete(chat.id);
+      await data.deleteChat(chat.id);
+    }
   }
 
   async renameChat(id: string, title: string): Promise<Chat | null> {
@@ -423,6 +462,18 @@ export class Store {
   /** One workspace's notes (the Notes tab): notes.json in its data folder. */
   notes(workspace: Pick<Workspace, 'path' | 'name'>): WorkspaceNotes {
     return new WorkspaceNotes(workspace.path, workspace.name);
+  }
+
+  /**
+   * How the agent behaves in one workspace: .code-ai/<workspace>/agent-settings.json, or the
+   * app-wide settings (`settings`) until the workspace saves its own.
+   */
+  agentSettings(workspace: Pick<Workspace, 'path' | 'name'>): SettingsStore {
+    const data = new WorkspaceData(workspace.path, workspace.name);
+    return new SettingsStore(nodePath.join(data.dir, 'agent-settings.json'), {
+      fallback: this.settings,
+      beforeWrite: () => data.ensure(),
+    });
   }
 
   /** Which MCP servers one workspace turned on: .code-ai/<workspace>/mcp.json, and whether it's approved. */
@@ -600,6 +651,11 @@ function checkName(name: unknown): string {
     throw new InputError(`Keep the name under ${LIMITS.workspaceName} characters.`);
   }
   return clean;
+}
+
+/** When a chat was last active, for ordering: an ISO time, or '' (oldest) when unknown. */
+function lastActive(chat: ChatRecord): string {
+  return chat.updatedAt ?? chat.createdAt ?? '';
 }
 
 function checkTitle(title: unknown): string {

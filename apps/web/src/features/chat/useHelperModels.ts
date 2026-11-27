@@ -13,11 +13,12 @@ import { announceWorkspaceSaved } from '../workspaces/workspaceEvents';
 /**
  * The voice and image models next to the chat's own, picked from the composer:
  * - voice: the workspace's speech server (Workspace settings → Voice), null when voice is off;
- * - image: the model that looks at images for chat models that can't (Settings → Agent).
+ * - image: the model that looks at images for chat models that can't (the workspace's Agent settings).
  * Choosing one saves it where those settings live, so the settings pages show it too.
  */
 export function useHelperModels(workspaceId: string, workspace: AsyncResource<Workspace>) {
-  const settings = useAsync(fetchSettings);
+  const loadSettings = useCallback(() => fetchSettings(workspaceId), [workspaceId]);
+  const settings = useAsync(loadSettings);
   const { setData: setSettings, reload: reloadSettings } = settings;
   useEffect(() => onSettingsSaved(reloadSettings), [reloadSettings]);
   const { setData: setWorkspace } = workspace;
@@ -46,11 +47,11 @@ export function useHelperModels(workspaceId: string, workspace: AsyncResource<Wo
   const chooseImageModel = useCallback(
     async (modelId: string | null) => {
       // The settings are saved whole: start from the latest, in case they changed elsewhere.
-      const current = await fetchSettings();
-      const saved = await saveSettings({ ...current, visionModelId: modelId });
+      const current = await fetchSettings(workspaceId);
+      const saved = await saveSettings(workspaceId, { ...current, visionModelId: modelId });
       setSettings(() => saved);
     },
-    [setSettings],
+    [workspaceId, setSettings],
   );
 
   return {

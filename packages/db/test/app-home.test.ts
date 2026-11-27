@@ -182,6 +182,29 @@ test('agent settings: defaults until saved, validated, and lenient when read', a
   assert.equal(read.planning, 'off');
 });
 
+test("a workspace's agent settings: the app-wide ones until it saves its own", async () => {
+  const dir = await home();
+  const appWide = new SettingsStore(appHomeFile(dir, 'agentSettings'));
+  await appWide.save({ ...DEFAULT_AGENT_SETTINGS, maxSteps: 40 });
+  let isEnsured = false;
+  const workspace = new SettingsStore(path.join(dir, 'ws', 'agent-settings.json'), {
+    fallback: appWide,
+    beforeWrite: async () => {
+      isEnsured = true;
+    },
+  });
+  assert.equal(await workspace.isSaved(), false);
+  assert.equal((await workspace.get()).maxSteps, 40);
+
+  await workspace.save({ ...DEFAULT_AGENT_SETTINGS, maxSteps: 7, approval: 'deny' });
+  assert.equal(isEnsured, true);
+  assert.equal(await workspace.isSaved(), true);
+  assert.equal((await workspace.get()).maxSteps, 7);
+  // The app-wide settings stay as they were.
+  assert.equal((await appWide.get()).maxSteps, 40);
+  assert.equal((await appWide.get()).approval, 'ask');
+});
+
 test('MCP servers: kept in order, names unique, renamed in place, saved privately', async () => {
   const dir = await home();
   const servers = new McpServerStore(appHomeFile(dir, 'mcpServers'));

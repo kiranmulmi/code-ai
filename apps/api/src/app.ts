@@ -118,7 +118,7 @@ export function createApp(context: AppContext) {
   v1.use(requireUser(context.auth));
   v1.use(authRouter());
   v1.use(infoRouter(context));
-  v1.use(settingsRouter(context.settings));
+  v1.use(settingsRouter(context.settings, workspaces));
   v1.use(modelsRouter(models));
   v1.use(promptsRouter(context, models));
   v1.use(quickChatRouter(context, models));

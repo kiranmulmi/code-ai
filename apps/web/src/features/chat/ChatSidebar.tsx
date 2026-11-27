@@ -1,13 +1,13 @@
-import { useCallback, useLayoutEffect, useRef, useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import type { AppInfo, ChatSummary, Workspace } from '@app/shared';
 import { IconButton } from '../../components/IconButton';
 import { Brand } from '../../layout/Brand';
 import { Link, useLocation } from 'react-router-dom';
 import {
+  BrainIcon,
   ChevronRightIcon,
   ComposeIcon,
   CrossIcon,
-  FolderTintIcon,
   GearIcon,
   PanelIcon,
   SearchIcon,
@@ -20,72 +20,38 @@ import { SidebarResizer } from './SidebarResizer';
 import type { useSidebarWidth } from './useSidebarWidth';
 
 /**
- * The workspace's real folder path on one line after a folder icon, as the system writes it
- * (e.g. /Users/me/projects/app), its own folder in bold. When it's wider than the sidebar it
- * scrolls sideways (no scrollbar), starting at the end so the workspace's own folder shows; a
- * fade marks the side with more.
+ * A workspace settings page link for desktop (xl), at the bottom of the chats sidebar: opens
+ * the page, or closes it when it's open.
  */
-function WorkspacePath({ path }: { path: string }) {
-  const trimmed = path.length > 1 ? path.replace(/[\\/]+$/, '') : path;
-  const cut = Math.max(trimmed.lastIndexOf('/'), trimmed.lastIndexOf('\\')) + 1;
-  const parent = trimmed.slice(0, cut);
-  const name = trimmed.slice(cut);
-  const [edges, setEdges] = useState({ hasMoreBefore: false, hasMoreAfter: false });
-  const readEdges = useCallback((node: HTMLElement) => {
-    const max = node.scrollWidth - node.clientWidth;
-    setEdges({ hasMoreBefore: node.scrollLeft > 1, hasMoreAfter: node.scrollLeft < max - 1 });
-  }, []);
-  const scroller = useRef<HTMLDivElement>(null);
-
-  useLayoutEffect(() => {
-    const node = scroller.current;
-    if (!node) return;
-    node.scrollLeft = node.scrollWidth;
-    readEdges(node);
-  }, [path, readEdges]);
-
-  const fade = [
-    edges.hasMoreBefore ? 'transparent, black 20px' : 'black',
-    edges.hasMoreAfter ? 'black calc(100% - 20px), transparent' : 'black',
-  ].join(', ');
-
-  return (
-    <div title={path} className="mt-1.5 flex min-w-0 items-center gap-1">
-      {/* Outside the scrolling part, so it stays put. */}
-      <FolderTintIcon size={12} className="shrink-0 text-accent" />
-      <div
-        ref={scroller}
-        onScroll={(event) => readEdges(event.currentTarget)}
-        style={{ maskImage: `linear-gradient(to right, ${fade})` }}
-        className="min-w-0 flex-1 overflow-x-auto whitespace-nowrap text-[11px] leading-snug text-ink-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-      >
-        {parent}
-        <span className="font-medium text-ink-2">{name}</span>
-      </div>
-    </div>
-  );
-}
-
-/**
- * Workspace settings link for desktop (xl) - sits at the bottom of the chats sidebar.
- */
-function WorkspaceSettingsRow({ workspace }: { workspace: Workspace }) {
-  const isSettings = useLocation().pathname.startsWith(`/workspaces/${workspace.id}/settings`);
+function WorkspaceSettingsRow({
+  workspace,
+  page,
+  label,
+  icon,
+}: {
+  workspace: Workspace;
+  /** the path under /workspaces/:id/ */
+  page: 'settings' | 'agent-settings';
+  label: string;
+  icon: ReactNode;
+}) {
+  const to = `/workspaces/${workspace.id}/${page}`;
+  const isOpen = useLocation().pathname.replace(/\/+$/, '') === to;
 
   return (
     <Link
-      to={isSettings ? `/workspaces/${workspace.id}` : `/workspaces/${workspace.id}/settings`}
-      aria-label={isSettings ? 'Close workspace settings' : 'Workspace settings'}
-      aria-current={isSettings ? 'page' : undefined}
-      title={isSettings ? 'Back to the chat' : 'Workspace settings'}
+      to={isOpen ? `/workspaces/${workspace.id}` : to}
+      aria-label={isOpen ? `Close ${label.toLowerCase()}` : label}
+      aria-current={isOpen ? 'page' : undefined}
+      title={isOpen ? 'Back to the chat' : label}
       className={`flex h-9 items-center gap-2.5 rounded-xl px-3 text-[13px] font-medium transition-colors ${
-        isSettings ? 'bg-accent-soft text-accent' : 'text-ink-2 hover:bg-subtle hover:text-ink'
+        isOpen ? 'bg-accent-soft text-accent' : 'text-ink-2 hover:bg-subtle hover:text-ink'
       }`}
     >
       <span className="grid h-6 w-6 shrink-0 place-items-center rounded-lg bg-accent-soft text-accent-2">
-        <GearIcon size={12} />
+        {icon}
       </span>
-      <span className="min-w-0 truncate">Workspace settings</span>
+      <span className="min-w-0 truncate">{label}</span>
     </Link>
   );
 }
@@ -164,9 +130,19 @@ export function ChatSidebar({
           <span className="xl:hidden">
             <Brand isHiddenInDesktopApp />
           </span>
-          <span className="hidden text-[10.5px] font-semibold uppercase tracking-wider text-ink-3 xl:block">
-            Chats
-          </span>
+          {/* At xl the open workspace's name takes the top bar, where "Chats" was. */}
+          {workspace ? (
+            <h2
+              title={workspace.path}
+              className="hidden min-w-0 flex-1 truncate text-[14.5px] font-extrabold tracking-tight text-ink xl:block"
+            >
+              {workspace.name}
+            </h2>
+          ) : (
+            <span className="hidden text-[10.5px] font-semibold uppercase tracking-wider text-ink-3 xl:block">
+              Chats
+            </span>
+          )}
           <IconButton onClick={onClose} aria-label="Hide chats" className="ml-auto xl:hidden">
             <ChevronRightIcon size={12} className="rotate-180" />
           </IconButton>
@@ -183,13 +159,14 @@ export function ChatSidebar({
         <div className="flex shrink-0 flex-col gap-1.5 px-1.5 pt-3">
           {workspace && (
             // Where you are: plain text on the sidebar's background, no card.
-            <div title={workspace.path} className="mb-1 flex min-w-0 items-center px-2.5 py-0.5">
-              <span className="flex min-w-0 flex-col leading-tight">
-                <h2 className="truncate text-[14.5px] font-extrabold tracking-tight text-ink">
-                  {workspace.name}
-                </h2>
-                <WorkspacePath path={workspace.path} />
-              </span>
+            // At xl it sits in the top bar instead.
+            <div
+              title={workspace.path}
+              className="mb-1 flex min-w-0 items-center px-2.5 py-0.5 xl:hidden"
+            >
+              <h2 className="truncate text-[14.5px] font-extrabold leading-tight tracking-tight text-ink">
+                {workspace.name}
+              </h2>
             </div>
           )}
           <button
@@ -246,12 +223,27 @@ export function ChatSidebar({
           onDeleted={onDeleted}
         />
 
-        {/* Workspace settings at the bottom of the chats sidebar on desktop (xl) */}
+        {/* The workspace's settings at the bottom of the chats sidebar on desktop (xl) */}
         <div className="hidden shrink-0 xl:block px-3 pb-2">
           <span className="block px-3 pb-1.5 text-[10.5px] font-bold uppercase tracking-[0.14em] text-ink-4">
             Settings
           </span>
-          {workspace && <WorkspaceSettingsRow workspace={workspace} />}
+          {workspace && (
+            <>
+              <WorkspaceSettingsRow
+                workspace={workspace}
+                page="settings"
+                label="Workspace settings"
+                icon={<GearIcon size={12} />}
+              />
+              <WorkspaceSettingsRow
+                workspace={workspace}
+                page="agent-settings"
+                label="Agent settings"
+                icon={<BrainIcon size={12} />}
+              />
+            </>
+          )}
         </div>
 
         {/* The drawer has every link; at xl Workspace settings is now in the chats sidebar and the rest is in the workspace sidebar. */}

@@ -33,7 +33,7 @@ export function ChatRoute() {
   const { workspaceId } = useParams();
   const chatMatch = useMatch('/workspaces/:workspaceId/chats/:chatId');
   const chatId = chatMatch?.params.chatId ?? null;
-  const info = useAppInfo();
+  const info = useAppInfo(workspaceId);
   const workspaces = useWorkspaces();
   const workspaceGroups = useWorkspaceGroups();
   const width = useSidebarWidth(WORKSPACES_SIDEBAR);

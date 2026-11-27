@@ -2,7 +2,7 @@
 // app's settings in ~/.code-ai/, and each workspace's chats, memory and settings in its
 // own folder (.code-ai/<workspace>/, so several workspaces can share a folder).
 export { InputError } from './errors.js';
-export { Store, type Chat } from './store.js';
+export { Store, MAX_CHATS_PER_WORKSPACE, type Chat } from './store.js';
 export { ModelStore, type ResolvedModel } from './models.js';
 export { McpServerStore } from './mcp-servers.js';
 export { PluginStore, PluginExistsError, isPluginServer, type PluginSave } from './plugins.js';

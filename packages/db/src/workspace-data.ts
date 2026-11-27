@@ -8,6 +8,7 @@
 //       .gitignore                  "*" again, so the subfolder stays out of git if moved on its own
 //       settings.json               { instructions, planning, disabledTools, hasTerminalTab, hasGitTab, voice }
 //       mcp.json                    which of the app's MCP servers are on here (workspace-mcp.ts)
+//       agent-settings.json         how the agent behaves here (Store.agentSettings); absent: the app-wide ones
 //       memory.json                 long-term memory (LongTermMemory from @app/agent)
 //       chats/<id>/chat.json        title, current and earlier plans, the memory list the model last saw
 //       chats/<id>/messages.jsonl   the conversation, one message per line, append-only

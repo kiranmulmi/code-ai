@@ -2,72 +2,15 @@ import {
   mcpTransportOf,
   TOOL_GROUPS,
   TOOL_GROUP_LABELS,
-  WORKSPACE_PLANNING,
   type McpServerEntry,
   type ToolGroup,
-  type WorkspacePlanning,
 } from '@app/shared';
 import { Switch } from '../../components/Switch';
+import { EditIcon } from '../../lib/icons';
 
 const TRANSPORT_LABEL = { stdio: 'Local', http: 'HTTP', sse: 'SSE' } as const;
 
 const LIST = 'mt-2 divide-y divide-line-2 overflow-hidden rounded-xl border border-line bg-surface';
-
-const PLANNING_LABEL: Record<WorkspacePlanning, string> = {
-  default: 'Agent settings',
-  off: 'Agent decides',
-  auto: 'Planning step',
-};
-
-/** How the workspace plans bigger tasks: as Settings → Agent says, or chosen here. */
-export function PlanningChoice({
-  id,
-  value,
-  onChange,
-  isPlansOff,
-}: {
-  id: string;
-  value: WorkspacePlanning;
-  onChange: (value: WorkspacePlanning) => void;
-  /** without plan tools there is no planning step */
-  isPlansOff: boolean;
-}) {
-  const current = isPlansOff ? 'off' : value;
-  return (
-    <div>
-      <div
-        id={id}
-        role="radiogroup"
-        aria-label="Planning"
-        className="mt-2 inline-flex rounded-xl border border-line bg-surface p-0.5"
-      >
-        {WORKSPACE_PLANNING.map((option) => {
-          const isOn = current === option;
-          return (
-            <button
-              key={option}
-              type="button"
-              role="radio"
-              aria-checked={isOn}
-              disabled={isPlansOff}
-              onClick={() => onChange(option)}
-              className={`h-8 rounded-lg px-3.5 text-[13px] font-medium transition-colors disabled:cursor-not-allowed ${
-                isOn
-                  ? 'bg-accent-soft text-accent-2'
-                  : 'text-ink-2 hover:bg-subtle hover:text-ink disabled:opacity-50 disabled:hover:bg-transparent'
-              }`}
-            >
-              {PLANNING_LABEL[option]}
-            </button>
-          );
-        })}
-      </div>
-      {isPlansOff && (
-        <p className="mt-1.5 text-[12.5px] text-ink-3">No plans while the Plans tools are off.</p>
-      )}
-    </div>
-  );
-}
 
 /** One switch per tool group; on unless turned off. */
 export function ToolGroupSwitches({
@@ -142,53 +85,104 @@ export function PanelTabSwitches({
   );
 }
 
-/** One switch per MCP server set up in the app; off here until turned on. */
+/** How a server starts: its command line (local) or its URL (HTTP/SSE). */
+function launchOf(server: McpServerEntry['server']): string {
+  return mcpTransportOf(server) === 'stdio'
+    ? [server.command ?? '', ...(server.args ?? [])].join(' ')
+    : (server.url ?? '');
+}
+
+/**
+ * One tile per MCP server set up in the app, each with its switch; off here until turned on.
+ * `query` only hides tiles: switching one still keeps the hidden servers' choices.
+ */
 export function McpServerSwitches({
   servers,
   enabled,
   onChange,
+  onEdit,
+  query = '',
 }: {
   servers: readonly McpServerEntry[];
   enabled: readonly string[];
   onChange: (enabled: string[]) => void;
+  /** shows an edit button on each tile */
+  onEdit?: (name: string) => void;
+  /** filters the tiles by name, transport or command/URL */
+  query?: string;
 }) {
+  const needle = query.trim().toLowerCase();
+  const shown = needle
+    ? servers.filter(({ name, server }) =>
+        [name, TRANSPORT_LABEL[mcpTransportOf(server)], launchOf(server)]
+          .join(' ')
+          .toLowerCase()
+          .includes(needle),
+      )
+    : servers;
+
+  if (shown.length === 0) {
+    return (
+      <div className="mt-2 rounded-xl border border-dashed border-line px-3.5 py-6 text-center text-[13px] text-ink-3">
+        No servers match “{query.trim()}”.
+      </div>
+    );
+  }
+
   return (
-    <ul className={LIST}>
-      {servers.map(({ name, server }) => {
+    <ul className="mt-2 grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
+      {shown.map(({ name, server }) => {
         const isOn = enabled.includes(name);
-        const launch =
-          mcpTransportOf(server) === 'stdio'
-            ? [server.command ?? '', ...(server.args ?? [])].join(' ')
-            : (server.url ?? '');
+        const launch = launchOf(server);
         return (
-          <li key={name} className="flex items-center gap-3 px-3.5 py-2">
-            <div className="min-w-0 flex-1">
-              <div className="flex items-baseline gap-2">
-                <span
-                  className={`truncate font-mono text-[13px] font-medium ${isOn ? 'text-ink' : 'text-ink-3'}`}
+          <li
+            key={name}
+            className={`group flex min-w-0 flex-col gap-2 rounded-xl border px-3.5 py-3 transition-colors ${
+              isOn ? 'border-line bg-accent-soft' : 'border-line bg-surface hover:bg-subtle'
+            }`}
+          >
+            <div className="flex items-start gap-2">
+              <div className="min-w-0 flex-1">
+                <div
+                  className={`truncate font-mono text-[13px] font-medium ${isOn ? 'text-ink' : 'text-ink-2'}`}
+                  title={name}
                 >
                   {name}
-                </span>
-                <span className="shrink-0 text-[10.5px] font-medium uppercase tracking-[0.12em] text-ink-3">
+                </div>
+                <span className="text-[10.5px] font-medium uppercase tracking-[0.12em] text-ink-3">
                   {TRANSPORT_LABEL[mcpTransportOf(server)]}
                 </span>
               </div>
-              <div className="truncate font-mono text-[11.5px] text-ink-3" title={launch}>
-                {launch}
-              </div>
+              {onEdit && (
+                <button
+                  type="button"
+                  onClick={() => onEdit(name)}
+                  aria-label={`Edit ${name}`}
+                  title="Edit (for every workspace)"
+                  className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-ink-3 opacity-0 transition hover:bg-surface-2 hover:text-ink focus-visible:opacity-100 group-hover:opacity-100 [@media(hover:none)]:opacity-100"
+                >
+                  <EditIcon size={13} />
+                </button>
+              )}
+              <Switch
+                isOn={isOn}
+                label={`MCP server ${name}`}
+                title={isOn ? `Turn ${name} off here` : `Turn ${name} on here`}
+                onChange={(next) =>
+                  onChange(
+                    servers
+                      .map((entry) => entry.name)
+                      .filter((item) => (item === name ? next : enabled.includes(item))),
+                  )
+                }
+              />
             </div>
-            <Switch
-              isOn={isOn}
-              label={`MCP server ${name}`}
-              title={isOn ? `Turn ${name} off here` : `Turn ${name} on here`}
-              onChange={(next) =>
-                onChange(
-                  servers
-                    .map((entry) => entry.name)
-                    .filter((item) => (item === name ? next : enabled.includes(item))),
-                )
-              }
-            />
+            <div
+              className="line-clamp-2 break-all font-mono text-[11.5px] leading-snug text-ink-3"
+              title={launch}
+            >
+              {launch}
+            </div>
           </li>
         );
       })}

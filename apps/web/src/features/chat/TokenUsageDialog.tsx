@@ -2,7 +2,7 @@ import { Fragment, useState } from 'react';
 import type { ModelCallUsage, TokenGroup, Usage } from '@app/shared';
 import { Modal } from '../../components/Modal';
 import { compactNumber, plural } from '../../lib/format';
-import { ChevronRightIcon } from '../../lib/icons';
+import { ChevronRightIcon, PulseIcon } from '../../lib/icons';
 import { MessageTime } from './MessageTime';
 import {
   CALL_KIND_LABELS,
@@ -74,11 +74,11 @@ export function TokenUsageDialog({
   return (
     <Modal
       title={reply ? 'Token usage: this reply' : 'Token usage: this chat'}
-      titleFont="sans"
+      icon={<PulseIcon size={15} />}
       size="lg"
       onClose={onClose}
     >
-      <div className="flex flex-col gap-5 p-4 sm:p-5">
+      <div className="flex flex-col gap-5 px-5 pb-5 pt-2">
         {reply ? (
           <>
             <p className="text-[13px] text-ink-2">

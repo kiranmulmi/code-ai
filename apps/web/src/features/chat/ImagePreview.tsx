@@ -3,7 +3,7 @@ import { formatBytes } from '@app/shared';
 import { IconButton } from '../../components/IconButton';
 import { Modal } from '../../components/Modal';
 import { Spinner } from '../../components/Spinner';
-import { ChevronRightIcon, DownloadIcon, ExpandIcon } from '../../lib/icons';
+import { ChevronRightIcon, DownloadIcon, ExpandIcon, ImageIcon } from '../../lib/icons';
 import { useAttachmentUrl } from './useAttachmentUrl';
 
 /** One image the previewer can show: a local URL already in the page, or a sent attachment. */
@@ -76,7 +76,7 @@ export function ImagePreview({
   return (
     <Modal
       title={image.name}
-      titleFont="sans"
+      icon={<ImageIcon size={15} />}
       size="wide"
       onClose={onClose}
       actions={
@@ -105,10 +105,15 @@ export function ImagePreview({
           </IconButton>
         </>
       }
-      footer={<p className="text-[12.5px] text-ink-3">{details.join(' · ')}</p>}
+      footer={
+        <p className="flex min-w-0 flex-1 items-center gap-2 text-[12.5px] text-ink-3">
+          <span className="truncate font-medium text-ink">{image.name}</span>
+          <span className="shrink-0">· {details.join(' · ')}</span>
+        </p>
+      }
     >
       <div
-        className={`flex bg-subtle p-4 ${isActualSize ? 'min-h-full min-w-full w-max' : 'h-full w-full'}`}
+        className={`flex border-t border-line bg-subtle p-4 ${isActualSize ? 'min-h-full min-w-full w-max' : 'h-full w-full'}`}
       >
         {url ? (
           <img

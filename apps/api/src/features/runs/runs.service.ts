@@ -48,8 +48,8 @@ export function createRunsService(
     }: RunRequest) {
       const workspace = await workspaces.require(workspaceId);
       const existing = chatId ? await chats.require(chatId, workspace.id) : null;
-      // Read once per run, so a settings change applies from the next message on.
-      const config = settings.configFor(agentConfig);
+      // The workspace's agent settings, read once per run, so a change applies from the next message on.
+      const config = settings.configFor(agentConfig, await settings.forWorkspace(workspace));
       const files = await attachments.requireAll(workspace, attachmentIds);
       const picked = await skills.requireAll(workspace, skillNames);
       // A message of files only has no text to check.
@@ -61,7 +61,11 @@ export function createRunsService(
       // Sub-agents and the reviewer can run on their own models (Settings → Agent).
       const helperModels = await store.models.helpersFor(config);
       const title = titleFrom(message.trim() ? message : (files[0]?.name ?? ''));
-      const chat = existing ?? (await store.createChat(workspace.id, title));
+      const chat =
+        existing ??
+        (await store.createChat(workspace.id, title, {
+          isRunning: (id) => runs.isRunning(id),
+        }));
       if (runs.isRunning(chat.id)) {
         throw new ConflictError('The agent is still working on the previous message in this chat.');
       }
@@ -149,8 +153,11 @@ export function createRunsService(
      * A message for the chat's run in progress: the agent reads it before its next step, and
      * the run's stream sends a `steer` event when it does.
      */
-    steer(chatId: string, message: string): SteerAccepted {
-      const inputCheck = checkInput(message, settings.configFor(agentConfig));
+    async steer(chatId: string, message: string): Promise<SteerAccepted> {
+      const chat = await store.getChat(chatId);
+      const workspace = chat ? await store.getWorkspace(chat.workspaceId) : null;
+      const current = workspace ? await settings.forWorkspace(workspace) : settings.current;
+      const inputCheck = checkInput(message, settings.configFor(agentConfig, current));
       if (!inputCheck.ok) throw new ValidationError(inputCheck.reason);
       const queued = runs.steer(chatId, message.trim());
       if (queued === null) throw new NotFoundError('That chat has no run in progress.');

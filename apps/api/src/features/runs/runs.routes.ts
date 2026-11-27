@@ -58,14 +58,13 @@ export function runsRouter(runsService: RunsService, registry: RunRegistry): Rou
   });
 
   /** A message for the chat's run in progress, read by the agent before its next step. */
-  router.post('/chats/:chatId/run/messages', (req, res, next) => {
-    try {
+  router.post(
+    '/chats/:chatId/run/messages',
+    asyncHandler(async (req, res) => {
       const { message } = parse(steerRequestSchema, req.body);
-      res.status(202).json({ data: runsService.steer(param(req, 'chatId'), message) });
-    } catch (error) {
-      next(error);
-    }
-  });
+      res.status(202).json({ data: await runsService.steer(param(req, 'chatId'), message) });
+    }),
+  );
 
   /** Turns Auto-approve on or off for the chat's run in progress (the composer's toggle). */
   router.patch('/chats/:chatId/run', (req, res, next) => {

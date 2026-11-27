@@ -4,7 +4,7 @@ import type { AppInfo } from '@app/shared';
 import { Badge } from '../../components/Badge';
 import { ThemeToggle } from '../../layout/ThemeToggle';
 import { errorMessage } from '../../lib/api';
-import { GearIcon, InstallIcon, PlusIcon, WarnIcon } from '../../lib/icons';
+import { BrainIcon, GearIcon, InstallIcon, PlusIcon, WarnIcon } from '../../lib/icons';
 import { useInstallApp } from '../../lib/installApp';
 import { useToast } from '../../lib/toast';
 
@@ -41,7 +41,7 @@ function PreferencesRow({ approval }: { approval: AppInfo['approval'] | null }) 
       <Link
         to="/settings/models"
         state={{ from: pathname }}
-        title="Models, MCP servers and agent settings"
+        title="Models, MCP servers, web search and logging"
         className={`${ROW} min-w-0 flex-1 transition-colors hover:bg-subtle hover:text-ink`}
       >
         <span className="grid h-6 w-6 shrink-0 place-items-center rounded-lg bg-accent-soft text-accent-2">
@@ -113,6 +113,11 @@ export function SidebarLinks({
             to={`/workspaces/${workspaceId}/settings`}
             icon={<GearIcon size={12} />}
             label="Workspace settings"
+          />
+          <SidebarLink
+            to={`/workspaces/${workspaceId}/agent-settings`}
+            icon={<BrainIcon size={12} />}
+            label="Agent settings"
           />
         </>
       )}

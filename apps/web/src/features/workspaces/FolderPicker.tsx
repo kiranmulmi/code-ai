@@ -55,9 +55,14 @@ export function FolderPicker({
     `${parent.replace(/[\\/]+$/, '')}${parent.includes('\\') ? '\\' : '/'}${name}`;
 
   return (
-    <Modal title="Choose the workspace folder" onClose={onClose}>
-      <div className="flex flex-col">
-        <div className="flex items-center gap-2 border-b border-line px-4 py-2.5">
+    <Modal
+      title="Choose the workspace folder"
+      icon={<FolderIcon size={15} />}
+      description="The agent can read and change everything in this folder."
+      onClose={onClose}
+    >
+      <div className="flex flex-col pt-1">
+        <div className="flex items-center gap-2 border-y border-line px-5 py-2.5">
           <Button
             size="sm"
             onClick={() => listing?.parent && open(listing.parent)}
@@ -105,9 +110,6 @@ export function FolderPicker({
         </div>
 
         <div className="flex flex-wrap items-center justify-end gap-2 border-t border-line bg-subtle px-4 py-3">
-          <span className="mr-auto text-[13px] text-ink-3">
-            The agent can read and change everything in this folder.
-          </span>
           <Button onClick={onClose}>Cancel</Button>
           <Button
             variant="primary"

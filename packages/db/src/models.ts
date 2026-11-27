@@ -205,6 +205,7 @@ export class ModelStore {
         maxTokens: saved.maxTokens,
         contextWindow: saved.contextWindow,
         reasoningEffort: null,
+        supportsReasoning: saved.supportsReasoning,
         supportsImages: saved.supportsImages,
       },
     };

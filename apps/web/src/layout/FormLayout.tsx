@@ -10,7 +10,7 @@ export function FormLayout() {
   // Settings and MCP pages belong to a workspace; /workspaces/new matches as "new" and finds none.
   const workspaceId = useMatch('/workspaces/:workspaceId/*')?.params.workspaceId;
   const { pathname } = useLocation();
-  const info = useAppInfo();
+  const info = useAppInfo(workspaceId === 'new' ? undefined : workspaceId);
   const workspaces = useWorkspaces();
   const list = workspaces.data ?? [];
   const workspace = list.find((item) => item.id === workspaceId) ?? null;

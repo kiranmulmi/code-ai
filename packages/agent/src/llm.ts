@@ -32,6 +32,11 @@ export interface ModelSettings {
   /** only for reasoning models that support it; null = the server's default */
   reasoningEffort: string | null;
   /**
+   * Whether the model is marked as a reasoning model (Settings → Models); undefined = unknown.
+   * Only such a model is sent reasoning_effort "none" to turn reasoning off.
+   */
+  supportsReasoning?: boolean;
+  /**
    * Whether the model can read images; undefined = it can. When false no image is ever sent:
    * each is replaced by a short note, and view_image asks the image model instead.
    */

@@ -31,7 +31,7 @@ import {
   assertPublicUrl,
   isPrivateAddress,
 } from '../src/guardrails.js';
-import { createAgent, type SteeringMessage } from '../src/agent.js';
+import { createAgent, withoutReasoning, type SteeringMessage } from '../src/agent.js';
 import { readUsage } from '../src/llm.js';
 import { inputBreakdown, outputBreakdown } from '../src/usage-breakdown.js';
 import { loadAgentConfig } from '../src/config.js';
@@ -1569,6 +1569,31 @@ test('config reads only the bootstrap values from env; saved settings fall back 
   assert.equal(readAgentSettings({ maxParallelSubagents: 5 }).maxParallelSubagents, 5);
   assert.equal(readAgentSettings({ maxParallelSubagents: 50 }).maxParallelSubagents, 3);
   assert.equal(readAgentSettings({ maxParallelSubagents: 0 }).maxParallelSubagents, 3);
+  // Sub-agents: their own step limit (default 12) and no reasoning by default.
+  assert.equal(readAgentSettings({}).subagentMaxSteps, 12);
+  assert.equal(readAgentSettings({ subagentMaxSteps: 20 }).subagentMaxSteps, 20);
+  assert.equal(readAgentSettings({ subagentMaxSteps: 0 }).subagentMaxSteps, 12);
+  assert.equal(readAgentSettings({}).subagentReasoning, false);
+});
+
+test('sub-agents run with reasoning off unless it is turned on', () => {
+  const model = {
+    label: 'm',
+    apiKey: '',
+    model: 'm',
+    maxTokens: null,
+    contextWindow: null,
+    reasoningEffort: 'high',
+    supportsReasoning: true,
+  };
+  assert.equal(withoutReasoning({ model }, undefined, false).model?.reasoningEffort, 'none');
+  // Without its own model the sub-agent uses the run's, with reasoning off too.
+  assert.equal(withoutReasoning({}, model, false).model?.reasoningEffort, 'none');
+  assert.equal(withoutReasoning({ model }, undefined, true).model?.reasoningEffort, 'high');
+  // Not a reasoning model: nothing is sent.
+  const plain = { ...model, supportsReasoning: false, reasoningEffort: null };
+  assert.equal(withoutReasoning({ model: plain }, undefined, false).model?.reasoningEffort, null);
+  assert.deepEqual(withoutReasoning({}, plain, false), {});
 });
 
 // ---------- Attachments ----------

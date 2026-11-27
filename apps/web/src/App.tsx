@@ -29,34 +29,32 @@ const ModelFormPage = lazyPage(() =>
 const AgentSettingsPage = lazyPage(() =>
   import('./features/settings/AgentSettingsPage').then((m) => m.AgentSettingsPage),
 );
-const McpServersPage = lazyPage(() =>
-  import('./features/mcp/McpServersPage').then((m) => m.McpServersPage),
-);
-const McpServerFormPage = lazyPage(() =>
-  import('./features/mcp/McpServerFormPage').then((m) => m.McpServerFormPage),
+const GeneralSettingsPage = lazyPage(() =>
+  import('./features/settings/GeneralSettingsPage').then((m) => m.GeneralSettingsPage),
 );
 const WorkspaceFormPage = lazyPage(() =>
   import('./features/workspaces/WorkspaceFormPage').then((m) => m.WorkspaceFormPage),
 );
 
-/** Models, Agent and MCP servers: full pages, or a popup over the chat (SettingsModal). */
+/**
+ * Models and General: full pages, or a popup over the chat (SettingsModal). MCP servers are
+ * managed from a workspace's MCP tab instead.
+ */
 const settingsRoutes = (
   <>
     <Route path="/settings/models" element={<ModelsPage />} />
-    <Route path="/settings/agent" element={<AgentSettingsPage />} />
     <Route path="/settings/models/new" element={<ModelFormPage />} />
     <Route path="/settings/models/:modelId/edit" element={<ModelFormPage />} />
-    <Route path="/settings/mcp" element={<McpServersPage />} />
-    <Route path="/settings/mcp/new" element={<McpServerFormPage />} />
-    <Route path="/settings/mcp/:serverName/edit" element={<McpServerFormPage />} />
+    <Route path="/settings/general" element={<GeneralSettingsPage />} />
   </>
 );
 
-/** New workspace and a workspace's settings: full pages, or a popup over the chat. */
+/** New workspace, a workspace's settings and its agent settings: full pages, or a popup over the chat. */
 const workspaceFormRoutes = (
   <>
     <Route path="/workspaces/new" element={<WorkspaceFormPage />} />
     <Route path="/workspaces/:workspaceId/settings" element={<WorkspaceFormPage />} />
+    <Route path="/workspaces/:workspaceId/agent-settings" element={<AgentSettingsPage />} />
   </>
 );
 

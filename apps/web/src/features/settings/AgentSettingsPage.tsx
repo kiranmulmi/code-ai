@@ -1,44 +1,66 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { Navigate, useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
   APPROVAL_MODES,
   DEFAULT_AGENT_SETTINGS,
-  LOG_LEVELS,
   REVIEW_MODES,
   SETTINGS_LIMITS,
   agentSettingsSchema,
   type AgentSettings,
   type ApprovalMode,
-  type LogLevel,
   type ModelCategory,
   type ModelProfile,
   type ReviewMode,
 } from '@app/shared';
 import { Button } from '../../components/Button';
-import { ERROR_SM as ERROR, INPUT_ERROR, INPUT_OK } from '../../components/form';
+import { INPUT_ERROR, INPUT_OK } from '../../components/form';
 import { PageLoader } from '../../components/PageLoader';
 import { Spinner } from '../../components/Spinner';
-import { Switch } from '../../components/Switch';
 import { FormActions, usePageHeader } from '../../layout/pageHeader';
 import { errorMessage } from '../../lib/api';
-import { compactNumber } from '../../lib/format';
+import { compactNumber, plural } from '../../lib/format';
+import {
+  BoltIcon,
+  BrainIcon,
+  BulbIcon,
+  CheckIcon,
+  DashIcon,
+  EyeIcon,
+  PulseIcon,
+  ShieldIcon,
+  WarnIcon,
+  WrenchIcon,
+} from '../../lib/icons';
 import { fromPath } from '../../lib/routerState';
 import { useToast } from '../../lib/toast';
 import { ModelOptions } from '../models/ModelOptions';
 import { useModels } from '../models/useModels';
+import { fetchWorkspace } from '../workspaces/api';
 import { fetchSettings, saveSettings } from './api';
-import { SettingsTabs } from './SettingsTabs';
+import {
+  ChoiceList,
+  DependentGroup,
+  Field,
+  NumberChoice,
+  SectionHeading,
+  SectionNav,
+  Stepper,
+  ToggleCard,
+  type Choice,
+  type NavSection,
+} from './AgentSettingsUi';
+import { CONTROL } from './SettingsUi';
 import { APP_NAME } from '../../lib/brand';
-import { InfoTip } from '../../components/InfoTip';
 
 /** The form keeps numbers as typed text, so a half-typed value isn't snapped to a number. */
-type NumberKey = 'maxSteps' | 'maxTotalTokens' | 'maxInputChars' | 'maxParallelSubagents';
+type NumberKey =
+  'maxSteps' | 'maxTotalTokens' | 'maxInputChars' | 'maxParallelSubagents' | 'subagentMaxSteps';
 type Draft = Omit<AgentSettings, NumberKey> & Record<NumberKey, string>;
-type Field = keyof AgentSettings;
-type FieldErrors = Partial<Record<Field, string>>;
+type SettingKey = keyof AgentSettings;
+type FieldErrors = Partial<Record<SettingKey, string>>;
 
 const FIELDS: readonly string[] = Object.keys(DEFAULT_AGENT_SETTINGS);
-const isField = (value: unknown): value is Field =>
+const isField = (value: unknown): value is SettingKey =>
   typeof value === 'string' && FIELDS.includes(value);
 
 const toDraft = (settings: AgentSettings): Draft => ({
@@ -47,6 +69,7 @@ const toDraft = (settings: AgentSettings): Draft => ({
   maxTotalTokens: String(settings.maxTotalTokens),
   maxInputChars: String(settings.maxInputChars),
   maxParallelSubagents: String(settings.maxParallelSubagents),
+  subagentMaxSteps: String(settings.subagentMaxSteps),
 });
 
 const toNumber = (text: string) => (text.trim() === '' ? Number.NaN : Number(text));
@@ -57,70 +80,133 @@ const fromDraft = (draft: Draft) => ({
   maxTotalTokens: toNumber(draft.maxTotalTokens),
   maxInputChars: toNumber(draft.maxInputChars),
   maxParallelSubagents: toNumber(draft.maxParallelSubagents),
+  subagentMaxSteps: toNumber(draft.subagentMaxSteps),
 });
 
-const APPROVALS: Record<ApprovalMode, { title: string; detail: string }> = {
+const APPROVALS: Record<ApprovalMode, Omit<Choice<ApprovalMode>, 'value'>> = {
   ask: {
-    title: 'Ask first',
-    detail: 'Asks before each tool that changes something: writing files, running commands, …',
+    title: 'Ask me first',
+    detail: 'You approve each tool that writes files, runs commands or changes something.',
+    icon: <ShieldIcon size={15} />,
   },
   auto: {
     title: 'Run without asking',
-    detail: 'Tools that change things run straight away, commands included.',
+    detail: 'Tools that change things run straight away. Fastest, but you see changes after.',
+    icon: <BoltIcon size={15} />,
   },
   deny: {
-    title: 'Refuse',
-    detail: 'Tools that change things are refused. The agent can still read and search.',
+    title: 'Read-only',
+    detail: 'The agent can only read and search. Anything that changes something is refused.',
+    icon: <EyeIcon size={15} />,
   },
 };
 
-const REVIEWS: Record<ReviewMode, { title: string; detail: string }> = {
-  off: { title: 'Off', detail: 'Answers go straight to you.' },
+const REVIEWS: Record<ReviewMode, Omit<Choice<ReviewMode>, 'value'>> = {
+  off: {
+    title: 'Off',
+    detail: 'Answers come straight to you.',
+    icon: <DashIcon size={14} />,
+  },
   tasks: {
     title: 'After tasks',
-    detail: 'A reviewer checks answers the agent used tools for, and can send them back once.',
+    detail: 'Checks answers to requests that used tools.',
+    icon: <WrenchIcon size={14} />,
   },
-  always: { title: 'Every answer', detail: 'A reviewer checks every answer, chat included.' },
+  always: {
+    title: 'Every answer',
+    detail: 'Checks every answer, plain chat too.',
+    icon: <CheckIcon size={14} />,
+  },
 };
 
-const LOG_TEXT: Record<LogLevel, string> = {
-  debug: 'Every event',
-  info: 'Steps and problems',
-  silent: 'Nothing',
+const PLANNING: Choice<'off' | 'auto'>[] = [
+  {
+    value: 'off',
+    title: 'Agent decides',
+    detail:
+      'Answers simple messages directly and makes a plan itself when a task has several steps.',
+  },
+  {
+    value: 'auto',
+    title: 'Planning step first',
+    detail:
+      'One extra model call before every message decides whether to plan. Steadier with smaller models, but slower.',
+  },
+];
+
+/** Common values offered as one-click picks; any value in range can still be typed. */
+const PRESETS: Record<Exclude<NumberKey, 'maxParallelSubagents'>, readonly number[]> = {
+  maxSteps: [10, 30, 60, 100],
+  maxTotalTokens: [200_000, 400_000, 1_000_000, 5_000_000],
+  maxInputChars: [20_000, 50_000, 200_000],
+  subagentMaxSteps: [6, 12, 25, 50],
 };
 
 const fmt = (value: number) => value.toLocaleString('en');
 
+type SectionId = 'permissions' | 'planning' | 'limits' | 'subagents';
+
+/** Which settings each section holds, for its unsaved-changes dot and error mark. */
+const SECTION_FIELDS: Record<SectionId, readonly SettingKey[]> = {
+  permissions: ['approval'],
+  planning: ['planning', 'review', 'reviewModelId'],
+  limits: ['maxSteps', 'maxTotalTokens', 'maxInputChars'],
+  subagents: [
+    'subagents',
+    'subagentModelId',
+    'maxParallelSubagents',
+    'subagentMaxSteps',
+    'subagentReasoning',
+  ],
+};
+const SECTION_ORDER: readonly SectionId[] = ['permissions', 'planning', 'limits', 'subagents'];
+
 /**
- * `/settings/agent`: how the agent behaves in every workspace (approvals, planning,
- * limits, web search, logging). Saved in ~/.code-ai; applies from the next message.
+ * `/workspaces/:workspaceId/agent-settings`: how the agent behaves in one workspace
+ * (permissions, planning and review, limits, sub-agents). Saved in the workspace's
+ * .code-ai/<workspace>/agent-settings.json; until then it shows the app-wide defaults. Web
+ * search and logging are app-wide (GeneralSettingsPage). Applies from the next message.
+ *
+ * Laid out as a list of sections on the left, each showing what it's set to now, and one
+ * section open at a time on the right, so the page fits without a long scroll.
  */
 export function AgentSettingsPage() {
+  const { workspaceId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
   const toast = useToast();
-  const backTo = fromPath(location.state) ?? '/';
+  const backTo = fromPath(location.state) ?? (workspaceId ? `/workspaces/${workspaceId}` : '/');
 
   const [saved, setSaved] = useState<AgentSettings | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
+  const [workspaceName, setWorkspaceName] = useState<string | null>(null);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [loadError, setLoadError] = useState<unknown>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [active, setActive] = useState<SectionId>('permissions');
   const models = useModels();
 
   usePageHeader({
-    title: 'Settings',
-    subtitle: 'How the agent behaves in every workspace. Changes apply from the next message.',
-    breadcrumbs: [{ label: APP_NAME, to: backTo }, { label: 'Settings' }],
+    title: 'Agent settings',
+    subtitle: workspaceName
+      ? `How the agent behaves in ${workspaceName}. Changes apply from the next message.`
+      : 'How the agent behaves in this workspace. Changes apply from the next message.',
+    breadcrumbs: [
+      { label: APP_NAME, to: backTo },
+      ...(workspaceName ? [{ label: workspaceName, to: backTo }] : []),
+      { label: 'Agent settings' },
+    ],
   });
 
   useEffect(() => {
+    if (!workspaceId) return;
     let isCurrent = true;
-    fetchSettings()
-      .then((settings) => {
+    Promise.all([fetchSettings(workspaceId), fetchWorkspace(workspaceId)])
+      .then(([settings, workspace]) => {
         if (!isCurrent) return;
         setSaved(settings);
         setDraft(toDraft(settings));
+        setWorkspaceName(workspace.name);
       })
       .catch((cause: unknown) => {
         if (isCurrent) setLoadError(cause);
@@ -128,18 +214,19 @@ export function AgentSettingsPage() {
     return () => {
       isCurrent = false;
     };
-  }, []);
+  }, [workspaceId]);
+
+  if (!workspaceId) return <Navigate to="/" replace />;
 
   if (!draft || !saved) {
     return (
       <div className="w-full">
-        <SettingsTabs />
         {loadError ? (
           <p
             role="alert"
-            className="border border-l-[3px] border-line border-l-danger-line bg-danger-bg px-4 py-3 text-[13px] text-danger"
+            className="rounded-xl border border-danger-line bg-danger-bg px-4 py-3 text-[13px] text-danger"
           >
-            {errorMessage(loadError, "Couldn't load the settings.")}
+            {errorMessage(loadError, "Couldn't load the agent settings.")}
           </p>
         ) : (
           <PageLoader />
@@ -148,13 +235,26 @@ export function AgentSettingsPage() {
     );
   }
 
+  const savedDraft = toDraft(saved);
+
   const set = <K extends keyof Draft>(key: K, value: Draft[K]) => {
     setDraft({ ...draft, [key]: value });
     if (isField(key)) setErrors((current) => ({ ...current, [key]: undefined }));
   };
+  const isChanged = (key: SettingKey) => draft[key] !== savedDraft[key];
+  const revert = (key: SettingKey) => () => set(key, savedDraft[key]);
 
-  const isDirty = JSON.stringify(toDraft(saved)) !== JSON.stringify(draft);
-  const isDefault = JSON.stringify(toDraft(DEFAULT_AGENT_SETTINGS)) === JSON.stringify(draft);
+  // Settings that aren't on this page keep their values: the image model (picked in the
+  // composer), and the SearXNG URL and log level (app-wide, in Preferences → General).
+  const defaults = toDraft({
+    ...DEFAULT_AGENT_SETTINGS,
+    visionModelId: draft.visionModelId,
+    searxngUrl: draft.searxngUrl,
+    logLevel: draft.logLevel,
+  });
+  const isDirty = JSON.stringify(savedDraft) !== JSON.stringify(draft);
+  const isDefault = JSON.stringify(defaults) === JSON.stringify(draft);
+  const changeCount = FIELDS.filter((key) => isField(key) && isChanged(key)).length;
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -166,234 +266,302 @@ export function AgentSettingsPage() {
         if (isField(field)) found[field] ??= issue.message;
       }
       setErrors(found);
+      // Open the first section with a problem, so it isn't hidden behind another one.
+      const first = SECTION_ORDER.find((id) => SECTION_FIELDS[id].some((key) => found[key]));
+      if (first) setActive(first);
       return;
     }
     setErrors({});
     setIsSaving(true);
     try {
-      const next = await saveSettings(checked.data);
+      // The image model may have been picked in the composer since this page loaded: keep the
+      // latest saved one, not the page's copy.
+      const latest = await fetchSettings(workspaceId);
+      const next = await saveSettings(workspaceId, {
+        ...checked.data,
+        visionModelId: latest.visionModelId,
+      });
       setSaved(next);
       setDraft(toDraft(next));
-      toast('Settings saved');
+      toast('Agent settings saved');
     } catch (cause) {
-      toast(errorMessage(cause, "Couldn't save the settings."), 'error');
+      toast(errorMessage(cause, "Couldn't save the agent settings."), 'error');
     } finally {
       setIsSaving(false);
     }
   };
 
+  const short = (key: NumberKey) => {
+    const value = toNumber(draft[key]);
+    return Number.isFinite(value) ? compactNumber(value) : '—';
+  };
+
+  const sections: NavSection<SectionId>[] = [
+    {
+      id: 'permissions',
+      label: 'Permissions',
+      icon: <ShieldIcon size={14} />,
+      summary: APPROVALS[draft.approval].title,
+    },
+    {
+      id: 'planning',
+      label: 'Planning & review',
+      icon: <BulbIcon size={14} />,
+      summary: `${draft.planning === 'auto' ? 'Plans first' : 'Agent decides'} · review ${REVIEWS[draft.review].title.toLowerCase()}`,
+    },
+    {
+      id: 'limits',
+      label: 'Limits',
+      icon: <PulseIcon size={14} />,
+      summary: `${short('maxSteps')} steps · ${short('maxTotalTokens')} tokens`,
+    },
+    {
+      id: 'subagents',
+      label: 'Sub-agents',
+      icon: <BrainIcon size={14} />,
+      summary: draft.subagents ? `On · ${draft.maxParallelSubagents || '?'} at once` : 'Off',
+    },
+  ].map((section) => ({
+    ...section,
+    id: section.id as SectionId,
+    isChanged: SECTION_FIELDS[section.id as SectionId].some(isChanged),
+    hasError: SECTION_FIELDS[section.id as SectionId].some((key) => Boolean(errors[key])),
+  }));
+
+  /** A number setting with quick picks, its range and default under it. */
   const numberField = (
-    key: NumberKey,
+    key: Exclude<NumberKey, 'maxParallelSubagents'>,
     label: string,
     unit: string,
-    hint: string,
-    isCompact = false,
+    description: string,
+    more?: string,
   ) => {
     const { min, max } = SETTINGS_LIMITS[key];
-    const id = `setting-${key}`;
-    const show = isCompact ? compactNumber : fmt;
-    const typed = toNumber(draft[key]);
+    const isBig = max >= 100_000;
+    const show = isBig ? compactNumber : fmt;
     return (
-      <Row
+      <Field
         label={label}
-        htmlFor={id}
-        hint={`${hint} ${show(min)}–${show(max)}, default ${show(DEFAULT_AGENT_SETTINGS[key])}.`}
+        htmlFor={`setting-${key}`}
+        description={description}
+        more={more}
+        meta={`Any whole number from ${show(min)} to ${show(max)}.`}
         error={errors[key]}
+        isChanged={isChanged(key)}
+        onRevert={revert(key)}
       >
-        {isCompact && Number.isFinite(typed) && (
-          <span aria-live="polite" className="text-[11px] font-medium text-ink-3 tabular-nums">
-            = {compactNumber(typed)}
-          </span>
-        )}
-        <div className="relative">
-          <input
-            id={id}
-            inputMode="numeric"
-            autoComplete="off"
-            value={draft[key]}
-            aria-invalid={errors[key] ? true : undefined}
-            onChange={(event) => set(key, event.target.value.replace(/[^\d]/g, ''))}
-            className={`${CONTROL} ${errors[key] ? INPUT_ERROR : INPUT_OK} w-36 pr-12 text-right tabular-nums`}
-          />
-          <span className="pointer-events-none absolute inset-y-0 right-2 flex items-center text-[10.5px] text-ink-3">
-            {unit}
-          </span>
-        </div>
-      </Row>
+        <NumberChoice
+          id={`setting-${key}`}
+          value={draft[key]}
+          unit={unit}
+          presets={PRESETS[key]}
+          defaultValue={DEFAULT_AGENT_SETTINGS[key]}
+          format={isBig ? compactNumber : fmt}
+          hasError={Boolean(errors[key])}
+          onChange={(value) => set(key, value)}
+        />
+      </Field>
     );
   };
 
-  return (
-    <div className="w-full">
-      <SettingsTabs />
+  const panels: Record<SectionId, ReactNode> = {
+    permissions: (
+      <>
+        <SectionHeading
+          title="Permissions"
+          description="What the agent may do beyond reading and searching. File tools always stay inside the workspace folder."
+        />
+        <ChoiceList
+          label="Tool approvals"
+          value={draft.approval}
+          defaultValue={DEFAULT_AGENT_SETTINGS.approval}
+          options={APPROVAL_MODES.map((m) => ({ value: m, ...APPROVALS[m] }))}
+          onChange={(mode) => set('approval', mode)}
+        />
+        {draft.approval === 'auto' && (
+          <p className="mt-3 flex items-start gap-2 rounded-xl border border-warn-line bg-warn-bg px-3.5 py-2.5 text-[12px] leading-snug text-warn">
+            <WarnIcon size={13} className="mt-px shrink-0" />
+            Writes files and runs commands without asking. A few catastrophic commands are still
+            refused, but commands run with your user&apos;s permissions.
+          </p>
+        )}
+      </>
+    ),
 
-      <form
-        id="settings-form"
-        noValidate
-        onSubmit={(event) => void submit(event)}
-        className="grid items-start gap-2.5 lg:grid-cols-2"
-      >
-        <Card
-          title="Approvals and limits"
-          hint="Tools that change things outside the agent, and guardrails for each message. File tools always stay inside the workspace folder."
-        >
-          <Row
-            label="Tool approvals"
-            hint={APPROVAL_MODES.map((m) => `${APPROVALS[m].title}: ${APPROVALS[m].detail}`).join(
-              ' ',
-            )}
-          >
-            <Segmented
-              label="Tool approvals"
-              value={draft.approval}
-              options={APPROVAL_MODES.map((m) => ({ value: m, ...APPROVALS[m] }))}
-              onChange={(mode) => set('approval', mode)}
+    planning: (
+      <>
+        <SectionHeading
+          title="Planning & review"
+          description="Extra model calls before and after the work. They can make answers steadier, at the cost of time and tokens."
+        />
+        <div className="flex flex-col gap-4">
+          <div>
+            <GroupLabel isChanged={isChanged('planning')}>Before each message</GroupLabel>
+            <ChoiceList
+              label="Planning"
+              value={draft.planning}
+              defaultValue={DEFAULT_AGENT_SETTINGS.planning}
+              options={PLANNING}
+              columns={2}
+              onChange={(mode) => set('planning', mode)}
             />
-          </Row>
-          {draft.approval === 'auto' && (
-            <p className="border-l-[3px] border-l-warn-line bg-warn-bg px-3 py-1 text-[11px] leading-snug text-warn">
-              Writes files and runs commands without asking. A few catastrophic commands are still
-              refused, but commands run with your user&apos;s permissions.
+          </div>
+          <div>
+            <GroupLabel isChanged={isChanged('review')}>Review the answer</GroupLabel>
+            <ChoiceList
+              label="Review answers"
+              value={draft.review}
+              defaultValue={DEFAULT_AGENT_SETTINGS.review}
+              options={REVIEW_MODES.map((m) => ({ value: m, ...REVIEWS[m] }))}
+              columns={3}
+              onChange={(mode) => set('review', mode)}
+            />
+            <p className="mt-2 text-[11.5px] leading-snug text-ink-4">
+              The reviewer sees the request, the plan, what the tools found and the answer, but not
+              the rest of the chat. It can send an answer back once.
             </p>
-          )}
-          <Row
-            label="Planning step"
-            hint="Off (the default): the agent answers simple messages directly and makes a plan itself when a task has several steps. On: an extra model call before every message decides whether to plan first; steadier with smaller models, but slower."
+          </div>
+          <DependentGroup
+            isEnabled={draft.review !== 'off'}
+            offNote="Turn on review to pick the reviewer's model."
           >
-            <Switch
-              isOn={draft.planning === 'auto'}
-              onChange={(isOn) => set('planning', isOn ? 'auto' : 'off')}
-              label="Planning step before every message"
+            <ModelPicker
+              id="setting-review-model"
+              label="Reviewer model"
+              description="A different model from the agent's catches more blind spots."
+              value={draft.reviewModelId}
+              models={models.data}
+              category="chat"
+              error={errors.reviewModelId}
+              isChanged={isChanged('reviewModelId')}
+              onRevert={revert('reviewModelId')}
+              onChange={(id) => set('reviewModelId', id)}
             />
-          </Row>
+          </DependentGroup>
+        </div>
+      </>
+    ),
+
+    limits: (
+      <>
+        <SectionHeading
+          title="Limits per message"
+          description="Guardrails that stop a single message from running away. The agent stops and tells you when it hits one."
+        />
+        <div className="panel flex flex-col divide-y divide-line-2">
           {numberField(
             'maxSteps',
-            'Max steps',
+            'Working steps',
             'steps',
-            "Working steps per message (planning and summaries don't count). Research with a plan can take 20+.",
+            'How many model calls that can use tools one message may take.',
+            "Planning and summaries don't count. Long refactors or research may need more; simple chats rarely use more than a few.",
           )}
           {numberField(
             'maxTotalTokens',
             'Token budget',
             'tokens',
-            'Input + output tokens per message. Input the server read from its cache counts at a tenth.',
-            true,
+            'Input and output tokens one message may use in total, sub-agents included.',
+            'Input the provider reads from its cache counts at a tenth, so long chats cost less than they look.',
           )}
           {numberField(
             'maxInputChars',
             'Longest message',
             'chars',
-            'Longer messages are rejected.',
+            'Messages you send that are longer than this are rejected.',
           )}
-        </Card>
+        </div>
+      </>
+    ),
 
-        <Card
-          title="Sub-agents and review"
-          hint="Extra model calls that can make long tasks better, at more tokens and time."
-        >
-          <Row
-            label="Sub-agents"
-            hint="Lets the agent hand self-contained parts of a task to specialist sub-agents (delegate_task): a researcher, coder, reviewer, writer, or your own from the workspace's .code-ai/<workspace>/agents/ folder. Each works in a fresh context, shares findings on the team notes, and reports back. They share the message's token budget and ask for approval like the agent does."
+    subagents: (
+      <>
+        <SectionHeading
+          title="Sub-agents"
+          description="Let the agent hand self-contained parts of a task to specialists that work in parallel."
+        />
+        <div className="flex flex-col gap-3">
+          <DependentGroup
+            isEnabled={draft.subagents}
+            offNote="Turn on sub-agents to change these."
+            header={
+              <ToggleCard
+                isFlat
+                title="Use sub-agents"
+                description="A researcher, coder, reviewer, writer, or your own from .code-ai/<workspace>/agents/. Each works in a fresh context and reports back."
+                isOn={draft.subagents}
+                isChanged={isChanged('subagents')}
+                onChange={(isOn) => set('subagents', isOn)}
+              />
+            }
           >
-            <Switch
-              isOn={draft.subagents}
-              onChange={(isOn) => set('subagents', isOn)}
-              label="Sub-agents"
-            />
-          </Row>
-          {draft.subagents && (
             <ModelPicker
               id="setting-subagent-model"
-              label="Sub-agent model"
-              hint="A cheaper or faster model often does well on delegated parts."
+              label="Model"
+              description="A cheaper or faster model often does well on delegated parts."
               value={draft.subagentModelId}
               models={models.data}
               category="chat"
               error={errors.subagentModelId}
+              isChanged={isChanged('subagentModelId')}
+              onRevert={revert('subagentModelId')}
               onChange={(id) => set('subagentModelId', id)}
             />
-          )}
-          {draft.subagents &&
-            numberField(
-              'maxParallelSubagents',
-              'Parallel sub-agents',
-              'at once',
-              'Sub-agents that may work at the same time; more started in one step wait their turn. Higher is faster but uses tokens quicker.',
+            <Field
+              label="Working at once"
+              htmlFor="setting-maxParallelSubagents"
+              description="More started in one step wait their turn."
+              meta={`From ${SETTINGS_LIMITS.maxParallelSubagents.min} to ${SETTINGS_LIMITS.maxParallelSubagents.max}, default ${DEFAULT_AGENT_SETTINGS.maxParallelSubagents}.`}
+              error={errors.maxParallelSubagents}
+              isChanged={isChanged('maxParallelSubagents')}
+              onRevert={revert('maxParallelSubagents')}
+            >
+              <Stepper
+                id="setting-maxParallelSubagents"
+                value={draft.maxParallelSubagents}
+                min={SETTINGS_LIMITS.maxParallelSubagents.min}
+                max={SETTINGS_LIMITS.maxParallelSubagents.max}
+                unit="sub-agents"
+                hasError={Boolean(errors.maxParallelSubagents)}
+                onChange={(value) => set('maxParallelSubagents', value)}
+              />
+            </Field>
+            {numberField(
+              'subagentMaxSteps',
+              'Steps each',
+              'steps',
+              'Working steps one sub-agent may take, separate from the main limit.',
             )}
-          <Row
-            label="Review answers"
-            hint={`${REVIEW_MODES.map((m) => `${REVIEWS[m].title}: ${REVIEWS[m].detail}`).join(' ')} The reviewer sees the request, the plan, what the tools found and the answer, but not the rest of the chat.`}
-          >
-            <Segmented
-              label="Review answers"
-              value={draft.review}
-              options={REVIEW_MODES.map((m) => ({ value: m, ...REVIEWS[m] }))}
-              onChange={(mode) => set('review', mode)}
+            <ToggleCard
+              isFlat
+              title="Let sub-agents reason"
+              description="They think before acting. Much slower on every step; only for reasoning models."
+              isOn={draft.subagentReasoning}
+              isChanged={isChanged('subagentReasoning')}
+              onChange={(isOn) => set('subagentReasoning', isOn)}
             />
-          </Row>
-          {draft.review !== 'off' && (
-            <ModelPicker
-              id="setting-review-model"
-              label="Reviewer model"
-              hint="A different model from the agent's catches more of its blind spots."
-              value={draft.reviewModelId}
-              models={models.data}
-              category="chat"
-              error={errors.reviewModelId}
-              onChange={(id) => set('reviewModelId', id)}
-            />
-          )}
-        </Card>
+          </DependentGroup>
+          <p className="text-[11.5px] leading-snug text-ink-4">
+            Sub-agents share the message&apos;s token budget and ask for approval like the agent
+            does.
+          </p>
+        </div>
+      </>
+    ),
+  };
 
-        <Card
-          title="Images, web search and logging"
-          hint="Still in .env, because the server needs them when it starts: PORT, CORS_ORIGIN, LOG_LEVEL (HTTP logs) and AGENT_LOG_DIR."
-        >
-          <ModelPicker
-            id="setting-vision-model"
-            label="Image model"
-            hint="For chat models that can't read images (Reads images turned off in Models): this model looks at images (view_image) and describes them in text. Without one, such a model can't see images at all. Lists the Image models from Settings → Models."
-            emptyLabel="None"
-            value={draft.visionModelId}
-            models={models.data?.filter((m) => m.supportsImages) ?? null}
-            category="image"
-            error={errors.visionModelId}
-            onChange={(id) => set('visionModelId', id)}
-          />
-          <Row
-            label="SearXNG URL"
-            htmlFor="setting-searxng"
-            hint="The instance the web_search tool uses, with the JSON format turned on (search.formats: [html, json])."
-            error={errors.searxngUrl}
-          >
-            <input
-              id="setting-searxng"
-              value={draft.searxngUrl}
-              autoComplete="off"
-              spellCheck={false}
-              maxLength={SETTINGS_LIMITS.searxngUrl}
-              placeholder={DEFAULT_AGENT_SETTINGS.searxngUrl}
-              aria-invalid={errors.searxngUrl ? true : undefined}
-              onChange={(event) => set('searxngUrl', event.target.value)}
-              className={`${CONTROL} ${errors.searxngUrl ? INPUT_ERROR : INPUT_OK} w-56 font-mono text-[11.5px]`}
-            />
-          </Row>
-          <Row
-            label="Console log level"
-            hint={`${LOG_TEXT[draft.logLevel]} in the server's terminal. Each run is also written to a JSONL log in ~/.code-ai/logs (move it with AGENT_LOG_DIR in .env).`}
-          >
-            <Segmented
-              label="Console log level"
-              value={draft.logLevel}
-              options={LOG_LEVELS.map((level) => ({
-                value: level,
-                title: level.charAt(0).toUpperCase() + level.slice(1),
-                detail: LOG_TEXT[level],
-              }))}
-              onChange={(level) => set('logLevel', level)}
-            />
-          </Row>
-        </Card>
+  return (
+    <div className="w-full">
+      <form
+        id="agent-settings-form"
+        noValidate
+        onSubmit={(event) => void submit(event)}
+        className="flex flex-col gap-4 md:flex-row md:items-start md:gap-5"
+      >
+        <SectionNav sections={sections} active={active} onSelect={setActive} />
+        {/* Keyed by section, so each one fades in when it's picked. */}
+        <div key={active} className="min-w-0 max-w-4xl flex-1 animate-fade-in">
+          {panels[active]}
+        </div>
       </form>
 
       <FormActions>
@@ -402,18 +570,21 @@ export function AgentSettingsPage() {
           className="mr-auto"
           disabled={isDefault || isSaving}
           onClick={() => {
-            setDraft(toDraft(DEFAULT_AGENT_SETTINGS));
+            setDraft(defaults);
             setErrors({});
           }}
           title="Fill in the defaults; nothing changes until you save"
         >
           Reset to defaults
         </Button>
+        {isDirty && (
+          <span className="text-[12px] text-ink-3">{plural(changeCount, 'unsaved change')}</span>
+        )}
         <Button onClick={() => navigate(backTo)}>{isDirty ? 'Cancel' : 'Back'}</Button>
         <Button
           variant="primary"
           type="submit"
-          form="settings-form"
+          form="agent-settings-form"
           disabled={!isDirty || isSaving}
         >
           {isSaving && <Spinner size={13} />}
@@ -424,149 +595,65 @@ export function AgentSettingsPage() {
   );
 }
 
-/** A small input, select or text box that sits at the end of a one-line setting row. */
-const CONTROL =
-  'h-7 rounded-md border bg-surface px-2 text-[12px] text-ink outline-none transition-colors placeholder:text-ink-3 focus:border-accent focus:ring-1 focus:ring-accent focus-visible:outline-none';
-
-/** A titled group of one-line setting rows; its explanation sits behind an info icon. */
-function Card({ title, hint, children }: { title: string; hint?: string; children: ReactNode }) {
+/** A small heading over a group of choices, with a dot when it has unsaved changes. */
+function GroupLabel({ children, isChanged }: { children: ReactNode; isChanged: boolean }) {
   return (
-    <section className="panel">
-      <div className="flex items-center gap-1 border-b border-line bg-subtle px-3 py-1">
-        <h2 className="text-[12px] font-bold text-ink">{title}</h2>
-        {hint && <InfoTip text={hint} />}
-      </div>
-      <div className="flex flex-col divide-y divide-line-2">{children}</div>
-    </section>
-  );
-}
-
-/** One setting on one line: its name (with an info tip) on the left, its control on the right. */
-function Row({
-  label,
-  htmlFor,
-  hint,
-  error,
-  children,
-}: {
-  label: string;
-  /** the control's id, when it's an input or select the label can point at */
-  htmlFor?: string;
-  hint?: string;
-  error?: string;
-  children: ReactNode;
-}) {
-  return (
-    <div className="px-3 py-1">
-      <div className="flex min-h-7 flex-wrap items-center justify-between gap-x-3 gap-y-1">
-        <div className="flex min-w-0 items-center gap-1">
-          {htmlFor ? (
-            <label htmlFor={htmlFor} className="truncate text-[12px] font-medium text-ink">
-              {label}
-            </label>
-          ) : (
-            <span className="truncate text-[12px] font-medium text-ink">{label}</span>
-          )}
-          {hint && <InfoTip text={hint} />}
-        </div>
-        <div className="flex shrink-0 items-center gap-1.5">{children}</div>
-      </div>
-      {error && (
-        <p role="alert" className={`${ERROR} text-right`}>
-          {error}
-        </p>
-      )}
+    <div className="mb-2 flex items-center gap-1.5">
+      <span className="text-[11.5px] font-semibold uppercase tracking-wide text-ink-3">
+        {children}
+      </span>
+      {isChanged && <span className="h-1.5 w-1.5 rounded-full bg-accent" title="Edited" />}
     </div>
   );
 }
 
-/** A small segmented control: one of a few options, each with its detail as a tooltip. */
-function Segmented<T extends string>({
-  label,
-  value,
-  options,
-  onChange,
-}: {
-  label: string;
-  value: T;
-  options: readonly { value: T; title: string; detail: string }[];
-  onChange: (value: T) => void;
-}) {
-  return (
-    <div
-      role="radiogroup"
-      aria-label={label}
-      className="inline-flex rounded-md border border-line bg-surface-2 p-0.5"
-    >
-      {options.map((option) => {
-        const isOn = option.value === value;
-        return (
-          <button
-            key={option.value}
-            type="button"
-            role="radio"
-            aria-checked={isOn}
-            title={option.detail}
-            onClick={() => onChange(option.value)}
-            className={`h-6 whitespace-nowrap rounded px-2 text-[11.5px] font-medium transition-colors ${
-              isOn
-                ? 'bg-surface text-ink shadow-[0_0_0_1px_var(--line)]'
-                : 'text-ink-3 hover:text-ink'
-            }`}
-          >
-            {option.title}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-/** Picks a saved model for sub-agents or the reviewer; empty means the model of the chat. */
+/** Picks a saved model for sub-agents or the reviewer; empty means the chat's model. */
 function ModelPicker({
   id,
   label,
-  hint,
-  emptyLabel = 'Same as the chat',
+  description,
   value,
   models,
   category,
   error,
+  isChanged,
+  onRevert,
   onChange,
 }: {
   id: string;
   label: string;
-  hint: string;
-  /** The option for no model of its own. */
-  emptyLabel?: string;
+  description: string;
   value: string | null;
   models: readonly ModelProfile[] | null;
   /** Listed first; any model can still be picked. */
   category: ModelCategory;
   error: string | undefined;
+  isChanged: boolean;
+  onRevert: () => void;
   onChange: (id: string | null) => void;
 }) {
   // A model deleted since still shows, so saving doesn't silently change it.
   const isMissing = value !== null && models !== null && !models.some((m) => m.id === value);
   return (
-    <Row label={label} htmlFor={id} hint={hint} error={error}>
+    <Field
+      label={label}
+      htmlFor={id}
+      description={description}
+      error={error}
+      isChanged={isChanged}
+      onRevert={onRevert}
+    >
       <select
         id={id}
         value={value ?? ''}
         aria-invalid={error ? true : undefined}
         onChange={(event) => onChange(event.target.value || null)}
-        className={`${CONTROL} ${error ? INPUT_ERROR : INPUT_OK} w-56 pr-7`}
+        className={`${CONTROL} ${error ? INPUT_ERROR : INPUT_OK} w-full pr-7 sm:w-72`}
       >
-        <option value="">{emptyLabel}</option>
+        <option value="">Same as the chat</option>
         <ModelOptions models={models} category={category} selectedId={value} />
-        {isMissing && (
-          <option value={value}>
-            {emptyLabel === 'None'
-              ? 'Unavailable model (not used)'
-              : "Deleted model (uses the chat's)"}
-          </option>
-        )}
+        {isMissing && <option value={value}>Deleted model (uses the chat&apos;s)</option>}
       </select>
-    </Row>
+    </Field>
   );
 }

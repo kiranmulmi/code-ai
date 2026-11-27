@@ -1,19 +1,27 @@
 import type { AgentSettings, AgentSettingsInput } from '@app/shared';
 import { jsonBody, request } from '../../lib/api';
 
-// Settings saved (Settings → Agent, or the composer's image model): every reader loads again.
+// Agent settings saved (a workspace's Agent settings, or the composer's image model): every
+// reader loads again.
 const EVENT = 'agent:settings-saved';
 
-export const fetchSettings = () => request<AgentSettings>('/settings');
+const path = (workspaceId: string) =>
+  `/workspaces/${encodeURIComponent(workspaceId)}/agent-settings`;
 
-/** Replaces every setting; applies from the next message on. */
-export async function saveSettings(input: AgentSettingsInput): Promise<AgentSettings> {
-  const saved = await request<AgentSettings>('/settings', jsonBody('PUT', input));
+/** One workspace's agent settings (the app-wide defaults until it saves its own). */
+export const fetchSettings = (workspaceId: string) => request<AgentSettings>(path(workspaceId));
+
+/** Replaces every setting of the workspace; applies from its next message on. */
+export async function saveSettings(
+  workspaceId: string,
+  input: AgentSettingsInput,
+): Promise<AgentSettings> {
+  const saved = await request<AgentSettings>(path(workspaceId), jsonBody('PUT', input));
   window.dispatchEvent(new Event(EVENT));
   return saved;
 }
 
-/** Calls `onSaved` whenever the agent settings are saved. Returns the unsubscribe function. */
+/** Calls `onSaved` whenever agent settings are saved. Returns the unsubscribe function. */
 export function onSettingsSaved(onSaved: () => void): () => void {
   window.addEventListener(EVENT, onSaved);
   return () => window.removeEventListener(EVENT, onSaved);

@@ -163,14 +163,16 @@ export function ConnectionMenu({
               detail="Add, edit, default"
               onClick={() => setIsOpen(false)}
             />
-            <SettingsLink
-              to="/settings/agent"
-              from={pathname}
-              icon={<GearIcon size={13} className="text-ink-3" />}
-              label="Agent settings"
-              detail="Approvals, limits, search"
-              onClick={() => setIsOpen(false)}
-            />
+            {workspace && (
+              <SettingsLink
+                to={`/workspaces/${workspace.id}/agent-settings`}
+                from={pathname}
+                icon={<GearIcon size={13} className="text-ink-3" />}
+                label="Agent settings"
+                detail="This workspace"
+                onClick={() => setIsOpen(false)}
+              />
+            )}
           </div>
           {auth && (
             <div className="border-t border-line py-1">

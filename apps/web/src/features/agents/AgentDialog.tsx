@@ -12,7 +12,6 @@ import { Badge } from '../../components/Badge';
 import { Button } from '../../components/Button';
 import { ConfirmDeleteDialog } from '../../components/ConfirmDeleteDialog';
 import { ERROR, INPUT, INPUT_ERROR, INPUT_OK } from '../../components/form';
-import { IconButton } from '../../components/IconButton';
 import { Modal } from '../../components/Modal';
 import { PageLoader } from '../../components/PageLoader';
 import { Spinner } from '../../components/Spinner';
@@ -21,7 +20,6 @@ import {
   BoltIcon,
   BrainIcon,
   CheckIcon,
-  CrossIcon,
   EyeIcon,
   FileIcon,
   FlagIcon,
@@ -238,21 +236,10 @@ export function AgentDialog({
         ? 'Fix specialist file'
         : 'New specialist';
 
-  const header = (
-    <div className="flex shrink-0 items-center gap-4 border-b border-line bg-surface py-3 pl-5 pr-3">
-      <span className="brand-mark h-10 w-10 rounded-xl">
-        <BrainIcon size={18} />
-      </span>
-      <div className="min-w-0">
-        <div className="flex items-center gap-2">
-          <h2 className="truncate text-[16px] font-bold text-ink">{title}</h2>
-          {isDirty && target.kind === 'edit' && <Badge tone="yellow">Unsaved</Badge>}
-        </div>
-        <p className="truncate text-[12.5px] text-ink-3">
-          A teammate the agent can hand work to: who it is, what it may touch, how it works.
-        </p>
-      </div>
-      <ol className="ml-auto hidden items-center gap-1 md:flex" aria-label="Progress">
+  // The title is in the modal's header: the progress steps top the left rail.
+  const heading = (
+    <div className="flex flex-col gap-3">
+      <ol className="flex flex-wrap items-center gap-1" aria-label="Progress">
         {steps.map((step, index) => (
           <li key={step.label} className="flex items-center gap-1">
             {index > 0 && (
@@ -279,9 +266,6 @@ export function AgentDialog({
           </li>
         ))}
       </ol>
-      <IconButton onClick={requestClose} aria-label="Close" className="ml-2 md:ml-3">
-        <CrossIcon />
-      </IconButton>
     </div>
   );
 
@@ -340,7 +324,15 @@ export function AgentDialog({
 
   return (
     <>
-      <Modal title={title} size="wide" onClose={requestClose} header={header} footer={footer}>
+      <Modal
+        title={title}
+        icon={<BrainIcon size={15} />}
+        aside={isDirty && target.kind === 'edit' ? <Badge tone="yellow">Unsaved</Badge> : undefined}
+        description="A teammate the agent can hand work to: who it is, what it may touch, how it works."
+        size="wide"
+        onClose={requestClose}
+        footer={footer}
+      >
         {isLoading ? (
           <PageLoader />
         ) : (
@@ -348,10 +340,11 @@ export function AgentDialog({
             id="agent-form"
             noValidate
             onSubmit={(event) => void submit(event)}
-            className="flex flex-col lg:grid lg:h-full lg:grid-cols-[340px_minmax(0,1fr)]"
+            className="flex flex-col border-t border-line lg:grid lg:h-full lg:grid-cols-[340px_minmax(0,1fr)]"
           >
             {/* ---------- Left rail: who it is, and a preview ---------- */}
             <aside className="flex flex-col gap-6 border-b border-line bg-subtle p-5 lg:min-h-0 lg:overflow-y-auto lg:border-b-0 lg:border-r">
+              {heading}
               {target.kind === 'fix' && (
                 <div className="flex items-start gap-2 rounded-xl border border-line border-l-4 border-l-warn-line bg-surface p-3 text-[12.5px] leading-snug text-ink-2">
                   <WarnIcon size={14} className="mt-0.5 shrink-0 text-warn" />
@@ -464,7 +457,7 @@ export function AgentDialog({
             </aside>
 
             {/* ---------- Main: access, model, role ---------- */}
-            <div className="flex min-w-0 flex-col gap-5 p-5 lg:min-h-0 lg:overflow-y-auto">
+            <div className="flex min-w-0 flex-col gap-5 p-5 lg:min-h-0 lg:overflow-y-auto lg:pt-14">
               <section
                 aria-labelledby="agent-tools-label"
                 className="shrink-0 rounded-2xl border border-line bg-surface p-4 shadow-card"

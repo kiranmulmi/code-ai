@@ -10,6 +10,7 @@ import {
   CopyIcon,
   CrossIcon,
   EditIcon,
+  FileIcon,
   SearchIcon,
   WrapIcon,
 } from '../../../lib/icons';
@@ -279,8 +280,20 @@ export function FilePreview({
   return (
     <Modal
       title={file.path}
+      icon={<FileIcon size={15} />}
       onClose={requestClose}
       size="wide"
+      footer={
+        <p className="flex min-w-0 flex-1 items-center gap-2 text-[12px] text-ink-3">
+          <span className="truncate font-mono text-ink-2">{file.path}</span>
+          {!isEditing && (
+            <span className="shrink-0">
+              · {languageLabel(language)} · {lines.length.toLocaleString('en')}{' '}
+              {lines.length === 1 ? 'line' : 'lines'}
+            </span>
+          )}
+        </p>
+      }
       actions={
         isEditing ? (
           <>
@@ -382,10 +395,6 @@ export function FilePreview({
                 </>
               )}
             </label>
-            <span className="mr-1 hidden text-[12px] text-ink-3 lg:inline">
-              {languageLabel(language)} · {lines.length.toLocaleString('en')}{' '}
-              {lines.length === 1 ? 'line' : 'lines'}
-            </span>
             <button
               type="button"
               onClick={toggleWrap}
@@ -420,7 +429,7 @@ export function FilePreview({
       }
     >
       {isEditing ? (
-        <div className="flex h-full flex-col">
+        <div className="flex h-full flex-col border-t border-line">
           {(problem ?? isClosing) && (
             <div
               role="alert"
@@ -495,7 +504,7 @@ export function FilePreview({
       ) : (
         <div
           ref={body}
-          className={`min-w-full py-2 font-mono text-[12.5px] leading-relaxed text-ink ${
+          className={`min-w-full border-t border-line pb-2 pt-2 font-mono text-[12.5px] leading-relaxed text-ink ${
             isWrapped ? '' : 'w-max'
           }`}
         >

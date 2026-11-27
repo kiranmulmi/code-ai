@@ -1,12 +1,14 @@
 import { createContext, useContext, type ReactNode } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { GearIcon, ServerIcon, SparkIcon } from '../../lib/icons';
+import { GearIcon, SparkIcon } from '../../lib/icons';
 import { fromPath } from '../../lib/routerState';
 
+// Agent settings are per workspace: they open from the chats sidebar, under Workspace settings.
+// MCP servers are managed from each workspace's MCP tab (Choose servers).
+// General holds the app-wide ones every workspace shares (web search, logging).
 const TABS = [
   { to: '/settings/models', label: 'Models', icon: <SparkIcon size={11} /> },
-  { to: '/settings/mcp', label: 'MCP servers', icon: <ServerIcon size={11} /> },
-  { to: '/settings/agent', label: 'Agent settings', icon: <GearIcon size={11} /> },
+  { to: '/settings/general', label: 'General', icon: <GearIcon size={11} /> },
 ] as const;
 
 /** Set inside the Preferences popup, whose side tabs replace each page's own tabs. */

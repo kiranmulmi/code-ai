@@ -15,8 +15,11 @@ import { jsonBody, request, requestBlob, requestStream } from '../../lib/api';
 
 const chatPath = (chatId: string) => `/chats/${encodeURIComponent(chatId)}`;
 
-export function fetchAppInfo(): Promise<AppInfo> {
-  return request<AppInfo>('/info');
+/** With a workspace, the approval mode is that workspace's. */
+export function fetchAppInfo(workspaceId?: string): Promise<AppInfo> {
+  return request<AppInfo>(
+    workspaceId ? `/info?workspaceId=${encodeURIComponent(workspaceId)}` : '/info',
+  );
 }
 
 /** Newest first, each with its `isRunning` flag. */

@@ -11,14 +11,12 @@ import { Badge } from '../../components/Badge';
 import { Button } from '../../components/Button';
 import { ConfirmDeleteDialog } from '../../components/ConfirmDeleteDialog';
 import { ERROR, INPUT, INPUT_ERROR, INPUT_OK } from '../../components/form';
-import { IconButton } from '../../components/IconButton';
 import { Modal } from '../../components/Modal';
 import { PageLoader } from '../../components/PageLoader';
 import { Spinner } from '../../components/Spinner';
 import { ApiError, errorMessage, isNotFound } from '../../lib/api';
 import {
   CheckIcon,
-  CrossIcon,
   FolderIcon,
   GlobeIcon,
   PlayIcon,
@@ -390,23 +388,10 @@ export function PluginDialog({
     { label: 'Test it', done: hasPassed },
   ];
 
-  const header = (
-    <div className="flex shrink-0 items-center gap-4 border-b border-line bg-surface py-3 pl-5 pr-3">
-      <span className="brand-mark h-10 w-10 rounded-xl">
-        <WrenchIcon size={18} />
-      </span>
-      <div className="min-w-0">
-        <div className="flex items-center gap-2">
-          <h2 className="truncate text-[16px] font-bold text-ink">
-            {isEdit ? 'Edit tool plugin' : 'New tool plugin'}
-          </h2>
-          {isDirty && isEdit && <Badge tone="yellow">Unsaved</Badge>}
-        </div>
-        <p className="truncate text-[12.5px] text-ink-3">
-          Describe a tool, AI writes it, you test it, then turn it on in a workspace.
-        </p>
-      </div>
-      <ol className="ml-auto hidden items-center gap-1 md:flex" aria-label="Progress">
+  // The title is in the modal's header: the progress steps top the left rail.
+  const heading = (
+    <div className="flex flex-col gap-3">
+      <ol className="flex flex-wrap items-center gap-1" aria-label="Progress">
         {steps.map((step, index) => (
           <li key={step.label} className="flex items-center gap-1">
             {index > 0 && (
@@ -433,9 +418,6 @@ export function PluginDialog({
           </li>
         ))}
       </ol>
-      <IconButton onClick={requestClose} aria-label="Close" className="ml-2 md:ml-3">
-        <CrossIcon />
-      </IconButton>
     </div>
   );
 
@@ -488,10 +470,12 @@ export function PluginDialog({
   return (
     <>
       <Modal
-        title={isEdit ? `Edit tool plugin ${pluginName}` : 'New tool plugin'}
+        title={isEdit ? 'Edit tool plugin' : 'New tool plugin'}
+        icon={<WrenchIcon size={15} />}
+        aside={isDirty && isEdit ? <Badge tone="yellow">Unsaved</Badge> : undefined}
+        description="Describe a tool, AI writes it, you test it, then turn it on in a workspace."
         size="wide"
         onClose={requestClose}
-        header={header}
         footer={footer}
       >
         {isLoading ? (
@@ -501,10 +485,11 @@ export function PluginDialog({
             id="plugin-form"
             onSubmit={(event) => void submit(event)}
             noValidate
-            className="flex flex-col lg:grid lg:h-full lg:grid-cols-[320px_minmax(0,1fr)]"
+            className="flex flex-col border-t border-line lg:grid lg:h-full lg:grid-cols-[320px_minmax(0,1fr)]"
           >
             {/* ---------- Left rail: what it is, and its secrets ---------- */}
             <aside className="flex flex-col gap-6 border-b border-line bg-subtle p-5 lg:min-h-0 lg:overflow-y-auto lg:border-b-0 lg:border-r">
+              {heading}
               <section>
                 <h3 className="eyebrow">Identity</h3>
                 <label
@@ -599,7 +584,7 @@ export function PluginDialog({
             </aside>
 
             {/* ---------- Main: AI prompt, code, test console ---------- */}
-            <div className="flex min-w-0 flex-col gap-4 p-5 lg:min-h-0 lg:overflow-y-auto">
+            <div className="flex min-w-0 flex-col gap-4 p-5 lg:min-h-0 lg:overflow-y-auto lg:pt-14">
               <PluginCodePane
                 value={draft.code}
                 onChange={(value) => change('code', value)}

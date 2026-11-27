@@ -46,6 +46,14 @@ export interface AgentSettings {
   subagentModelId: string | null;
   /** Sub-agents that may work at the same time; more started in one step wait their turn. */
   maxParallelSubagents: number;
+  /** Working steps per sub-agent run, separate from maxSteps (the main agent's). */
+  subagentMaxSteps: number;
+  /**
+   * Whether sub-agents' models reason ("think"). Off by default: delegated parts are narrow, and
+   * reasoning makes every step of a sub-agent much slower. Only sent to models marked as
+   * reasoning models.
+   */
+  subagentReasoning: boolean;
   /** When a reviewer checks the agent's final answer. */
   review: ReviewMode;
   /** The model the reviewer runs on (a saved model's id); null: the chat's model. */
@@ -65,6 +73,7 @@ export const DEFAULT_AGENT_SETTINGS: AgentSettings = {
   logLevel: 'info',
   subagents: false,
   subagentModelId: null,
+  subagentReasoning: false,
   review: 'tasks',
   reviewModelId: null,
   visionModelId: null,
@@ -102,6 +111,8 @@ export const agentSettingsSchema = z.object({
   subagents: z.boolean(),
   subagentModelId: optionalModelId,
   maxParallelSubagents: wholeNumber('Parallel sub-agents', SETTINGS_LIMITS.maxParallelSubagents),
+  subagentMaxSteps: wholeNumber('Sub-agent max steps', SETTINGS_LIMITS.subagentMaxSteps),
+  subagentReasoning: z.boolean(),
   review: z.enum(REVIEW_MODES),
   reviewModelId: optionalModelId,
   visionModelId: optionalModelId,
@@ -131,6 +142,8 @@ export function readAgentSettings(raw: unknown): AgentSettings {
     subagents: field('subagents'),
     subagentModelId: field('subagentModelId'),
     maxParallelSubagents: field('maxParallelSubagents'),
+    subagentMaxSteps: field('subagentMaxSteps'),
+    subagentReasoning: field('subagentReasoning'),
     review: field('review'),
     reviewModelId: field('reviewModelId'),
     visionModelId: field('visionModelId'),

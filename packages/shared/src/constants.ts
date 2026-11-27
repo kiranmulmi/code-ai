@@ -23,6 +23,8 @@ export const AGENT_SETTING_DEFAULTS = {
   maxInputChars: 20_000,
   /** sub-agents that may work at the same time when the agent starts several in one step */
   maxParallelSubagents: 3,
+  /** working steps per sub-agent run (its own limit, separate from maxSteps) */
+  subagentMaxSteps: 12,
 };
 
 /** The range Settings -> Agent accepts. */
@@ -31,6 +33,7 @@ export const SETTINGS_LIMITS = {
   maxTotalTokens: { min: 1_000, max: 50_000_000 },
   maxInputChars: { min: 100, max: 1_000_000 },
   maxParallelSubagents: { min: 1, max: 8 },
+  subagentMaxSteps: { min: 1, max: 200 },
   searxngUrl: 500,
 } as const;
 

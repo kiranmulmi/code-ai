@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
 import type { McpServerState, McpServerStatus } from '@app/shared';
 import { Badge, type BadgeTone } from '../../components/Badge';
 import { Spinner } from '../../components/Spinner';
@@ -39,6 +38,7 @@ export function McpServerRow({
   onToggle,
   onRestart,
   onAutoApprove,
+  onEdit,
 }: {
   server: McpServerStatus;
   /** the agent is working in this workspace: changes wait */
@@ -48,8 +48,9 @@ export function McpServerRow({
   onToggle: (isOn: boolean) => void;
   onRestart: () => void;
   onAutoApprove: (tool: string, isOn: boolean) => void;
+  /** opens the server's form (shared by every workspace) */
+  onEdit: () => void;
 }) {
-  const { pathname } = useLocation();
   const [isOpen, setIsOpen] = useState(false);
   const state = STATE[server.state];
   const isOn = server.state !== 'disabled';
@@ -123,15 +124,15 @@ export function McpServerRow({
               <EditIcon size={12} />
             </span>
           ) : (
-            <Link
-              to={`/settings/mcp/${encodeURIComponent(server.name)}/edit`}
-              state={{ from: pathname }}
+            <button
+              type="button"
+              onClick={onEdit}
               aria-label={`Edit ${server.name}`}
               title="Edit"
               className={ACTION}
             >
               <EditIcon size={12} />
-            </Link>
+            </button>
           )}
           <span className="ml-1">
             <Switch

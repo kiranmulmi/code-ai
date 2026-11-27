@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
 import type { McpOverview } from '@app/shared';
 import { Button } from '../../components/Button';
 import { IconButton } from '../../components/IconButton';
@@ -12,6 +11,8 @@ import { useAsync } from '../../lib/useAsync';
 import { approveMcpConfig, fetchMcpOverview, patchMcpServer, restartMcpServer } from './api';
 import { onWorkspaceSaved } from '../workspaces/workspaceEvents';
 import { McpServerRow } from './McpServerRow';
+import { ChooseMcpServersModal } from './ChooseMcpServersModal';
+import { McpServerFormModal } from './McpServerFormModal';
 
 const ADD_LINK =
   'inline-flex h-7 items-center gap-1.5 rounded-lg border border-line bg-surface px-2.5 text-[12px] font-medium text-ink transition-colors hover:border-line-strong hover:bg-subtle';
@@ -31,10 +32,13 @@ export function McpPanel({
   onChange?: () => void;
 }) {
   const toast = useToast();
-  const { pathname } = useLocation();
   const load = useCallback(() => fetchMcpOverview(workspaceId), [workspaceId]);
   const overview = useAsync(load);
   const [pending, setPending] = useState<string | null>(null);
+  const [isChooserOpen, setIsChooserOpen] = useState(false);
+  const closeChooser = useCallback(() => setIsChooserOpen(false), []);
+  const [editing, setEditing] = useState<string | null>(null);
+  const closeEditor = useCallback(() => setEditing(null), []);
   const { data, setData, reload } = overview;
   // The workspace form (a popup over this screen) may have turned servers on or off.
   useEffect(() => onWorkspaceSaved(reload), [reload]);
@@ -54,14 +58,14 @@ export function McpPanel({
   };
 
   const chooseServers = (
-    <Link
-      to={`/workspaces/${encodeURIComponent(workspaceId)}/settings`}
-      state={{ from: pathname, tab: 'mcp' }}
-      title="Turn MCP servers on or off in the workspace settings"
+    <button
+      type="button"
+      onClick={() => setIsChooserOpen(true)}
+      title="Choose which MCP servers this workspace uses"
       className={ADD_LINK}
     >
       <GearIcon size={12} /> Choose servers
-    </Link>
+    </button>
   );
 
   // The servers this workspace uses (chosen in its settings), on or off, so one turned off
@@ -151,7 +155,7 @@ export function McpPanel({
               <div className="font-bold text-ink">No MCP servers in this workspace</div>
               <p className="mx-auto mt-1 max-w-[42ch] text-[13px] leading-relaxed text-ink-3">
                 MCP servers give the agent more tools, like GitHub, a database or a browser. Choose
-                which ones this workspace uses in its settings.
+                which ones this workspace uses.
               </p>
               <div className="mt-3 flex justify-center">{chooseServers}</div>
             </div>
@@ -170,6 +174,7 @@ export function McpPanel({
                       isOn ? `${server.name} turned on` : `${server.name} turned off`,
                     )
                   }
+                  onEdit={() => setEditing(server.name)}
                   onRestart={() =>
                     void save(
                       `restart:${server.name}`,
@@ -194,20 +199,35 @@ export function McpPanel({
           )}
 
           <p className="mt-3 text-[12px] leading-relaxed text-ink-3">
-            Servers are set up once in{' '}
-            <Link
-              to="/settings/mcp"
-              state={{ from: pathname }}
-              className="font-medium text-accent-2 hover:underline"
-            >
-              Settings → MCP servers
-            </Link>
-            ; which ones this workspace uses is chosen in its settings, and each is switched on or
-            off here. Both are saved in{' '}
+            Servers are added in Choose servers and shared by every workspace, but only run where
+            they&apos;re chosen; each is switched on or off here. Both are saved in{' '}
             <span className="font-mono [overflow-wrap:anywhere]">{data.file}</span>. Each MCP tool
             asks before it runs unless you turn on Always allow (for that tool everywhere).
           </p>
         </>
+      )}
+
+      {isChooserOpen && (
+        <ChooseMcpServersModal
+          workspaceId={workspaceId}
+          onClose={closeChooser}
+          onSaved={onChange}
+        />
+      )}
+
+      {editing && (
+        <McpServerFormModal
+          serverName={editing}
+          onClose={closeEditor}
+          onSaved={() => {
+            reload();
+            onChange?.();
+          }}
+          onDeleted={() => {
+            reload();
+            onChange?.();
+          }}
+        />
       )}
     </>
   );

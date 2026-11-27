@@ -223,8 +223,15 @@ async function main(): Promise<void> {
       const current = session.chat ?? (await store.createChat(workspace.id, titleFrom(text)));
       const resolved = await store.models.settingsFor(model.id);
       if (!resolved) throw new Error(`"${model.name}" was deleted. Pick another with /model.`);
-      // Settings -> Agent in the web app (limits, approvals, planning), read per message.
-      const saved = await store.settings.get();
+      // The workspace's Agent settings in the web app (limits, approvals, planning), read per
+      // message; the app-wide ones until the workspace saves its own.
+      // The SearXNG URL and log level are app-wide only (Preferences → General).
+      const appWide = await store.settings.get();
+      const saved = {
+        ...(await store.agentSettings(workspace).get()),
+        searxngUrl: appWide.searxngUrl,
+        logLevel: appWide.logLevel,
+      };
       const agentOptions: AgentRunOptions = {
         ...baseOptions,
         config: { ...config, ...saved },

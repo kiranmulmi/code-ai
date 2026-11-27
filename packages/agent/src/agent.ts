@@ -225,6 +225,22 @@ export interface Agent {
   reset(): void;
 }
 
+/**
+ * A sub-agent's model with reasoning turned off (reasoning_effort "none"), unless `reasoning`
+ * is on. Only for models marked as reasoning models; a scripted caller (tests) is kept as is.
+ * Without a model of its own the sub-agent runs on `runModel`, so that one is copied too.
+ */
+export function withoutReasoning(
+  picked: { callModel?: CallModel; model?: ModelSettings },
+  runModel: ModelSettings | undefined,
+  reasoning: boolean,
+): { callModel?: CallModel; model?: ModelSettings } {
+  if (reasoning || picked.callModel) return picked;
+  const model = picked.model ?? runModel;
+  if (!model?.supportsReasoning) return picked;
+  return { callModel: undefined, model: { ...model, reasoningEffort: 'none' } };
+}
+
 function modelCallerFor({ callModel, model }: AgentRunOptions): CallModel {
   if (callModel) return callModel;
   if (model) return createModelCaller(model);
@@ -1224,7 +1240,7 @@ export function createAgent(options: AgentOptions): Agent {
       if (tokensLeft <= 0)
         throw new Error('The token budget is used up. Finish without a sub-agent.');
       const from: ApprovalSource = { subagent: label, specialist: chosen.name };
-      const ownModel =
+      const picked =
         chosen.model === 'review' && (options.reviewCallModel || options.reviewModel)
           ? options.reviewCallModel
             ? { callModel: options.reviewCallModel }
@@ -1234,6 +1250,11 @@ export function createAgent(options: AgentOptions): Agent {
             : options.subagentModel
               ? { callModel: undefined, model: options.subagentModel }
               : {};
+      const ownModel = withoutReasoning(
+        picked,
+        options.callModel ? undefined : options.model,
+        config.subagentReasoning,
+      );
       logger.record({ type: 'subagent_start', label, specialist: chosen.name });
       const subagentStartedAt = Date.now();
       const child = createAgent({
@@ -1248,6 +1269,8 @@ export function createAgent(options: AgentOptions): Agent {
           review: 'off',
           subagents: false,
           maxTotalTokens: tokensLeft,
+          // Sub-agents have their own, smaller step limit.
+          maxSteps: config.subagentMaxSteps,
         },
         team: board ? { board, author: label, specialist: chosen } : undefined,
         approve: (name, input) => approve(name, input, from),

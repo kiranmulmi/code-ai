@@ -17,7 +17,7 @@ import { Modal } from '../../components/Modal';
 import { PageLoader } from '../../components/PageLoader';
 import { Spinner } from '../../components/Spinner';
 import { ApiError, errorMessage, isNotFound } from '../../lib/api';
-import { DownloadIcon, FileIcon, TrashIcon } from '../../lib/icons';
+import { DownloadIcon, FileIcon, SkillIcon, TrashIcon } from '../../lib/icons';
 import { useToast } from '../../lib/toast';
 import {
   createSkill,
@@ -293,7 +293,7 @@ export function SkillDialog({
     <>
       <Modal
         title={isEdit ? 'Edit skill' : 'New skill'}
-        titleFont="sans"
+        icon={<SkillIcon size={15} />}
         size="lg"
         onClose={requestClose}
         footer={footer}
