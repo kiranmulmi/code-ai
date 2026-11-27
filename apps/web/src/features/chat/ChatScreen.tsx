@@ -337,7 +337,6 @@ export function ChatScreen({
           <div className="flex min-h-0 min-w-0 flex-col bg-surface">
             <ChatHeader
               title={chatId ? (chatTitle ?? 'Chat') : 'New chat'}
-              isBusy={isBusy}
               tabs={centerTabs}
               tab={shownCenterTab}
               onTab={selectCenterTab}

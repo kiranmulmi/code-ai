@@ -1,5 +1,4 @@
 import type { ReactNode } from 'react';
-import { Badge } from '../../components/Badge';
 import { IconButton } from '../../components/IconButton';
 import {
   ConversationIcon,
@@ -21,13 +20,11 @@ const TAB_ICON: Record<CenterTab, ReactNode> = {
 };
 
 /**
- * The middle section's toolbar: a tab strip with Chat (its title as the tooltip, and whether the agent is
- * working) first, then the workspace's terminal, git diff, instructions and notes. While a side is hidden, a
+ * The middle section's toolbar: a tab strip with Chat (its title as the tooltip) first, then the workspace's terminal, git diff, instructions and notes. While a side is hidden, a
  * button brings it back: the chats sidebar (wide screens) in front of the tabs, the panel at the end.
  */
 export function ChatHeader({
   title,
-  isBusy,
   tabs,
   tab,
   onTab,
@@ -37,7 +34,6 @@ export function ChatHeader({
   onShowSidebar,
 }: {
   title: string;
-  isBusy: boolean;
   /** the tabs this workspace shows (`visibleCenterTabs`) */
   tabs: readonly CenterTab[];
   tab: CenterTab;
@@ -100,11 +96,6 @@ export function ChatHeader({
                 <span className="hidden text-[13.5px] font-medium sm:inline">
                   {PANEL_TAB_LABEL[id]}
                 </span>
-                {isChat && isBusy && (
-                  <Badge tone="blue" icon={<span aria-hidden className="live-dot h-1.5 w-1.5" />}>
-                    Working
-                  </Badge>
-                )}
                 {id === 'git' && gitChanges && gitChanges.count > 0 && (
                   <TabCount
                     title={`${gitChanges.count}${gitChanges.isTruncated ? '+' : ''} ${
